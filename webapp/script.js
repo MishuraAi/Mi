@@ -2,8 +2,8 @@
 const tgApp = window.Telegram.WebApp;
 tgApp.expand(); // Расширяем на весь экран
 
-// API URL - замените на ваш реальный URL, когда он будет доступен
-const API_URL = 'https://your-backend-url.com';
+// API URL
+const API_URL = window.location.origin;
 
 // Элементы DOM
 const uploadBox = document.getElementById('uploadBox');
@@ -43,8 +43,14 @@ fileInput.addEventListener('change', (e) => {
             }
             
             // Удаляем иконку и текст
-            uploadIcon.style.display = 'none';
-            uploadBox.querySelector('p').style.display = 'none';
+            if (uploadIcon) {
+                uploadIcon.style.display = 'none';
+            }
+            
+            const textElement = uploadBox.querySelector('p');
+            if (textElement) {
+                textElement.style.display = 'none';
+            }
             
             // Создаем и добавляем новое превью
             imagePreview = document.createElement('img');
@@ -73,13 +79,15 @@ function hideLoading() {
     }
 }
 
-// Функция для преобразования текста Markdown в HTML
+// Функция для преобразования Markdown в HTML
 function markdownToHtml(markdown) {
+    if (!markdown) return '';
+    
     // Замена заголовков
     let html = markdown
-        .replace(/^# (.*$)/gm, '<h2>$1</h2>')
-        .replace(/^## (.*$)/gm, '<h3>$1</h3>')
-        .replace(/^### (.*$)/gm, '<h4>$1</h4>');
+        .replace(/^# (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h4>$1</h4>')
+        .replace(/^### (.*$)/gm, '<h5>$1</h5>');
     
     // Замена выделений
     html = html
@@ -88,7 +96,7 @@ function markdownToHtml(markdown) {
     
     // Замена списков
     html = html
-        .replace(/^\s*- (.*$)/gm, '<li>$1</li>')
+        .replace(/^- (.*$)/gm, '<li>$1</li>')
         .replace(/(<li>.*<\/li>)/gms, '<ul>$1</ul>');
     
     // Замена параграфов (пустые строки разделяют параграфы)
@@ -126,42 +134,18 @@ submitBtn.addEventListener('click', async () => {
         formData.append('occasion', occasion);
         formData.append('preferences', preferences);
         
-        // В реальной версии здесь будет запрос к серверу API
-        // const response = await fetch(`${API_URL}/analyze-outfit`, {
-        //     method: 'POST',
-        //     body: formData
-        // });
-        // const data = await response.json();
+        // Отправляем запрос к API
+        const response = await fetch(`${API_URL}/analyze-outfit`, {
+            method: 'POST',
+            body: formData
+        });
         
-        // Заглушка для тестирования (эмуляция ответа от сервера)
-        // Имитируем задержку ответа от сервера
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Проверяем ответ
+        if (!response.ok) {
+            throw new Error(`Ошибка HTTP: ${response.status}`);
+        }
         
-        const data = {
-            status: 'success',
-            advice: `
-# Анализ вашей одежды
-
-## Описание
-На изображении представлена классическая белая блуза с V-образным вырезом и длинными рукавами. Материал выглядит как легкий хлопок или шелковая смесь.
-
-## Оценка для повода "${occasion}"
-Эта блуза является универсальным предметом гардероба и подходит для многих случаев, включая "${occasion}". ${occasion === 'work' ? 'Для офиса она создаст профессиональный образ' : occasion === 'date' ? 'Для свидания она может стать основой романтичного наряда' : occasion === 'party' ? 'Для вечеринки её можно дополнить яркими аксессуарами' : 'Для повседневных выходов она создаст элегантный кэжуал'}.
-
-## Рекомендации по сочетанию
-- **Для работы/офиса**: Сочетайте с классическими брюками или юбкой-карандаш темно-синего или черного цвета.
-- **Для повседневного образа**: Подойдут джинсы или цветные брюки, можно заправить блузу или оставить навыпуск.
-- **Для вечернего выхода**: Комбинируйте с элегантной юбкой миди или узкими брюками и добавьте яркие аксессуары.
-
-## Советы по аксессуарам
-- Добавьте ожерелье средней длины, которое будет хорошо смотреться с V-образным вырезом
-- Элегантные серьги подчеркнут образ
-- Для придания образу цвета можно использовать яркий шарф или платок
-- Пояс на талии поможет подчеркнуть силуэт
-
-Эта блуза - прекрасная базовая вещь, которая послужит основой для множества разнообразных образов.
-            `
-        };
+        const data = await response.json();
         
         // Скрываем индикатор загрузки
         hideLoading();
@@ -185,8 +169,8 @@ submitBtn.addEventListener('click', async () => {
         hideLoading();
         
         // Показываем ошибку
-        alert('Произошла ошибка при отправке изображения. Пожалуйста, попробуйте позже.');
         console.error('Error:', error);
+        alert('Произошла ошибка при отправке изображения. Пожалуйста, попробуйте позже.');
     }
 });
 
@@ -200,8 +184,15 @@ newConsultationBtn.addEventListener('click', () => {
         uploadBox.removeChild(imagePreview);
     }
     
-    uploadIcon.style.display = 'block';
-    uploadBox.querySelector('p').style.display = 'block';
+    if (uploadIcon) {
+        uploadIcon.style.display = 'block';
+    }
+    
+    const textElement = uploadBox.querySelector('p');
+    if (textElement) {
+        textElement.style.display = 'block';
+    }
+    
     document.getElementById('occasion').value = 'everyday';
     document.getElementById('preferences').value = '';
     submitBtn.disabled = true;
@@ -221,10 +212,7 @@ tgApp.onEvent('viewportChanged', () => {
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     // Настройка темы в соответствии с Telegram
-    document.body.style.backgroundColor = tgApp.backgroundColor;
-    
-    // Если в Telegram используется темная тема
-    if (tgApp.colorScheme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
+    if (tgApp && tgApp.colorScheme === 'dark') {
+        document.body.classList.add('dark-theme');
     }
 });

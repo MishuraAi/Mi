@@ -1,8 +1,13 @@
 import os
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
+import logging
+from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -18,120 +23,169 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Словарь MIME-типов
+# Словарь MIME-типов для различных расширений файлов
 MIME_TYPES = {
     ".html": "text/html",
     ".css": "text/css",
     ".js": "application/javascript",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".svg": "image/svg+xml",
+    ".gif": "image/gif",
     ".ico": "image/x-icon",
+    ".txt": "text/plain",
 }
 
-# Функция для определения MIME-типа
 def get_mime_type(file_path):
+    """Определяет MIME-тип по расширению файла"""
     ext = os.path.splitext(file_path)[1].lower()
     return MIME_TYPES.get(ext, "application/octet-stream")
 
-# Прямой доступ к файлам веб-приложения
-@app.get("/webapp/{path:path}")
-async def serve_webapp_file(path: str, request: Request):
-    # Если путь пустой или заканчивается на /, возвращаем index.html
-    if path == "" or path.endswith("/"):
-        file_path = "webapp/index.html"
-    else:
-        file_path = f"webapp/{path}"
-    
-    # Проверяем существование файла
-    if not os.path.exists(file_path):
-        # Пробуем найти index.html, если файл не найден
-        if path == "":
-            alt_path = "webapp/index.html"
-            if os.path.exists(alt_path):
-                return FileResponse(alt_path)
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    # Если это директория, пытаемся найти index.html внутри
-    if os.path.isdir(file_path):
-        index_path = os.path.join(file_path, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
-        raise HTTPException(status_code=404, detail="Directory index not found")
-    
-    # Определяем MIME-тип файла
-    mime_type = get_mime_type(file_path)
-    
-    # Возвращаем файл с правильным MIME-типом
-    return FileResponse(file_path, media_type=mime_type)
+@app.get("/")
+async def root():
+    """Корневой маршрут API"""
+    return {"message": "Style AI API is running", "webapp_url": "/webapp/"}
 
-# Маршрут для корня веб-приложения
-@app.get("/webapp", include_in_schema=False)
-@app.get("/webapp/", include_in_schema=False)
+@app.get("/webapp", response_class=HTMLResponse)
+@app.get("/webapp/", response_class=HTMLResponse)
 async def serve_webapp_root():
-    return FileResponse("webapp/index.html")
-
-# Проверка путей к файлам
-@app.get("/debug/check-files")
-async def debug_check_files(path: str = None):
-    if path:
-        full_path = f"webapp/{path}"
-        if os.path.exists(full_path):
-            if os.path.isfile(full_path):
-                size = os.path.getsize(full_path)
-                mime = get_mime_type(full_path)
-                return {
-                    "exists": True, 
-                    "is_file": True, 
-                    "size": size,
-                    "mime": mime
-                }
-            else:
-                return {"exists": True, "is_file": False, "contents": os.listdir(full_path)}
+    """Корневой маршрут веб-приложения"""
+    try:
+        path = "webapp/index.html"
+        if os.path.exists(path):
+            logger.info(f"Serving index.html")
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return HTMLResponse(content=content)
         else:
-            return {"exists": False}
-    
-    files = os.listdir(".")
-    webapp_exists = os.path.exists("webapp")
-    webapp_files = []
-    if webapp_exists:
-        webapp_files = os.listdir("webapp")
-        
-        # Проверяем основные файлы
-        checks = {
-            "index.html": os.path.exists("webapp/index.html"),
-            "styles.css": os.path.exists("webapp/styles.css"),
-            "script.js": os.path.exists("webapp/script.js"),
-            "images_dir": os.path.exists("webapp/images") and os.path.isdir("webapp/images")
-        }
-        
-        # Проверяем изображения
-        images = []
-        if checks["images_dir"]:
-            images = os.listdir("webapp/images")
-    
-    return {
-        "files": files, 
-        "webapp_exists": webapp_exists, 
-        "webapp_files": webapp_files,
-        "file_checks": checks if webapp_exists else None,
-        "images": images if webapp_exists and checks["images_dir"] else None
-    }
+            logger.error(f"File not found: {path}")
+            return HTMLResponse(content="File not found", status_code=404)
+    except Exception as e:
+        logger.error(f"Error serving index.html: {e}")
+        return HTMLResponse(content=f"Error: {str(e)}", status_code=500)
 
-# Простой эндпоинт для анализа
+@app.get("/webapp/{file_path:path}")
+async def serve_static_file(file_path: str):
+    """Обслуживание статических файлов веб-приложения"""
+    try:
+        # Формируем полный путь к файлу
+        full_path = f"webapp/{file_path}"
+        
+        # Проверяем существование файла
+        if not os.path.exists(full_path) or not os.path.isfile(full_path):
+            logger.error(f"File not found: {full_path}")
+            return Response(content=f"File not found: {file_path}", status_code=404)
+        
+        # Определяем MIME-тип
+        mime_type = get_mime_type(full_path)
+        logger.info(f"Serving {full_path} with MIME type {mime_type}")
+        
+        # Возвращаем файл с правильным MIME-типом
+        return FileResponse(full_path, media_type=mime_type)
+    except Exception as e:
+        logger.error(f"Error serving static file: {e}")
+        return Response(content=f"Error: {str(e)}", status_code=500)
+
 @app.post("/analyze-outfit")
 async def analyze_outfit(image: UploadFile = File(...), 
                       occasion: str = Form(...),
                       preferences: str = Form(None)):
-    return {"status": "success", "message": "Analysis endpoint is working"}
+    """Анализ одежды на фотографии"""
+    try:
+        # В реальном приложении здесь будет интеграция с OpenAI для анализа
+        # Сейчас это просто заглушка для тестирования
+        
+        advice = f"""
+# Анализ вашей одежды
 
-# Главная страница
-@app.get("/")
-async def root():
-    return {"message": "Style AI API is running", "webapp": "/webapp/"}
+## Описание
+На изображении представлена классическая одежда. Материал выглядит качественным и комфортным.
 
-# Запуск сервера
+## Оценка для повода "{occasion}"
+Данная одежда подходит для указанного повода: "{occasion}". 
+{
+    "Для офиса она создаст профессиональный образ." if occasion == 'work' else 
+    "Для свидания она поможет создать романтичный образ." if occasion == 'date' else 
+    "Для вечеринки её можно дополнить яркими аксессуарами." if occasion == 'party' else 
+    "Для повседневного использования это отличный базовый элемент гардероба."
+}
+
+## Рекомендации по сочетанию
+- **Для работы/офиса**: Сочетайте с классическими брюками или юбкой-карандаш.
+- **Для повседневного образа**: Подойдут джинсы или цветные брюки.
+- **Для вечернего выхода**: Комбинируйте с элегантной юбкой миди или добавьте яркие аксессуары.
+
+## Советы по аксессуарам
+- Добавьте аксессуары, соответствующие случаю
+- Для делового образа выбирайте минималистичные украшения
+- Для вечернего выхода подойдут более яркие и заметные аксессуары
+        """
+        
+        return {"status": "success", "advice": advice}
+    except Exception as e:
+        logger.error(f"Error analyzing outfit: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/debug/info")
+async def debug_info():
+    """Отладочная информация о файлах"""
+    try:
+        # Проверяем наличие основных файлов
+        files_info = {}
+        
+        # Список всех файлов в корневой директории
+        files_info["root_files"] = os.listdir(".")
+        
+        # Проверка webapp директории
+        if os.path.exists("webapp"):
+            files_info["webapp_exists"] = True
+            files_info["webapp_files"] = os.listdir("webapp")
+            
+            # Проверка наличия основных файлов
+            files_info["index_html"] = {
+                "exists": os.path.exists("webapp/index.html"),
+                "size": os.path.getsize("webapp/index.html") if os.path.exists("webapp/index.html") else 0
+            }
+            
+            files_info["styles_css"] = {
+                "exists": os.path.exists("webapp/styles.css"),
+                "size": os.path.getsize("webapp/styles.css") if os.path.exists("webapp/styles.css") else 0
+            }
+            
+            files_info["script_js"] = {
+                "exists": os.path.exists("webapp/script.js"),
+                "size": os.path.getsize("webapp/script.js") if os.path.exists("webapp/script.js") else 0
+            }
+            
+            # Проверка images директории
+            if os.path.exists("webapp/images"):
+                files_info["images_dir_exists"] = True
+                files_info["images_files"] = os.listdir("webapp/images")
+                
+                # Проверка наличия иконки загрузки
+                icon_path = "webapp/images/upload-icon.svg"
+                files_info["upload_icon"] = {
+                    "exists": os.path.exists(icon_path),
+                    "size": os.path.getsize(icon_path) if os.path.exists(icon_path) else 0
+                }
+            else:
+                files_info["images_dir_exists"] = False
+        else:
+            files_info["webapp_exists"] = False
+        
+        # Информация о среде выполнения
+        files_info["environment"] = {
+            "current_directory": os.getcwd(),
+            "python_path": os.path.dirname(os.__file__)
+        }
+        
+        return files_info
+    except Exception as e:
+        logger.error(f"Error in debug info: {e}")
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

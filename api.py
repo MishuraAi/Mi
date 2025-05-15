@@ -3,7 +3,7 @@ import base64
 import json
 import requests
 from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -27,7 +27,17 @@ app.add_middleware(
 )
 
 # Монтирование статических файлов веб-приложения
-app.mount("/webapp", StaticFiles(directory="webapp"), name="webapp")
+# Эта строка должна быть перед определением маршрутов
+try:
+    app.mount("/webapp", StaticFiles(directory="webapp"), name="webapp")
+    print("Webapp directory mounted successfully")
+except Exception as e:
+    print(f"Error mounting webapp directory: {e}")
+
+# Прямой доступ к файлу index.html
+@app.get("/webapp/", response_class=FileResponse)
+async def webapp_root():
+    return FileResponse("webapp/index.html")
 
 # Эндпоинт для анализа изображения
 @app.post("/analyze-outfit")
@@ -94,10 +104,33 @@ async def telegram_webhook(request: Request):
     
     return {"status": "success"}
 
+# Проверка файлов для диагностики
+@app.get("/check-files")
+async def check_files():
+    try:
+        import os
+        files = os.listdir(".")
+        webapp_exists = os.path.exists("webapp")
+        webapp_files = []
+        if webapp_exists:
+            webapp_files = os.listdir("webapp")
+        
+        # Проверка конкретного файла
+        index_exists = os.path.exists("webapp/index.html")
+        
+        return {
+            "root_files": files,
+            "webapp_exists": webapp_exists,
+            "webapp_files": webapp_files,
+            "index_html_exists": index_exists
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 # Главная страница
 @app.get("/")
 async def root():
-    return {"message": "Style AI API is running"}
+    return {"message": "Style AI API is running", "info": "Access the webapp at /webapp/"}
 
 # Запуск сервера
 if __name__ == "__main__":

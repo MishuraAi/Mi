@@ -180,19 +180,17 @@ newConsultationBtn.addEventListener('click', () => {
     fileInput.value = '';
     selectedFile = null;
     
-    if (imagePreview) {
-        uploadBox.removeChild(imagePreview);
-    }
+    // Полностью пересоздаем содержимое uploadBox для решения проблемы
+    uploadBox.innerHTML = `
+        <img src="/webapp/images/upload-icon.svg" alt="Загрузить" id="uploadIcon">
+        <p>Нажмите, чтобы выбрать фото</p>
+    `;
     
-    if (uploadIcon) {
-        uploadIcon.style.display = 'block';
-    }
+    // Обновляем ссылку на uploadIcon после пересоздания
+    const newUploadIcon = document.getElementById('uploadIcon');
     
-    const textElement = uploadBox.querySelector('p');
-    if (textElement) {
-        textElement.style.display = 'block';
-    }
-    
+    // Сбрасываем другие элементы
+    imagePreview = null;
     document.getElementById('occasion').value = 'everyday';
     document.getElementById('preferences').value = '';
     submitBtn.disabled = true;
@@ -200,6 +198,11 @@ newConsultationBtn.addEventListener('click', () => {
     // Показываем основную секцию
     mainSection.style.display = 'block';
     resultSection.style.display = 'none';
+    
+    // Добавляем обработчик клика заново, так как мы пересоздали элементы
+    uploadBox.addEventListener('click', () => {
+        fileInput.click();
+    });
 });
 
 // Событие при закрытии окна

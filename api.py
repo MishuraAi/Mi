@@ -4,6 +4,7 @@ from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from gemini_ai import analyze_clothing_image
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -94,34 +95,11 @@ async def analyze_outfit(image: UploadFile = File(...),
                       preferences: str = Form(None)):
     """Анализ одежды на фотографии"""
     try:
-        # В реальном приложении здесь будет интеграция с OpenAI для анализа
-        # Сейчас это просто заглушка для тестирования
+        # Чтение содержимого загруженного файла
+        image_data = await image.read()
         
-        advice = f"""
-# Анализ вашей одежды
-
-## Описание
-На изображении представлена классическая одежда. Материал выглядит качественным и комфортным.
-
-## Оценка для повода "{occasion}"
-Данная одежда подходит для указанного повода: "{occasion}". 
-{
-    "Для офиса она создаст профессиональный образ." if occasion == 'work' else 
-    "Для свидания она поможет создать романтичный образ." if occasion == 'date' else 
-    "Для вечеринки её можно дополнить яркими аксессуарами." if occasion == 'party' else 
-    "Для повседневного использования это отличный базовый элемент гардероба."
-}
-
-## Рекомендации по сочетанию
-- **Для работы/офиса**: Сочетайте с классическими брюками или юбкой-карандаш.
-- **Для повседневного образа**: Подойдут джинсы или цветные брюки.
-- **Для вечернего выхода**: Комбинируйте с элегантной юбкой миди или добавьте яркие аксессуары.
-
-## Советы по аксессуарам
-- Добавьте аксессуары, соответствующие случаю
-- Для делового образа выбирайте минималистичные украшения
-- Для вечернего выхода подойдут более яркие и заметные аксессуары
-        """
+        # Анализ изображения с помощью Gemini
+        advice = await analyze_clothing_image(image_data, occasion, preferences)
         
         return {"status": "success", "advice": advice}
     except Exception as e:

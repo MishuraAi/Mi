@@ -1,63 +1,78 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Стиль AI - Ваш персональный стилист</title>
-    <link rel="stylesheet" href="/webapp/styles.css">
+    <title>Стиль AI - Консультация стилиста</title>
+    <link rel="stylesheet" href="styles.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
+
 <body>
     <div class="container">
         <header>
             <h1>Стиль AI</h1>
-            <p>Ваш персональный стилист</p>
+            <p class="subtitle">Персональный AI-стилист у вас в кармане</p>
         </header>
 
-        <section class="main-section">
-            <div class="upload-section">
-                <h2>Загрузите фото одежды</h2>
-                <div class="upload-box" id="uploadBox">
-                    <img src="/webapp/images/upload-icon.svg" alt="Загрузить" id="uploadIcon">
-                    <p>Нажмите, чтобы выбрать фото</p>
-                </div>
-                <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        <div class="upload-section">
+            <div class="upload-container" id="upload-container">
+                <img src="images/upload-icon.svg" alt="Загрузить" class="upload-icon">
+                <p>Нажмите, чтобы загрузить фото одежды</p>
+                <input type="file" id="file-input" accept="image/*" style="display: none;">
+            </div>
+            <div class="image-preview-container" id="image-preview-container" style="display: none;">
+                <img id="image-preview" src="#" alt="Предпросмотр">
+                <button class="change-image-btn" id="change-image-btn">Изменить фото</button>
+            </div>
+        </div>
+
+        <div class="form-section" id="form-section" style="display: none;">
+            <div class="form-group">
+                <label for="occasion">Для какого повода?</label>
+                <select id="occasion" name="occasion">
+                    <option value="повседневный">Повседневный образ</option>
+                    <option value="работа">Работа/офис</option>
+                    <option value="свидание">Свидание</option>
+                    <option value="вечеринка">Вечеринка/клуб</option>
+                    <option value="официальное">Официальное мероприятие</option>
+                    <option value="отдых">Отдых/путешествие</option>
+                    <option value="спорт">Спорт/активный отдых</option>
+                </select>
             </div>
 
-            <div class="questions-section">
-                <h2>Дополнительная информация</h2>
-                <div class="form-group">
-                    <label for="occasion">Для какого случая?</label>
-                    <select id="occasion">
-                        <option value="everyday">Повседневный образ</option>
-                        <option value="work">Работа/офис</option>
-                        <option value="date">Свидание</option>
-                        <option value="party">Вечеринка</option>
-                        <option value="other">Другое</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="preferences">Ваши предпочтения (необязательно)</label>
-                    <textarea id="preferences" placeholder="Расскажите о своих предпочтениях, например: любимые цвета, стили, особенности фигуры"></textarea>
-                </div>
+            <div class="form-group">
+                <label for="preferences">Дополнительные пожелания (необязательно)</label>
+                <textarea id="preferences" name="preferences" rows="3"
+                    placeholder="Например: предпочитаю яркие цвета, избегаю кожаных изделий, ищу комфортный вариант..."></textarea>
             </div>
 
-            <button id="submitBtn" class="submit-btn" disabled>Получить консультацию</button>
-        </section>
+            <button class="analyze-btn" id="analyze-btn">Получить консультацию</button>
+        </div>
 
-        <section class="result-section" style="display: none;">
-            <h2>Рекомендация стилиста</h2>
-            <div class="result-content" id="resultContent">
-                <!-- Здесь будет результат от ИИ -->
+        <div class="loading-section" id="loading-section" style="display: none;">
+            <div class="loader"></div>
+            <p>Анализирую вашу одежду с помощью искусственного интеллекта...</p>
+            <p class="loading-tip">Это может занять до 15 секунд</p>
+        </div>
+
+        <div class="result-section" id="result-section" style="display: none;">
+            <div class="result-header">
+                <h2>Анализ вашей одежды</h2>
+                <button class="new-analysis-btn" id="new-analysis-btn">Новый анализ</button>
             </div>
-            <button id="newConsultationBtn" class="secondary-btn">Новая консультация</button>
-        </section>
-
-        <footer>
-            <p>© 2025 Стиль AI. Все права защищены.</p>
-        </footer>
+            <div class="result-content" id="result-content">
+                <!-- Здесь будет результат анализа -->
+            </div>
+        </div>
     </div>
 
-    <script src="/webapp/script.js"></script>
+    <footer>
+        <p>Стиль AI © 2025 — Powered by Gemini AI</p>
+    </footer>
+
+    <script src="script.js"></script>
 </body>
+
 </html>

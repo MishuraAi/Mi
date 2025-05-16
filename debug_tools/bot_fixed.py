@@ -1,32 +1,38 @@
 import os
 import logging
 from dotenv import load_dotenv
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
-import database as db
-from datetime import datetime
-import random
-from gemini_ai import analyze_clothing_file
 
-# Загрузка переменных окружения
-load_dotenv()
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://style-ai-bot.onrender.com/webapp")
+# Сбрасываем системную переменную если она существует
+if "TELEGRAM_TOKEN" in os.environ:
+    del os.environ["TELEGRAM_TOKEN"]
 
-# Добавляем случайное число к URL, чтобы обойти кэш Telegram
-WEBAPP_URL = f"{WEBAPP_URL}?v={random.randint(10000, 99999)}"
+# Загружаем переменные из .env с принудительной перезаписью
+load_dotenv(override=True)
 
-# Проверка и форматирование URL веб-приложения
-if not WEBAPP_URL.startswith("https://") and not WEBAPP_URL.startswith("http://"):
-    WEBAPP_URL = "https://" + WEBAPP_URL
-print(f"Используемый URL веб-приложения: {WEBAPP_URL}")
+# Путь к файлу .env
+env_path = os.path.join(os.getcwd(), '.env')
+
+# Явно читаем значение из файла
+with open(env_path, 'r') as f:
+    for line in f:
+        if line.startswith('TELEGRAM_TOKEN='):
+            TOKEN = line.strip().split('=', 1)[1]
+            break
+
+print(f"Используемый токен: {TOKEN}")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-webapp-url.com")
 
 # Настройка логирования
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+import database as db
+from datetime import datetime
 
 # Инициализация базы данных
 db.init_db()
@@ -46,44 +52,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Получаем баланс пользователя
     balance = db.get_user_balance(user.id)
     
-    # Создаем инлайн-клавиатуру для веб-приложения
-    inline_keyboard = [
-        [InlineKeyboardButton("🚀 Получить консультацию стилиста", web_app=WebAppInfo(url=WEBAPP_URL))]
-    ]
-    
-    # Отправляем приветственное сообщение
     await update.message.reply_html(
         f"Привет, {user.mention_html()}! Я ИИ-стилист <b>Стиль AI</b>.\n\n"
         f"Загрузите фото одежды, и я дам профессиональные рекомендации по стилю.\n\n"
-        f"Ваш баланс: {balance} консультаций\n\n"
-        f"Нажмите на кнопку ниже, чтобы открыть веб-приложение:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard)
-    )
-    
-    # Также отправляем обычную клавиатуру (без кнопки веб-приложения)
-    await update.message.reply_text(
-        "Или воспользуйтесь меню:",
+        f"Ваш баланс: {balance} консультаций",
         reply_markup=get_main_keyboard()
     )
 
-# Клавиатура с кнопками (без кнопки веб-приложения)
+# Клавиатура с кнопками
 def get_main_keyboard():
     keyboard = [
+        [KeyboardButton("Получить консультацию", web_app=WebAppInfo(url=WEBAPP_URL))],
         [KeyboardButton("Мои консультации"), KeyboardButton("Пополнить баланс")],
         [KeyboardButton("О сервисе"), KeyboardButton("Поддержка")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-# Обработчик команды /webapp - для прямого доступа к веб-приложению
-async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    inline_keyboard = [
-        [InlineKeyboardButton("🚀 Получить консультацию стилиста", web_app=WebAppInfo(url=WEBAPP_URL))]
-    ]
-    
-    await update.message.reply_text(
-        "Нажмите на кнопку ниже, чтобы открыть веб-приложение стилиста:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard)
-    )
 
 # Обработчик текстовых сообщений
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -143,14 +126,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        # Показываем кнопку для веб-приложения
-        inline_keyboard = [
-            [InlineKeyboardButton("🚀 Получить консультацию стилиста", web_app=WebAppInfo(url=WEBAPP_URL))]
-        ]
-        
         await update.message.reply_text(
-            "Для получения консультации, пожалуйста, загрузите фотографию одежды или нажмите кнопку ниже:",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard)
+            "Для получения консультации, пожалуйста, загрузите фотографию одежды или нажмите кнопку «Получить консультацию»."
         )
 
 # Обработчик фотографий
@@ -186,30 +163,41 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Уменьшаем баланс пользователя
     db.update_user_balance(user_id, -1)
     
-    # Отправляем сообщение о том, что начался анализ
-    processing_message = await update.message.reply_text("Анализирую вашу одежду... Это может занять несколько секунд.")
-    
-    # Анализируем фото с помощью Gemini (используем 'casual' как повод по умолчанию)
-    advice = await analyze_clothing_file(file_path, "повседневный")
+    # Временная заглушка для демонстрации
+    advice = """
+    # Анализ вашей одежды
+
+    ## Описание
+    На изображении представлена классическая белая блуза с V-образным вырезом и длинными рукавами. Материал выглядит как легкий хлопок или шелковая смесь.
+
+    ## Рекомендации по сочетанию
+    - **Для работы/офиса**: Сочетайте с классическими брюками или юбкой-карандаш темно-синего или черного цвета.
+    - **Для повседневного образа**: Подойдут джинсы или цветные брюки, можно заправить блузу или оставить навыпуск.
+    - **Для вечернего выхода**: Комбинируйте с элегантной юбкой миди или узкими брюками и добавьте яркие аксессуары.
+
+    ## Советы по аксессуарам
+    - Добавьте ожерелье средней длины, которое будет хорошо смотреться с V-образным вырезом
+    - Элегантные серьги подчеркнут образ
+    - Для придания образу цвета можно использовать яркий шарф или платок
+    """
     
     # Сохраняем консультацию в базу данных
     consultation_id = db.save_consultation(
         user_id, 
-        "повседневный", 
+        "Не указан", 
         "Не указаны", 
         file_path, 
         advice
     )
     
-    # Удаляем сообщение о процессе
-    await processing_message.delete()
-    
-    # Отправляем краткий ответ пользователю
-    summary = advice.split("\n\n")[0:2]  # Берем только заголовок и первый раздел для краткого ответа
-    
+    # Отправляем ответ пользователю
     await update.message.reply_text(
         f"Анализ вашей одежды (ID: {consultation_id}):\n\n"
-        f"{'\n'.join(summary)}\n\n"
+        f"Это белая блуза с V-образным вырезом. Отличный базовый элемент гардероба!\n\n"
+        f"Рекомендации:\n"
+        f"- Для работы: сочетайте с классическими брюками\n"
+        f"- Для отдыха: подойдут джинсы или цветные брюки\n"
+        f"- Аксессуары: добавьте ожерелье средней длины\n\n"
         f"Для полной консультации отправьте /consultation {consultation_id}\n\n"
         f"Ваш баланс: {db.get_user_balance(user_id)} консультаций"
     )
@@ -291,13 +279,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     await update.message.reply_html(
         "📱 <b>Как пользоваться ботом:</b>\n\n"
-        "1. Для получения консультации загрузите фотографию одежды или используйте кнопку «Получить консультацию стилиста»\n"
+        "1. Для получения консультации загрузите фотографию одежды или нажмите кнопку «Получить консультацию»\n"
         "2. Выберите повод, для которого вы подбираете одежду\n"
         "3. Дождитесь результата анализа\n\n"
         "📋 <b>Доступные команды:</b>\n"
         "/start - начать работу с ботом\n"
         "/help - получить справку по использованию бота\n"
-        "/webapp - открыть веб-приложение стилиста\n"
         "/consultation ID - получить полный текст консультации\n\n"
         f"💰 Ваш текущий баланс: {balance} консультаций"
     )
@@ -310,7 +297,6 @@ def main() -> None:
     # Добавляем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("webapp", webapp_command))
     application.add_handler(CommandHandler("consultation", get_consultation))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler))

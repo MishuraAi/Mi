@@ -370,3 +370,105 @@ async def analyze_clothing_image(image_data, occasion, preferences=None):
                 
                 if retry_count < MAX_RETRIES:
                     logger.info(f"Ожидание {RETRY_DELAY} сек перед следующей попыткой...")
+                    time.sleep(RETRY_DELAY)
+        
+        # Если все попытки не удались
+        logger.error(f"Все попытки запроса к Gemini не удались: {last_error}")
+        return handle_gemini_error(last_error)
+    
+    except Exception as e:
+        logger.error(f"Ошибка при анализе изображения с Gemini: {e}")
+        return f"Произошла неожиданная ошибка при обработке запроса: {str(e)}"
+
+# КОМПОНЕНТ: Анализ изображения из файла
+# СТАТУС: Улучшено
+# ИЗМЕНЕНО: 2025-05-16
+# ЗАВИСИМОСТИ: analyze_clothing_image
+async def analyze_clothing_file(file_path, occasion, preferences=None):
+    """
+    Анализ изображения одежды из файла с помощью Gemini
+    
+    Args:
+        file_path: Путь к файлу изображения
+        occasion: Повод/случай для одежды
+        preferences: Дополнительные предпочтения пользователя
+    
+    Returns:
+        str: Анализ и рекомендации по стилю в формате Markdown
+    """
+    try:
+        logger.info(f"Анализ файла: {file_path}")
+        
+        # Проверка существования файла
+        if not os.path.exists(file_path):
+            logger.error(f"Файл не найден: {file_path}")
+            return "Ошибка: Файл не найден"
+        
+        # Чтение файла
+        try:
+            with open(file_path, "rb") as image_file:
+                image_data = image_file.read()
+        except Exception as e:
+            logger.error(f"Ошибка при чтении файла: {e}")
+            return f"Ошибка при чтении файла. Подробности: {str(e)}"
+            
+        # Анализ изображения
+        return await analyze_clothing_image(image_data, occasion, preferences)
+    
+    except Exception as e:
+        logger.error(f"Ошибка при анализе файла: {e}")
+        return f"Произошла ошибка при обработке файла. Подробности: {str(e)}"
+
+# Простой тест, если файл запущен напрямую
+if __name__ == "__main__":
+    import asyncio
+    import sys
+    
+    async def test_gemini():
+        print("Тестирование Gemini API...")
+        print(f"API ключ установлен: {'Да' if GEMINI_API_KEY else 'Нет'}")
+        
+        if not GEMINI_API_KEY:
+            print("ОШИБКА: API ключ не установлен в .env файле")
+            return
+        
+        # Проверка соединения
+        connection_test, message = await test_gemini_connection()
+        print(f"Тест соединения: {'УСПЕШНО' if connection_test else 'ОШИБКА'}")
+        print(f"Сообщение: {message}")
+        
+        if not connection_test:
+            print("Пропуск дальнейших тестов из-за ошибки соединения.")
+            return
+            
+        # Список доступных моделей
+        try:
+            models = genai.list_models()
+            print("Доступные модели:")
+            for model in models:
+                print(f"• {model.name}")
+        except Exception as e:
+            print(f"ОШИБКА при получении списка моделей: {e}")
+        
+        # Тестируем модель Gemini
+        try:
+            print(f"\nТестирование {VISION_MODEL}...")
+            # Создаем простое тестовое изображение
+            from PIL import Image, ImageDraw
+            
+            # Создаем простое тестовое изображение
+            img = Image.new('RGB', (100, 100), color = (73, 109, 137))
+            d = ImageDraw.Draw(img)
+            d.rectangle([(20, 20), (80, 80)], fill=(255, 255, 255))
+            
+            # Сохраняем во временный файл
+            img_path = "test_image.jpg"
+            img.save(img_path)
+            
+            with open(img_path, "rb") as f:
+                test_result = await analyze_clothing_file(img_path, "повседневный")
+                print(f"Результат анализа: {test_result[:100]}...")
+        except Exception as e:
+            print(f"ОШИБКА при тестировании: {e}")
+    
+    asyncio.run(test_gemini())

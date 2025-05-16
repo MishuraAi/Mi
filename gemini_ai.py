@@ -1,5 +1,5 @@
 """
-ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.0
+ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
 ЭТАП РАЗРАБОТКИ: Интеграция Gemini AI
 ДАТА: 2025-05-16
 
@@ -8,11 +8,12 @@
 Обрабатывает изображения, формирует промпты и интерпретирует ответы AI.
 
 ТЕКУЩЕЕ СОСТОЯНИЕ:
-- Реализована базовая интеграция с Gemini AI
+- Реализована интеграция с Gemini AI
 - Настроен промпт для анализа одежды
 - Добавлена обработка различных форматов изображений
 - Добавлено кэширование результатов для оптимизации
-- Улучшен промпт для более детального анализа
+- Улучшена обработка ошибок и диагностика проблем API
+- Добавлены механизмы повторных попыток при ошибках
 
 СЛЕДУЮЩИЕ ШАГИ:
 - Добавить агрегацию знаний о трендах из внешних источников
@@ -31,13 +32,16 @@ from io import BytesIO
 from cache_manager import AnalysisCacheManager
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Загрузка переменных окружения
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 logger.info(f"Gemini API Key loaded: {'Yes' if GEMINI_API_KEY else 'No'}")
+if not GEMINI_API_KEY:
+    logger.error("GEMINI_API_KEY не найден в .env файле")
 
 # Полные имена моделей (с префиксом "models/")
 VISION_MODEL = "models/gemini-1.5-flash"  # Актуальная модель для анализа изображений
@@ -48,7 +52,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2
 
 # КОМПОНЕНТ: Инициализация Gemini API
-# СТАТУС: Завершено
+# СТАТУС: Обновлено
 # ИЗМЕНЕНО: 2025-05-16
 if not GEMINI_API_KEY:
     logger.error("GEMINI_API_KEY не найден в .env файле")
@@ -58,9 +62,16 @@ else:
         genai.configure(api_key=GEMINI_API_KEY)
         logger.info("Gemini API успешно настроен")
         
-        # Создание экземпляра модели с правильным именем
-        model = genai.GenerativeModel(VISION_MODEL)
-        logger.info(f"Модель {VISION_MODEL} инициализирована")
+        # Тестовое соединение с API
+        try:
+            model = genai.GenerativeModel("models/gemini-1.5-flash")
+            response = model.generate_content("Test connection")
+            if response and response.text:
+                logger.info("Тестовое соединение с Gemini API успешно")
+            else:
+                logger.error("Тестовое соединение с Gemini API не вернуло текста")
+        except Exception as e:
+            logger.error(f"Ошибка при тестовом соединении с Gemini API: {e}")
     except Exception as e:
         logger.error(f"Ошибка при инициализации Gemini API: {e}")
 
@@ -68,8 +79,79 @@ else:
 cache_manager = AnalysisCacheManager()
 logger.info("Менеджер кэша инициализирован")
 
-# КОМПОНЕНТ: Оптимизация изображения перед отправкой
+# КОМПОНЕНТ: Тестирование соединения с Gemini API
 # СТАТУС: Добавлено
+# ИЗМЕНЕНО: 2025-05-16
+async def test_gemini_connection():
+    """
+    Тестирует соединение с Gemini API
+    
+    Returns:
+        tuple: (bool, str) - (успех, сообщение)
+    """
+    if not GEMINI_API_KEY:
+        return False, "API ключ не настроен. Добавьте GEMINI_API_KEY в .env файл."
+    
+    try:
+        # Конфигурация API
+        genai.configure(api_key=GEMINI_API_KEY)
+        
+        # Попытка создать простой запрос без изображения
+        model = genai.GenerativeModel("models/gemini-1.5-flash")
+        response = model.generate_content("Test connection")
+        
+        if response and response.text:
+            return True, "Соединение с Gemini API работает нормально."
+        else:
+            return False, "API не вернул ответ на тестовый запрос."
+    except Exception as e:
+        return False, f"Ошибка при тестировании соединения с Gemini API: {str(e)}"
+
+# КОМПОНЕНТ: Обработка ошибок Gemini API
+# СТАТУС: Добавлено
+# ИЗМЕНЕНО: 2025-05-16
+def handle_gemini_error(error):
+    """
+    Преобразует технические ошибки API в понятные сообщения для пользователя
+    
+    Args:
+        error: Исключение, полученное при вызове API
+        
+    Returns:
+        str: Пользовательское сообщение об ошибке
+    """
+    error_str = str(error).lower()
+    
+    if "api key" in error_str or "authentication" in error_str or "auth" in error_str:
+        return "Ошибка аутентификации API. Пожалуйста, сообщите администратору о необходимости проверить API ключ."
+    
+    elif "rate limit" in error_str or "quota" in error_str:
+        return "Превышен лимит запросов к API. Пожалуйста, попробуйте позже."
+    
+    elif "invalid image" in error_str or "unsupported format" in error_str:
+        return "Формат изображения не поддерживается. Пожалуйста, загрузите фото в формате JPG или PNG."
+    
+    elif "too large" in error_str or "size limit" in error_str:
+        return "Изображение слишком большое. Пожалуйста, загрузите фото меньшего размера."
+    
+    elif "timeout" in error_str or "deadline exceeded" in error_str:
+        return "Время обработки запроса превышено. Пожалуйста, загрузите другое фото или попробуйте позже."
+    
+    elif "service unavailable" in error_str or "server error" in error_str:
+        return "Сервис временно недоступен. Пожалуйста, попробуйте позже."
+    
+    elif "content filtered" in error_str or "safety" in error_str:
+        return "Изображение не может быть обработано из-за ограничений содержания. Пожалуйста, загрузите другое фото."
+    
+    elif "network" in error_str or "connection" in error_str:
+        return "Проблемы с сетевым соединением при обращении к API. Пожалуйста, проверьте подключение к интернету."
+    
+    else:
+        logger.error(f"Необработанная ошибка Gemini API: {error}")
+        return f"Ошибка при обработке изображения: {str(error)}"
+
+# КОМПОНЕНТ: Оптимизация изображения перед отправкой
+# СТАТУС: Обновлено
 # ИЗМЕНЕНО: 2025-05-16
 def optimize_image(img, max_size=1024, quality=85):
     """
@@ -86,35 +168,40 @@ def optimize_image(img, max_size=1024, quality=85):
     Returns:
         bytes: Оптимизированное изображение в формате байтов
     """
-    # Проверка размера изображения
-    width, height = img.size
+    try:
+        # Проверка размера изображения
+        width, height = img.size
+        
+        # Изменение размера с сохранением пропорций, если нужно
+        if width > max_size or height > max_size:
+            if width > height:
+                new_width = max_size
+                new_height = int(height * (max_size / width))
+            else:
+                new_height = max_size
+                new_width = int(width * (max_size / height))
+            img = img.resize((new_width, new_height), Image.LANCZOS)
+            logger.info(f"Изображение изменено до размера {new_width}x{new_height}")
+        
+        # Конвертация в RGB если нужно
+        if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
+            img = img.convert('RGB')
+            logger.info(f"Изображение конвертировано из {img.mode} в RGB")
+        
+        # Автокоррекция и улучшение
+        img = ImageOps.autocontrast(img)
+        
+        # Сохранение в формате JPEG с указанным качеством
+        img_byte_arr = BytesIO()
+        img.save(img_byte_arr, format='JPEG', quality=quality, optimize=True)
+        img_bytes = img_byte_arr.getvalue()
+        
+        logger.info(f"Изображение оптимизировано, итоговый размер: {len(img_bytes) / 1024:.1f} KB")
+        return img_bytes
     
-    # Изменение размера с сохранением пропорций, если нужно
-    if width > max_size or height > max_size:
-        if width > height:
-            new_width = max_size
-            new_height = int(height * (max_size / width))
-        else:
-            new_height = max_size
-            new_width = int(width * (max_size / height))
-        img = img.resize((new_width, new_height), Image.LANCZOS)
-        logger.info(f"Изображение изменено до размера {new_width}x{new_height}")
-    
-    # Конвертация в RGB если нужно
-    if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
-        img = img.convert('RGB')
-        logger.info(f"Изображение конвертировано из {img.mode} в RGB")
-    
-    # Автокоррекция и улучшение
-    img = ImageOps.autocontrast(img)
-    
-    # Сохранение в формате JPEG с указанным качеством
-    img_byte_arr = BytesIO()
-    img.save(img_byte_arr, format='JPEG', quality=quality, optimize=True)
-    img_bytes = img_byte_arr.getvalue()
-    
-    logger.info(f"Изображение оптимизировано, итоговый размер: {len(img_bytes) / 1024:.1f} KB")
-    return img_bytes
+    except Exception as e:
+        logger.error(f"Ошибка при оптимизации изображения: {e}")
+        raise ValueError(f"Не удалось оптимизировать изображение: {str(e)}")
 
 # КОМПОНЕНТ: Формирование промпта для анализа одежды
 # СТАТУС: Улучшено
@@ -221,7 +308,7 @@ async def analyze_clothing_image(image_data, occasion, preferences=None):
         # Проверяем, что ключ API установлен
         if not GEMINI_API_KEY:
             logger.error("GEMINI_API_KEY не найден в конфигурации")
-            return "Ошибка конфигурации Gemini API. Пожалуйста, проверьте настройки сервера."
+            return "Ошибка конфигурации Gemini API. API ключ не настроен. Пожалуйста, сообщите администратору о необходимости добавить GEMINI_API_KEY в .env файл."
         
         # Проверяем наличие результата в кэше
         cached_result = cache_manager.get_from_cache(image_data, occasion, preferences)
@@ -230,11 +317,19 @@ async def analyze_clothing_image(image_data, occasion, preferences=None):
             return cached_result
         
         # Преобразование бинарных данных в изображение
-        img = Image.open(BytesIO(image_data))
-        logger.info(f"Изображение успешно загружено, размер: {img.size}")
+        try:
+            img = Image.open(BytesIO(image_data))
+            logger.info(f"Изображение успешно загружено, размер: {img.size}, формат: {img.format}, режим: {img.mode}")
+        except Exception as e:
+            logger.error(f"Не удалось открыть изображение: {e}")
+            return f"Ошибка при обработке изображения. Возможно, файл поврежден или имеет неподдерживаемый формат. Подробности: {str(e)}"
         
         # Оптимизация изображения
-        img_bytes = optimize_image(img)
+        try:
+            img_bytes = optimize_image(img)
+        except Exception as e:
+            logger.error(f"Ошибка при оптимизации изображения: {e}")
+            return f"Не удалось оптимизировать изображение для анализа. Пожалуйста, попробуйте загрузить другое фото. Подробности: {str(e)}"
         
         # Создание промпта для Gemini
         prompt = create_analysis_prompt(occasion, preferences)
@@ -247,6 +342,9 @@ async def analyze_clothing_image(image_data, occasion, preferences=None):
         
         while retry_count < MAX_RETRIES:
             try:
+                # Переконфигурируем API перед каждым запросом для уверенности
+                genai.configure(api_key=GEMINI_API_KEY)
+                
                 # Создаем экземпляр модели
                 model = genai.GenerativeModel(VISION_MODEL)
                 
@@ -272,83 +370,3 @@ async def analyze_clothing_image(image_data, occasion, preferences=None):
                 
                 if retry_count < MAX_RETRIES:
                     logger.info(f"Ожидание {RETRY_DELAY} сек перед следующей попыткой...")
-                    time.sleep(RETRY_DELAY)
-        
-        # Если все попытки не удались
-        logger.error(f"Все попытки запроса к Gemini не удались: {last_error}")
-        return "Произошла ошибка при анализе изображения. Пожалуйста, попробуйте еще раз позже или загрузите другое изображение."
-    
-    except Exception as e:
-        logger.error(f"Ошибка при анализе изображения с Gemini: {e}")
-        return f"Произошла ошибка при анализе. Подробности: {str(e)}"
-
-# КОМПОНЕНТ: Анализ изображения из файла
-# СТАТУС: Улучшено
-# ИЗМЕНЕНО: 2025-05-16
-# ЗАВИСИМОСТИ: analyze_clothing_image
-async def analyze_clothing_file(file_path, occasion, preferences=None):
-    """
-    Анализ изображения одежды из файла с помощью Gemini
-    
-    Args:
-        file_path: Путь к файлу изображения
-        occasion: Повод/случай для одежды
-        preferences: Дополнительные предпочтения пользователя
-    
-    Returns:
-        str: Анализ и рекомендации по стилю в формате Markdown
-    """
-    try:
-        logger.info(f"Анализ файла: {file_path}")
-        with open(file_path, "rb") as image_file:
-            image_data = image_file.read()
-        return await analyze_clothing_image(image_data, occasion, preferences)
-    
-    except Exception as e:
-        logger.error(f"Ошибка при чтении файла изображения: {e}")
-        return f"Произошла ошибка при обработке файла изображения. Подробности: {str(e)}"
-
-# Простой тест, если файл запущен напрямую
-if __name__ == "__main__":
-    import asyncio
-    import sys
-    
-    async def test_gemini():
-        print("Тестирование Gemini API...")
-        print(f"API ключ установлен: {'Да' if GEMINI_API_KEY else 'Нет'}")
-        
-        if not GEMINI_API_KEY:
-            print("ОШИБКА: API ключ не установлен в .env файле")
-            return
-        
-        # Список доступных моделей
-        try:
-            models = genai.list_models()
-            print("Доступные модели:")
-            for model in models:
-                print(f"• {model.name}")
-        except Exception as e:
-            print(f"ОШИБКА при получении списка моделей: {e}")
-        
-        # Тестируем модель Gemini
-        try:
-            print(f"\nТестирование {VISION_MODEL}...")
-            # Создаем тестовое изображение
-            from PIL import Image, ImageDraw
-            
-            # Создаем простое тестовое изображение
-            img = Image.new('RGB', (100, 100), color = (73, 109, 137))
-            d = ImageDraw.Draw(img)
-            d.rectangle([(20, 20), (80, 80)], fill=(255, 255, 255))
-            
-            # Сохраняем во временный файл
-            img_path = "test_image.jpg"
-            img.save(img_path)
-            
-            with open(img_path, "rb") as f:
-                test_result = await analyze_clothing_file(img_path, "повседневный")
-                print(f"Результат анализа: {test_result[:100]}...")
-        except Exception as e:
-            print(f"ОШИБКА при тестировании: {e}")
-    
-    asyncio.run(test_gemini())

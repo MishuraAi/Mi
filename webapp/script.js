@@ -19,6 +19,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const resultContent = document.getElementById('result-content');
     const newAnalysisBtn = document.getElementById('new-analysis-btn');
 
+    // Отладка - проверка загрузки скрипта
+    console.log("Скрипт инициализирован");
+    console.log("URL страницы:", window.location.href);
+    console.log("Базовый URL:", window.location.origin);
+
     // Применение цветовой схемы Telegram
     function applyTelegramTheme() {
         const root = document.documentElement;
@@ -43,6 +48,8 @@ document.addEventListener('DOMContentLoaded', function () {
             root.style.setProperty('--tg-theme-button-color', window.Telegram.WebApp.buttonColor || '#2481cc');
             root.style.setProperty('--tg-theme-button-text-color', window.Telegram.WebApp.buttonTextColor || '#ffffff');
         }
+
+        console.log("Тема Telegram применена:", window.Telegram.WebApp.colorScheme);
     }
 
     // Функция для обновления предпросмотра изображения
@@ -66,6 +73,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 uploadContainer.style.display = 'none';
                 imagePreviewContainer.style.display = 'block';
                 formSection.style.display = 'block';
+
+                console.log("Предпросмотр изображения обновлен");
             };
             reader.readAsDataURL(file);
             return true;
@@ -75,11 +84,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Обработчик для события нажатия на область загрузки
     uploadContainer.addEventListener('click', function () {
+        console.log("Нажатие на область загрузки");
         fileInput.click();
     });
 
     // Обработчик для выбора файла
     fileInput.addEventListener('change', function (e) {
+        console.log("Файл выбран");
         // Сбрасываем предыдущие результаты
         resultSection.style.display = 'none';
 
@@ -90,6 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Обработчик для кнопки смены изображения
     changeImageBtn.addEventListener('click', function () {
+        console.log("Нажата кнопка смены изображения");
         // Сбрасываем предыдущие результаты
         resultSection.style.display = 'none';
         fileInput.click();
@@ -97,6 +109,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Обработчик для кнопки анализа
     analyzeBtn.addEventListener('click', function () {
+        console.log("Кнопка анализа нажата");
+
         if (!fileInput.files || !fileInput.files[0]) {
             alert('Пожалуйста, выберите изображение для анализа');
             return;
@@ -107,34 +121,50 @@ document.addEventListener('DOMContentLoaded', function () {
         imagePreviewContainer.style.display = 'none';
         loadingSection.style.display = 'block';
 
+        console.log("Подготовка данных для отправки");
         // Отправка данных на сервер
         const formData = new FormData();
         formData.append('image', fileInput.files[0]);
         formData.append('occasion', document.getElementById('occasion').value);
         formData.append('preferences', document.getElementById('preferences').value);
 
-        fetch('/analyze-outfit', {
+        // Получаем абсолютный URL для API конечной точки
+        const apiUrl = window.location.origin + '/analyze-outfit';
+        console.log("Отправка запроса на:", apiUrl);
+
+        fetch(apiUrl, {
             method: 'POST',
             body: formData
         })
-            .then(response => response.json())
+            .then(response => {
+                console.log("Получен ответ от сервера, статус:", response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log("Данные ответа:", data);
                 // Скрыть загрузку
                 loadingSection.style.display = 'none';
 
                 if (data.status === 'success') {
                     // Показать результат
+                    console.log("Успешный анализ, отображаем результат");
                     // Конвертация Markdown в HTML для отображения
                     resultContent.innerHTML = markdownToHtml(data.advice);
                     resultSection.style.display = 'block';
 
                     // Отправить данные в Telegram при успешном анализе
-                    window.Telegram.WebApp.sendData(JSON.stringify({
-                        status: 'success',
-                        occasion: document.getElementById('occasion').value,
-                        preferences: document.getElementById('preferences').value
-                    }));
+                    try {
+                        window.Telegram.WebApp.sendData(JSON.stringify({
+                            status: 'success',
+                            occasion: document.getElementById('occasion').value,
+                            preferences: document.getElementById('preferences').value
+                        }));
+                        console.log("Данные отправлены в Telegram");
+                    } catch (e) {
+                        console.error("Ошибка при отправке данных в Telegram:", e);
+                    }
                 } else {
+                    console.error("Ошибка анализа:", data.message);
                     alert('Ошибка при анализе: ' + data.message);
                     // Вернуть к форме загрузки
                     uploadContainer.style.display = 'block';
@@ -143,6 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             })
             .catch(error => {
+                console.error("Ошибка запроса:", error);
                 loadingSection.style.display = 'none';
                 alert('Ошибка при отправке данных: ' + error);
                 // Вернуть к форме загрузки
@@ -154,6 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Обработчик для кнопки нового анализа
     newAnalysisBtn.addEventListener('click', function () {
+        console.log("Нажата кнопка нового анализа");
         // Сбросить форму и вернуться к загрузке
         imagePreview.src = '';
         fileInput.value = '';
@@ -168,6 +200,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function markdownToHtml(markdown) {
         if (!markdown) return '';
 
+        console.log("Преобразование Markdown в HTML");
         // Базовое форматирование
         return markdown
             // Заголовки

@@ -19,14 +19,14 @@
 - Backend: Python (Telegram Bot API, FastAPI)
 - Frontend: HTML/CSS/JavaScript
 - База данных: SQLite
-- ИИ: OpenAI API (GPT-4 Vision)
+- ИИ: Google Gemini AI (Gemini 1.5 Flash)
 
 ## Установка и настройка
 
 ### Требования
 - Python 3.8+
 - Telegram Bot Token
-- OpenAI API ключ
+- Google Gemini API ключ
 
 ### Настройка окружения
 1. Клонировать репозиторий

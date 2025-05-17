@@ -1,22 +1,17 @@
-/*
+<!DOCTYPE html>
+<!-- 
 ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
 ФАЙЛ: index.html
 НАЗНАЧЕНИЕ: Основной HTML файл веб-приложения
 ДАТА ОБНОВЛЕНИЯ: 2025-05-17
-
-МЕТОДОЛОГИЯ ОБНОВЛЕНИЯ КОДА:
-При внесении любых изменений в этот файл необходимо предоставлять полный код файла целиком,
-а не только изменившиеся части. Это обеспечивает целостность кода и исключает ошибки интеграции.
-*/
-
-<!DOCTYPE html>
+-->
 <html lang="ru">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ИИ Стилист</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="./styles.css">
     <!-- Подключаем шрифты -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,12 +28,12 @@
 
         <div class="mode-selector">
             <button id="single-mode" class="mode-button active">
-                <img src="images/single-mode-icon.svg" alt="" class="button-icon">
+                <!-- <img src="./images/single-mode-icon.svg" alt="" class="button-icon"> -->
                 <span class="button-text">Одиночный анализ</span>
                 <span class="glow-border"></span>
             </button>
             <button id="compare-mode" class="mode-button">
-                <img src="images/compare-mode-icon.svg" alt="" class="button-icon">
+                <!-- <img src="./images/compare-mode-icon.svg" alt="" class="button-icon"> -->
                 <span class="button-text">Сравнение вещей</span>
                 <span class="glow-border"></span>
             </button>
@@ -55,7 +50,14 @@
                         <div class="upload-container">
                             <div id="file-drop-area">
                                 <label for="file-input" class="upload-label">
-                                    <img src="images/upload-icon.svg" alt="Загрузить" class="upload-icon">
+                                    <!-- <img src="./images/upload-icon.svg" alt="Загрузить" class="upload-icon"> -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60"
+                                        fill="none" stroke="#b3b3b3" stroke-width="1.5" stroke-linecap="round"
+                                        stroke-linejoin="round" class="upload-icon">
+                                        <path d="M18 15v3H6v-3"></path>
+                                        <path d="M12 3v10"></path>
+                                        <path d="M9 6l3-3 3 3"></path>
+                                    </svg>
                                     <span class="upload-text">Выберите файл или перетащите сюда</span>
                                 </label>
                                 <input type="file" id="file-input" name="image" accept="image/*" multiple>
@@ -95,7 +97,7 @@
                     <div class="result-header">
                         <h2>Анализ стилиста</h2>
                         <button id="back-button" class="secondary-button">
-                            <img src="images/back-button-icon.svg" alt="" class="button-icon">
+                            <!-- <img src="./images/back-button-icon.svg" alt="" class="button-icon"> -->
                             <span class="button-text">Назад</span>
                             <span class="glow-border"></span>
                         </button>
@@ -110,7 +112,7 @@
         </main>
 
         <footer>
-            <p>© 2025 ИИ Стилист | <a href="#" id="about-link">О сервисе</a></p>
+            <p>© 2025 Мешура | <a href="#" id="about-link">О сервисе</a></p>
         </footer>
     </div>
 
@@ -118,7 +120,7 @@
     <div id="about-modal" class="modal hidden">
         <div class="modal-content card">
             <span class="close-modal">&times;</span>
-            <h2>О сервисе ИИ Стилист</h2>
+            <h2>О сервисе Мешура</h2>
             <p>ИИ Стилист - это персональный помощник по стилю, который анализирует вашу одежду с помощью технологий
                 искусственного интеллекта.</p>
             <p>Наш сервис предоставляет профессиональные рекомендации по сочетанию одежды, подбору аксессуаров и
@@ -128,7 +130,7 @@
     </div>
 
     <!-- Подключаем скрипты -->
-    <script src="script.js"></script>
+    <script src="./script.js"></script>
 </body>
 
 </html>

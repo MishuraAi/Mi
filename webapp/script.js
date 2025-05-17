@@ -1,12 +1,8 @@
-/*
+/* 
 ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
 ФАЙЛ: script.js
 НАЗНАЧЕНИЕ: Клиентский JavaScript для веб-приложения
 ДАТА ОБНОВЛЕНИЯ: 2025-05-17
-
-МЕТОДОЛОГИЯ ОБНОВЛЕНИЯ КОДА:
-При внесении любых изменений в этот файл необходимо предоставлять полный код файла целиком,
-а не только изменившиеся части. Это обеспечивает целостность кода и исключает ошибки интеграции.
 */
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -386,5 +382,3 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!this.classList.contains('mode-button') || !this.classList.contains('active')) {
             this.querySelector('.glow-border').style.opacity = 0;
         }
-    }
-});

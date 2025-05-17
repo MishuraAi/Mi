@@ -124,14 +124,22 @@ document.addEventListener('DOMContentLoaded', function () {
     // Обработка выбора файлов
     function handleFileSelect(e) {
         const files = e.target.files;
-        processFiles(files);
+        if (files && files.length > 0) {
+            processFiles(files);
+        } else {
+            console.log("Файлы не выбраны");
+        }
     }
 
     // Обработка перетаскивания файлов
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
-        processFiles(files);
+        if (files && files.length > 0) {
+            processFiles(files);
+        } else {
+            console.log("Файлы не получены при перетаскивании");
+        }
     }
 
     // Обработка файлов

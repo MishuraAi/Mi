@@ -1,3 +1,28 @@
+/* Стили для анимации курсора */
+.cursor-circle {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-primary);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.1s ease;
+}
+
+.particle-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9998;
+}
+
 /* 
 ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
 ФАЙЛ: styles.css
@@ -12,10 +37,14 @@
     --card-hover: #252525;
     --text-primary: #f5f5f5;
     --text-secondary: #b3b3b3;
-    --accent-primary: #8a2be2;
-    --accent-secondary: #1db954;
-    --accent-tertiary: #ff6b6b;
-    --accent-quaternary: #4a9eff;
+    --accent-primary: #00c8ff;
+    /* Светло-голубой для основных кнопок */
+    --accent-secondary: #ff00ff;
+    /* Пурпурный для второй кнопки переключения */
+    --accent-tertiary: #00ff66;
+    /* Яркий зеленый для кнопки "Назад" */
+    --accent-quaternary: #ff9900;
+    /* Оранжевый для кнопки отправки */
     --button-bg: #2e2e2e;
     --button-hover: #3e3e3e;
     --error: #ff5252;
@@ -23,7 +52,8 @@
     --border-radius: 12px;
     --transition-speed: 0.3s;
     --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    --glow-intensity: 0.7;
+    --glow-intensity: 1;
+    /* Увеличена интенсивность свечения */
 }
 
 /* Сброс стилей и основные настройки */
@@ -165,15 +195,19 @@ header h1 {
 
 .mode-button:nth-child(1) .glow-border,
 #submit-button .glow-border {
-    box-shadow: 0 0 10px 2px var(--accent-primary);
+    box-shadow: 0 0 15px 3px var(--accent-primary);
 }
 
 .mode-button:nth-child(2) .glow-border {
-    box-shadow: 0 0 10px 2px var(--accent-secondary);
+    box-shadow: 0 0 15px 3px var(--accent-secondary);
 }
 
 #back-button .glow-border {
-    box-shadow: 0 0 10px 2px var(--accent-tertiary);
+    box-shadow: 0 0 15px 3px var(--accent-tertiary);
+}
+
+.primary-button .glow-border {
+    box-shadow: 0 0 15px 3px var(--accent-quaternary);
 }
 
 .mode-button:hover .glow-border,
@@ -181,7 +215,7 @@ header h1 {
 #submit-button:hover .glow-border,
 #back-button:hover .glow-border,
 .glow-active {
-    opacity: 0.7;
+    opacity: 1;
 }
 
 /* Основные секции */
@@ -365,7 +399,8 @@ textarea {
 }
 
 .primary-button:hover {
-    background-color: #9b3df0;
+    background-color: #33d5ff;
+    /* Более яркий светло-голубой при наведении */
 }
 
 .secondary-button:hover {
@@ -592,5 +627,10 @@ footer a:hover {
     .primary-button:hover,
     .secondary-button:hover {
         transform: none;
+    }
+
+    .cursor-circle,
+    .particle-canvas {
+        display: none;
     }
 }

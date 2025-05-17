@@ -1,3 +1,49 @@
+/* Исправление цвета SVG в слотах - сразу сделаем голубым */
+svg {
+    stroke: var(--accent-primary) !important;
+    /* Переопределение цвета SVG для лучшей видимости */
+}
+
+#single-upload-container,
+#multi-upload-container {
+    transition: all 0.4s ease;
+    margin-bottom: 30px;
+    position: relative;
+}
+
+#single-upload-container {
+    opacity: 1;
+    transform: scale(1);
+    margin-bottom: 40px;
+    /* Больше отступ между контейнерами */
+}
+
+#multi-upload-container {
+    opacity: 0.6;
+    /* Изначально немного затемнен */
+    transform: scale(0.95);
+}
+
+.upload-mode-title {
+    color: var(--accent-primary);
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    text-align: center;
+    text-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
+    position: relative;
+    padding-bottom: 10px;
+}
+
+.upload-mode-title::after {
+    content: '';
+    position: absolute;
+    left: 25%;
+    bottom: 0;
+    width: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+}
+
 /* Вспомогательные классы для анимаций */
 .animate-float {
     animation: floatElement 6s ease-in-out infinite;

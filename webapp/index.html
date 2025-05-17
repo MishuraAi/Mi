@@ -10,7 +10,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мишура</title>
+    <title>МИШУРА</title>
     <link rel="stylesheet" href="/webapp/styles-enhanced.css">
     <!-- Подключаем шрифты -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +22,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Мишура</h1>
+            <h1>МИШУРА</h1>
             <p class="tagline">Профессиональные рекомендации по стилю</p>
         </header>
 
@@ -48,12 +48,13 @@
 
                     <form id="analysis-form" enctype="multipart/form-data">
                         <div class="upload-container">
-                            <!-- Контейнер для одиночной загрузки (показан по умолчанию) -->
+                            <!-- Показываем оба режима сразу (убрали класс hidden) -->
                             <div id="single-upload-container">
+                                <h3 class="upload-mode-title">Одиночный анализ</h3>
                                 <div id="file-drop-area">
                                     <label for="file-input" class="upload-label">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60"
-                                            height="60" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            height="60" fill="none" stroke="#00c8ff" stroke-width="1.5"
                                             stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
                                             <path d="M18 15v3H6v-3"></path>
                                             <path d="M12 3v10"></path>
@@ -66,13 +67,14 @@
                                 <div id="preview-container" class="hidden"></div>
                             </div>
 
-                            <!-- Контейнер для множественной загрузки (скрыт по умолчанию) -->
-                            <div id="multi-upload-container" class="hidden">
+                            <!-- Убрали класс hidden для видимости сразу -->
+                            <div id="multi-upload-container">
+                                <h3 class="upload-mode-title">Сравнение вещей</h3>
                                 <!-- Слот 1 -->
                                 <div class="image-slot">
                                     <label class="upload-label">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
-                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            height="30" fill="none" stroke="#00c8ff" stroke-width="1.5"
                                             stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
                                             <path d="M12 5v14M5 12h14"></path>
                                         </svg>
@@ -86,7 +88,7 @@
                                 <div class="image-slot">
                                     <label class="upload-label">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
-                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            height="30" fill="none" stroke="#00c8ff" stroke-width="1.5"
                                             stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
                                             <path d="M12 5v14M5 12h14"></path>
                                         </svg>
@@ -100,7 +102,7 @@
                                 <div class="image-slot">
                                     <label class="upload-label">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
-                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            height="30" fill="none" stroke="#00c8ff" stroke-width="1.5"
                                             stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
                                             <path d="M12 5v14M5 12h14"></path>
                                         </svg>
@@ -114,7 +116,7 @@
                                 <div class="image-slot">
                                     <label class="upload-label">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
-                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            height="30" fill="none" stroke="#00c8ff" stroke-width="1.5"
                                             stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
                                             <path d="M12 5v14M5 12h14"></path>
                                         </svg>
@@ -181,7 +183,7 @@
         </main>
 
         <footer>
-            <p>© 2025 Мишура | <a href="#" id="about-link">О сервисе</a></p>
+            <p>© 2025 Мешура | <a href="#" id="about-link">О сервисе</a></p>
         </footer>
     </div>
 
@@ -189,8 +191,8 @@
     <div id="about-modal" class="modal hidden">
         <div class="modal-content card">
             <span class="close-modal">&times;</span>
-            <h2>О сервисе Мишура</h2>
-            <p>Мишура - это персональный помощник по стилю, который анализирует вашу одежду с помощью технологий
+            <h2>О сервисе Мешура</h2>
+            <p>Мешура - это персональный помощник по стилю, который анализирует вашу одежду с помощью технологий
                 искусственного интеллекта.</p>
             <p>Наш сервис предоставляет профессиональные рекомендации по сочетанию одежды, подбору аксессуаров и
                 созданию гармоничных образов для различных случаев.</p>

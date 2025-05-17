@@ -107,6 +107,8 @@ document.addEventListener('DOMContentLoaded', function () {
             compareModeBtn.classList.remove('active');
             singleModeText.style.display = 'block';
             compareModeText.style.display = 'none';
+            // Важно для мобильных устройств
+            fileInput.setAttribute('multiple', ''); // Очищаем атрибут
             fileInput.removeAttribute('multiple');
         } else {
             singleModeBtn.classList.remove('active');
@@ -119,12 +121,25 @@ document.addEventListener('DOMContentLoaded', function () {
         // Сброс выбранных файлов
         selectedFiles = [];
         updateFilePreview();
+
+        // Для отладки
+        console.log("Режим изменен на:", mode);
+        console.log("Multiple атрибут:", fileInput.multiple);
     }
 
     // Обработка выбора файлов
     function handleFileSelect(e) {
         const files = e.target.files;
         if (files && files.length > 0) {
+            console.log("Файлы выбраны через input:", files.length);
+            // На мобильном устройстве принудительно проверяем режим
+            if (isMobileDevice() && currentMode === 'compare' && !fileInput.multiple) {
+                console.log("Мобильное устройство - принудительно устанавливаем multiple");
+                fileInput.setAttribute('multiple', 'multiple');
+                // На мобильных устройствах после установки multiple требуется заново открыть выбор файлов
+                alert("Пожалуйста, выберите файлы снова для режима сравнения");
+                return;
+            }
             processFiles(files);
         } else {
             console.log("Файлы не выбраны");
@@ -136,6 +151,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const dt = e.dataTransfer;
         const files = dt.files;
         if (files && files.length > 0) {
+            console.log("Файлы получены при перетаскивании:", files.length);
             processFiles(files);
         } else {
             console.log("Файлы не получены при перетаскивании");
@@ -144,6 +160,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Обработка файлов
     function processFiles(files) {
+        console.log("Обработка файлов:", files.length, "текущий режим:", currentMode);
+
         if (currentMode === 'single') {
             // В режиме одиночного анализа берем только первый файл
             selectedFiles = files.length > 0 ? [files[0]] : [];
@@ -161,6 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        console.log("Выбранные файлы:", selectedFiles.length);
         updateFilePreview();
     }
 

@@ -68,17 +68,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Функция для создания новой частицы
         function createParticle(x, y, velocityX, velocityY) {
+            // Только два цвета: белый и светло-голубой
             const colors = [
+                '#ffffff', // Белый
                 '#00c8ff', // Светло-голубой
-                '#ff00ff', // Пурпурный
-                '#00ff66', // Яркий зеленый
-                '#ff9900', // Оранжевый
             ];
 
             const particle = {
                 x: x,
                 y: y,
-                size: Math.random() * 5 + 2,
+                size: Math.random() * 3 + 1, // Немного уменьшим размер частиц
                 color: colors[Math.floor(Math.random() * colors.length)],
                 speedX: (Math.random() - 0.5) * 2 - velocityX * 0.1,
                 speedY: (Math.random() - 0.5) * 2 - velocityY * 0.1,

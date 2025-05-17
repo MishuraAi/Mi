@@ -1,28 +1,3 @@
-/* Стили для анимации курсора */
-.cursor-circle {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid var(--accent-primary);
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 9999;
-    transition: transform 0.1s ease;
-}
-
-.particle-canvas {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 9998;
-}
-
 /* 
 ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
 ФАЙЛ: styles.css
@@ -538,6 +513,34 @@ footer a:hover {
 
 .compare-mode-text {
     display: none;
+}
+
+/* Стили для анимации курсора */
+.cursor-circle {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 8px;
+    /* Уменьшено в 3 раза с 24px */
+    height: 8px;
+    /* Уменьшено в 3 раза с 24px */
+    border-radius: 50%;
+    border: 1px solid var(--accent-primary);
+    /* Уменьшили толщину границы с 2px до 1px */
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.1s ease;
+}
+
+.particle-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9998;
 }
 
 /* Анимации */

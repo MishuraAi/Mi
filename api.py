@@ -1,10 +1,21 @@
+"""
+ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
+ФАЙЛ: api.py
+НАЗНАЧЕНИЕ: API-сервер для веб-приложения и обработки запросов от Telegram Mini App
+ДАТА ОБНОВЛЕНИЯ: 2025-05-17
+
+МЕТОДОЛОГИЯ ОБНОВЛЕНИЯ КОДА:
+При внесении любых изменений в этот файл необходимо предоставлять полный код файла целиком,
+а не только изменившиеся части. Это обеспечивает целостность кода и исключает ошибки интеграции.
+"""
+
 import os
 import logging
 from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from gemini_ai import analyze_clothing_image
+from gemini_ai import analyze_clothing_image, compare_clothing_images
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -104,6 +115,33 @@ async def analyze_outfit(image: UploadFile = File(...),
         return {"status": "success", "advice": advice}
     except Exception as e:
         logger.error(f"Error analyzing outfit: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/compare-outfits")
+async def compare_outfits(
+    images: list[UploadFile] = File(...), 
+    occasion: str = Form(...),
+    preferences: str = Form(None)):
+    """Сравнительный анализ нескольких предметов одежды"""
+    try:
+        # Ограничение на количество изображений
+        if len(images) < 2:
+            return {"status": "error", "message": "Необходимо загрузить не менее 2 изображений для сравнения"}
+        elif len(images) > 5:
+            return {"status": "error", "message": "Максимальное число изображений для сравнения - 5"}
+        
+        # Чтение содержимого загруженных файлов
+        image_data_list = []
+        for img in images:
+            image_data = await img.read()
+            image_data_list.append(image_data)
+        
+        # Анализ изображений с помощью Gemini
+        advice = await compare_clothing_images(image_data_list, occasion, preferences)
+        
+        return {"status": "success", "advice": advice}
+    except Exception as e:
+        logger.error(f"Ошибка при сравнении одежды: {e}")
         return {"status": "error", "message": str(e)}
 
 @app.get("/debug/info")

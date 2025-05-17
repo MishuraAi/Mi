@@ -1,5 +1,15 @@
 <!DOCTYPE html>
 <html lang="ru">
+<!--
+ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
+ФАЙЛ: index.html
+НАЗНАЧЕНИЕ: Основной HTML-файл веб-приложения для загрузки и анализа одежды
+ДАТА ОБНОВЛЕНИЯ: 2025-05-17
+
+МЕТОДОЛОГИЯ ОБНОВЛЕНИЯ КОДА:
+При внесении любых изменений в этот файл необходимо предоставлять полный код файла целиком,
+а не только изменившиеся части. Это обеспечивает целостность кода и исключает ошибки интеграции.
+-->
 
 <head>
     <meta charset="UTF-8">
@@ -16,45 +26,88 @@
             <p class="subtitle">Персональный AI-стилист у вас в кармане</p>
         </header>
 
-        <div class="upload-section">
-            <div class="upload-container" id="upload-container">
-                <img src="/webapp/images/upload-icon.svg" alt="Загрузить" class="upload-icon">
-                <p>Нажмите, чтобы загрузить фото одежды</p>
-                <input type="file" id="file-input" accept="image/*" style="display: none;">
+        <div class="mode-selector">
+            <button class="mode-btn active" id="single-mode-btn">Одиночный анализ</button>
+            <button class="mode-btn" id="compare-mode-btn">Сравнение вещей</button>
+        </div>
+
+        <div id="single-mode" class="mode-container">
+            <div class="upload-section">
+                <div class="upload-container" id="upload-container">
+                    <img src="/webapp/images/upload-icon.svg" alt="Загрузить" class="upload-icon">
+                    <p>Нажмите, чтобы загрузить фото одежды</p>
+                    <input type="file" id="file-input" accept="image/*" style="display: none;">
+                </div>
+                <div class="image-preview-container" id="image-preview-container" style="display: none;">
+                    <img id="image-preview" src="#" alt="Предпросмотр">
+                    <button class="change-image-btn" id="change-image-btn">Изменить фото</button>
+                </div>
             </div>
-            <div class="image-preview-container" id="image-preview-container" style="display: none;">
-                <img id="image-preview" src="#" alt="Предпросмотр">
-                <button class="change-image-btn" id="change-image-btn">Изменить фото</button>
+
+            <div class="form-section" id="form-section" style="display: none;">
+                <div class="form-group">
+                    <label for="occasion">Для какого повода?</label>
+                    <select id="occasion" name="occasion">
+                        <option value="повседневный">Повседневный образ</option>
+                        <option value="работа">Работа/офис</option>
+                        <option value="свидание">Свидание</option>
+                        <option value="вечеринка">Вечеринка/клуб</option>
+                        <option value="официальное">Официальное мероприятие</option>
+                        <option value="отдых">Отдых/путешествие</option>
+                        <option value="спорт">Спорт/активный отдых</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="preferences">Дополнительные пожелания (необязательно)</label>
+                    <textarea id="preferences" name="preferences" rows="3"
+                        placeholder="Например: предпочитаю яркие цвета, избегаю кожаных изделий, ищу комфортный вариант..."></textarea>
+                </div>
+
+                <button class="analyze-btn" id="analyze-btn">Получить консультацию</button>
             </div>
         </div>
 
-        <div class="form-section" id="form-section" style="display: none;">
-            <div class="form-group">
-                <label for="occasion">Для какого повода?</label>
-                <select id="occasion" name="occasion">
-                    <option value="повседневный">Повседневный образ</option>
-                    <option value="работа">Работа/офис</option>
-                    <option value="свидание">Свидание</option>
-                    <option value="вечеринка">Вечеринка/клуб</option>
-                    <option value="официальное">Официальное мероприятие</option>
-                    <option value="отдых">Отдых/путешествие</option>
-                    <option value="спорт">Спорт/активный отдых</option>
-                </select>
+        <div id="compare-mode" class="mode-container" style="display: none;">
+            <div class="upload-section">
+                <div class="upload-container" id="compare-upload-container">
+                    <img src="/webapp/images/upload-icon.svg" alt="Загрузить" class="upload-icon">
+                    <p>Нажмите, чтобы загрузить несколько фото для сравнения</p>
+                    <input type="file" id="compare-file-input" accept="image/*" multiple style="display: none;">
+                </div>
+                <div class="images-gallery" id="images-gallery">
+                    <!-- Здесь будут отображаться загруженные изображения -->
+                </div>
             </div>
 
-            <div class="form-group">
-                <label for="preferences">Дополнительные пожелания (необязательно)</label>
-                <textarea id="preferences" name="preferences" rows="3"
-                    placeholder="Например: предпочитаю яркие цвета, избегаю кожаных изделий, ищу комфортный вариант..."></textarea>
-            </div>
+            <div class="form-section" id="compare-form-section" style="display: none;">
+                <div class="form-group">
+                    <label for="compare-occasion">Для какого повода?</label>
+                    <select id="compare-occasion" name="compare-occasion">
+                        <option value="повседневный">Повседневный образ</option>
+                        <option value="работа">Работа/офис</option>
+                        <option value="свидание">Свидание</option>
+                        <option value="вечеринка">Вечеринка/клуб</option>
+                        <option value="официальное">Официальное мероприятие</option>
+                        <option value="отдых">Отдых/путешествие</option>
+                        <option value="спорт">Спорт/активный отдых</option>
+                    </select>
+                </div>
 
-            <button class="analyze-btn" id="analyze-btn">Получить консультацию</button>
+                <div class="form-group">
+                    <label for="compare-preferences">Дополнительные пожелания (необязательно)</label>
+                    <textarea id="compare-preferences" name="compare-preferences" rows="3"
+                        placeholder="Например: предпочитаю яркие цвета, избегаю кожаных изделий, ищу комфортный вариант..."></textarea>
+                </div>
+
+                <button class="analyze-btn" id="compare-analyze-btn">Сравнить предметы</button>
+            </div>
         </div>
 
         <div class="loading-section" id="loading-section" style="display: none;">
             <div class="loader"></div>
-            <p>Анализирую вашу одежду с помощью искусственного интеллекта...</p>
-            <p class="loading-tip">Это может занять до 15 секунд</p>
+            <p>Анализирую вашу одежду с подождите немного...</p>
+            <p class="loading-tip">Это может занять до 30 секунд</p>
         </div>
 
         <div class="result-section" id="result-section" style="display: none;">
@@ -69,7 +122,7 @@
     </div>
 
     <footer>
-        <p>Стиль AI © 2025 — Powered by Gemini AI</p>
+        <p>Мишура © 2025 — Created by Dubaki</p>
     </footer>
 
     <script src="/webapp/script.js"></script>

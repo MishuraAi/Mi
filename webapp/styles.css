@@ -99,15 +99,6 @@ header h1 {
     padding: 30px;
 }
 
-/* Селектор режима */
-.mode-selector {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-bottom: 30px;
-    animation: fadeIn 0.8s ease-out;
-}
-
 /* Стили для иконок кнопок */
 .button-icon {
     width: 20px;
@@ -119,6 +110,15 @@ header h1 {
 .mode-button:hover .button-icon,
 .secondary-button:hover .button-icon {
     transform: scale(1.1);
+}
+
+/* Селектор режима */
+.mode-selector {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 30px;
+    animation: fadeIn 0.8s ease-out;
 }
 
 .mode-button {
@@ -179,8 +179,9 @@ header h1 {
 .mode-button:hover .glow-border,
 .mode-button.active .glow-border,
 #submit-button:hover .glow-border,
-#back-button:hover .glow-border {
-    opacity: var(--glow-intensity);
+#back-button:hover .glow-border,
+.glow-active {
+    opacity: 0.7;
 }
 
 /* Основные секции */

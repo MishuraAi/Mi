@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function processFiles(files) {
         if (currentMode === 'single') {
             // В режиме одиночного анализа берем только первый файл
-            selectedFiles = [files[0]];
+            selectedFiles = files.length > 0 ? [files[0]] : [];
         } else {
             // В режиме сравнения добавляем файлы к уже выбранным
             const newFiles = Array.from(files);
@@ -302,20 +302,38 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Списки
         html = html.replace(/^\s*-\s*(.*$)/gm, '<li>$1</li>');
-        html = html.replace(/<li>(.*?)<\/li>/g, function (match) {
-            if (!/<ul>[\s\S]*<\/ul>/.test(html)) {
-                return '<ul>' + match + '</ul>';
-            }
-            return match;
-        });
 
-        // Параграфы
-        html = html.replace(/(?:\r\n|\r|\n){2,}/g, '</p><p>');
-        html = '<p>' + html + '</p>';
-        html = html.replace(/<p>\s*<h([1-3])>/g, '<h$1>');
-        html = html.replace(/<\/h([1-3])>\s*<\/p>/g, '</h$1>');
-        html = html.replace(/<p>\s*<ul>/g, '<ul>');
-        html = html.replace(/<\/ul>\s*<\/p>/g, '</ul>');
+        // Группировка элементов списка в <ul>
+        let inList = false;
+        const lines = html.split('\n');
+        html = lines.map(line => {
+            if (line.includes('<li>')) {
+                if (!inList) {
+                    inList = true;
+                    return '<ul>' + line;
+                }
+                return line;
+            } else if (inList) {
+                inList = false;
+                return '</ul>' + line;
+            }
+            return line;
+        }).join('\n');
+
+        if (inList) {
+            html += '</ul>';
+        }
+
+        // Параграфы (игнорируем строки, которые уже содержат HTML-теги)
+        const paragraphs = html.split('\n\n');
+        html = paragraphs.map(para => {
+            // Если параграф содержит HTML-теги, оставляем как есть
+            if (para.trim().startsWith('<') || para.trim() === '') {
+                return para;
+            }
+            // Иначе оборачиваем в теги <p>
+            return '<p>' + para + '</p>';
+        }).join('\n\n');
 
         return html;
     }
@@ -372,13 +390,21 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         // Добавляем эффект свечения для текущей кнопки
-        this.querySelector('.glow-border').style.opacity = var(--glow - intensity);
-        this.querySelector('.glow-border').classList.add('glow-active');
+        const glowBorder = this.querySelector('.glow-border');
+        if (glowBorder) {
+            glowBorder.style.opacity = '0.7'; // Используем конкретное значение вместо var()
+            glowBorder.classList.add('glow-active');
+        }
     }
 
     // Обработчик окончания касания
     function handleTouchEnd(e) {
         // Если это не кнопка режима или это не активная кнопка режима, убираем свечение
         if (!this.classList.contains('mode-button') || !this.classList.contains('active')) {
-            this.querySelector('.glow-border').style.opacity = 0;
+            const glowBorder = this.querySelector('.glow-border');
+            if (glowBorder) {
+                glowBorder.style.opacity = '0';
+            }
         }
+    }
+});

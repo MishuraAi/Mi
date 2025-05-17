@@ -1,131 +1,134 @@
-<!DOCTYPE html>
-<html lang="ru">
-<!--
+/*
 ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
 ФАЙЛ: index.html
-НАЗНАЧЕНИЕ: Основной HTML-файл веб-приложения для загрузки и анализа одежды
+НАЗНАЧЕНИЕ: Основной HTML файл веб-приложения
 ДАТА ОБНОВЛЕНИЯ: 2025-05-17
 
 МЕТОДОЛОГИЯ ОБНОВЛЕНИЯ КОДА:
 При внесении любых изменений в этот файл необходимо предоставлять полный код файла целиком,
 а не только изменившиеся части. Это обеспечивает целостность кода и исключает ошибки интеграции.
--->
+*/
+
+<!DOCTYPE html>
+<html lang="ru">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Стиль AI - Консультация стилиста</title>
-    <link rel="stylesheet" href="/webapp/styles.css">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>ИИ Стилист</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Подключаем шрифты -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
 </head>
 
 <body>
     <div class="container">
         <header>
-            <h1>Стиль AI</h1>
-            <p class="subtitle">Персональный AI-стилист у вас в кармане</p>
+            <h1>ИИ Стилист</h1>
+            <p class="tagline">Профессиональные рекомендации по стилю</p>
         </header>
 
         <div class="mode-selector">
-            <button class="mode-btn active" id="single-mode-btn">Одиночный анализ</button>
-            <button class="mode-btn" id="compare-mode-btn">Сравнение вещей</button>
+            <button id="single-mode" class="mode-button active">
+                <img src="images/single-mode-icon.svg" alt="" class="button-icon">
+                <span class="button-text">Одиночный анализ</span>
+                <span class="glow-border"></span>
+            </button>
+            <button id="compare-mode" class="mode-button">
+                <img src="images/compare-mode-icon.svg" alt="" class="button-icon">
+                <span class="button-text">Сравнение вещей</span>
+                <span class="glow-border"></span>
+            </button>
         </div>
 
-        <div id="single-mode" class="mode-container">
-            <div class="upload-section">
-                <div class="upload-container" id="upload-container">
-                    <img src="/webapp/images/upload-icon.svg" alt="Загрузить" class="upload-icon">
-                    <p>Нажмите, чтобы загрузить фото одежды</p>
-                    <input type="file" id="file-input" accept="image/*" style="display: none;">
+        <main>
+            <section id="upload-section" class="card">
+                <div class="card-content">
+                    <h2>Загрузите фото одежды</h2>
+                    <p class="description single-mode-text">Загрузите фотографию предмета одежды для анализа</p>
+                    <p class="description compare-mode-text">Загрузите 2-4 фотографии для сравнения</p>
+
+                    <form id="analysis-form" enctype="multipart/form-data">
+                        <div class="upload-container">
+                            <div id="file-drop-area">
+                                <label for="file-input" class="upload-label">
+                                    <img src="images/upload-icon.svg" alt="Загрузить" class="upload-icon">
+                                    <span class="upload-text">Выберите файл или перетащите сюда</span>
+                                </label>
+                                <input type="file" id="file-input" name="image" accept="image/*" multiple>
+                            </div>
+                            <div id="preview-container" class="hidden"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="occasion">Повод:</label>
+                            <select id="occasion" name="occasion" required>
+                                <option value="">Выберите повод</option>
+                                <option value="повседневный">Повседневный</option>
+                                <option value="деловой">Деловая встреча</option>
+                                <option value="торжественный">Торжественное мероприятие</option>
+                                <option value="свидание">Свидание</option>
+                                <option value="спортивный">Спортивное мероприятие</option>
+                                <option value="отдых">Отдых/Путешествие</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="preferences">Предпочтения (необязательно):</label>
+                            <textarea id="preferences" name="preferences"
+                                placeholder="Укажите ваши предпочтения (стиль, цвета, особенности)"></textarea>
+                        </div>
+
+                        <button type="submit" id="submit-button" class="primary-button">
+                            <span class="button-text">Получить анализ</span>
+                            <span class="glow-border"></span>
+                        </button>
+                    </form>
                 </div>
-                <div class="image-preview-container" id="image-preview-container" style="display: none;">
-                    <img id="image-preview" src="#" alt="Предпросмотр">
-                    <button class="change-image-btn" id="change-image-btn">Изменить фото</button>
+            </section>
+
+            <section id="result-section" class="card hidden">
+                <div class="card-content">
+                    <div class="result-header">
+                        <h2>Анализ стилиста</h2>
+                        <button id="back-button" class="secondary-button">
+                            <img src="images/back-button-icon.svg" alt="" class="button-icon">
+                            <span class="button-text">Назад</span>
+                            <span class="glow-border"></span>
+                        </button>
+                    </div>
+                    <div id="loading-indicator" class="hidden">
+                        <div class="spinner"></div>
+                        <p>Анализируем фото...</p>
+                    </div>
+                    <div id="result-content"></div>
                 </div>
-            </div>
+            </section>
+        </main>
 
-            <div class="form-section" id="form-section" style="display: none;">
-                <div class="form-group">
-                    <label for="occasion">Для какого повода?</label>
-                    <select id="occasion" name="occasion">
-                        <option value="повседневный">Повседневный образ</option>
-                        <option value="работа">Работа/офис</option>
-                        <option value="свидание">Свидание</option>
-                        <option value="вечеринка">Вечеринка/клуб</option>
-                        <option value="официальное">Официальное мероприятие</option>
-                        <option value="отдых">Отдых/путешествие</option>
-                        <option value="спорт">Спорт/активный отдых</option>
-                    </select>
-                </div>
+        <footer>
+            <p>© 2025 ИИ Стилист | <a href="#" id="about-link">О сервисе</a></p>
+        </footer>
+    </div>
 
-                <div class="form-group">
-                    <label for="preferences">Дополнительные пожелания (необязательно)</label>
-                    <textarea id="preferences" name="preferences" rows="3"
-                        placeholder="Например: предпочитаю яркие цвета, избегаю кожаных изделий, ищу комфортный вариант..."></textarea>
-                </div>
-
-                <button class="analyze-btn" id="analyze-btn">Получить консультацию</button>
-            </div>
-        </div>
-
-        <div id="compare-mode" class="mode-container" style="display: none;">
-            <div class="upload-section">
-                <div class="upload-container" id="compare-upload-container">
-                    <img src="/webapp/images/upload-icon.svg" alt="Загрузить" class="upload-icon">
-                    <p>Нажмите, чтобы загрузить несколько фото для сравнения</p>
-                    <input type="file" id="compare-file-input" accept="image/*" multiple style="display: none;">
-                </div>
-                <div class="images-gallery" id="images-gallery">
-                    <!-- Здесь будут отображаться загруженные изображения -->
-                </div>
-            </div>
-
-            <div class="form-section" id="compare-form-section" style="display: none;">
-                <div class="form-group">
-                    <label for="compare-occasion">Для какого повода?</label>
-                    <select id="compare-occasion" name="compare-occasion">
-                        <option value="повседневный">Повседневный образ</option>
-                        <option value="работа">Работа/офис</option>
-                        <option value="свидание">Свидание</option>
-                        <option value="вечеринка">Вечеринка/клуб</option>
-                        <option value="официальное">Официальное мероприятие</option>
-                        <option value="отдых">Отдых/путешествие</option>
-                        <option value="спорт">Спорт/активный отдых</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="compare-preferences">Дополнительные пожелания (необязательно)</label>
-                    <textarea id="compare-preferences" name="compare-preferences" rows="3"
-                        placeholder="Например: предпочитаю яркие цвета, избегаю кожаных изделий, ищу комфортный вариант..."></textarea>
-                </div>
-
-                <button class="analyze-btn" id="compare-analyze-btn">Сравнить предметы</button>
-            </div>
-        </div>
-
-        <div class="loading-section" id="loading-section" style="display: none;">
-            <div class="loader"></div>
-            <p>Анализирую вашу одежду с подождите немного...</p>
-            <p class="loading-tip">Это может занять до 30 секунд</p>
-        </div>
-
-        <div class="result-section" id="result-section" style="display: none;">
-            <div class="result-header">
-                <h2>Анализ вашей одежды</h2>
-                <button class="new-analysis-btn" id="new-analysis-btn">Новый анализ</button>
-            </div>
-            <div class="result-content" id="result-content">
-                <!-- Здесь будет результат анализа -->
-            </div>
+    <!-- Модальное окно "О сервисе" -->
+    <div id="about-modal" class="modal hidden">
+        <div class="modal-content card">
+            <span class="close-modal">&times;</span>
+            <h2>О сервисе ИИ Стилист</h2>
+            <p>ИИ Стилист - это персональный помощник по стилю, который анализирует вашу одежду с помощью технологий
+                искусственного интеллекта.</p>
+            <p>Наш сервис предоставляет профессиональные рекомендации по сочетанию одежды, подбору аксессуаров и
+                созданию гармоничных образов для различных случаев.</p>
+            <p>Версия: 0.3.1</p>
         </div>
     </div>
 
-    <footer>
-        <p>Мишура © 2025 — Created by Dubaki</p>
-    </footer>
-
-    <script src="/webapp/script.js"></script>
+    <!-- Подключаем скрипты -->
+    <script src="script.js"></script>
 </body>
 
 </html>

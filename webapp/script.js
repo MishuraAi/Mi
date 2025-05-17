@@ -1,5 +1,5 @@
 /* 
-ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
+ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.2
 ФАЙЛ: script.js
 НАЗНАЧЕНИЕ: Клиентский JavaScript для веб-приложения
 ДАТА ОБНОВЛЕНИЯ: 2025-05-17
@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const compareModeBtn = document.getElementById('compare-mode');
     const fileInput = document.getElementById('file-input');
     const fileDropArea = document.getElementById('file-drop-area');
+    const singleUploadContainer = document.getElementById('single-upload-container');
+    const multiUploadContainer = document.getElementById('multi-upload-container');
     const previewContainer = document.getElementById('preview-container');
     const analysisForm = document.getElementById('analysis-form');
     const uploadSection = document.getElementById('upload-section');
@@ -25,9 +27,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const singleModeText = document.querySelector('.single-mode-text');
     const compareModeText = document.querySelector('.compare-mode-text');
 
+    // Элементы для многослотовой загрузки
+    const imageSlots = document.querySelectorAll('.image-slot');
+    const slotInputs = document.querySelectorAll('.slot-input');
+
     // Состояние приложения
     let currentMode = 'single'; // 'single' или 'compare'
-    let selectedFiles = []; // Массив выбранных файлов
+    let selectedFiles = []; // Массив выбранных файлов для одиночного режима
+    let slotFiles = [null, null, null, null]; // Массив файлов для слотов в режиме сравнения
 
     // Инициализация
     initApp();
@@ -52,10 +59,10 @@ document.addEventListener('DOMContentLoaded', function () {
         singleModeBtn.addEventListener('click', () => switchMode('single'));
         compareModeBtn.addEventListener('click', () => switchMode('compare'));
 
-        // Обработка файлов
+        // Обработка файлов для одиночного режима
         fileInput.addEventListener('change', handleFileSelect);
 
-        // Drag and drop
+        // Drag and drop для одиночного режима
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             fileDropArea.addEventListener(eventName, preventDefaults, false);
         });
@@ -69,6 +76,55 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         fileDropArea.addEventListener('drop', handleDrop, false);
+
+        // Настройка обработчиков для слотов изображений
+        imageSlots.forEach((slot, index) => {
+            // Обработка клика по слоту
+            slot.addEventListener('click', () => {
+                if (!slot.classList.contains('has-image')) {
+                    slotInputs[index].click();
+                }
+            });
+
+            // Обработка выбора файла
+            slotInputs[index].addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleSlotFileSelect(index, e.target.files[0]);
+                }
+            });
+
+            // Обработка drag and drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                slot.addEventListener(eventName, preventDefaults, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                slot.addEventListener(eventName, function (e) {
+                    slot.classList.add('drag-over');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                slot.addEventListener(eventName, function (e) {
+                    slot.classList.remove('drag-over');
+                }, false);
+            });
+
+            slot.addEventListener('drop', function (e) {
+                if (e.dataTransfer.files.length > 0) {
+                    handleSlotFileSelect(index, e.dataTransfer.files[0]);
+                }
+            }, false);
+
+            // Обработка удаления изображения
+            const removeBtn = slot.querySelector('.remove-image');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Предотвращаем открытие диалога выбора файла
+                    removeSlotFile(index);
+                });
+            }
+        });
 
         // Форма анализа
         analysisForm.addEventListener('submit', handleFormSubmit);
@@ -107,42 +163,39 @@ document.addEventListener('DOMContentLoaded', function () {
             compareModeBtn.classList.remove('active');
             singleModeText.style.display = 'block';
             compareModeText.style.display = 'none';
-            // Важно для мобильных устройств
-            fileInput.setAttribute('multiple', ''); // Очищаем атрибут
-            fileInput.removeAttribute('multiple');
+
+            // Показываем одиночную загрузку, скрываем множественную
+            singleUploadContainer.classList.remove('hidden');
+            multiUploadContainer.classList.add('hidden');
         } else {
             singleModeBtn.classList.remove('active');
             compareModeBtn.classList.add('active');
             singleModeText.style.display = 'none';
             compareModeText.style.display = 'block';
-            fileInput.setAttribute('multiple', 'multiple');
+
+            // Показываем множественную загрузку, скрываем одиночную
+            singleUploadContainer.classList.add('hidden');
+            multiUploadContainer.classList.remove('hidden');
         }
 
         // Сброс выбранных файлов
         selectedFiles = [];
+        slotFiles = [null, null, null, null];
         updateFilePreview();
+        updateSlotPreviews();
 
         // Для отладки
         console.log("Режим изменен на:", mode);
-        console.log("Multiple атрибут:", fileInput.multiple);
     }
+
+    // ОБРАБОТКА ФАЙЛОВ ДЛЯ ОДИНОЧНОГО РЕЖИМА
 
     // Обработка выбора файлов
     function handleFileSelect(e) {
         const files = e.target.files;
         if (files && files.length > 0) {
-            console.log("Файлы выбраны через input:", files.length);
-            // На мобильном устройстве принудительно проверяем режим
-            if (isMobileDevice() && currentMode === 'compare' && !fileInput.multiple) {
-                console.log("Мобильное устройство - принудительно устанавливаем multiple");
-                fileInput.setAttribute('multiple', 'multiple');
-                // На мобильных устройствах после установки multiple требуется заново открыть выбор файлов
-                alert("Пожалуйста, выберите файлы снова для режима сравнения");
-                return;
-            }
-            processFiles(files);
-        } else {
-            console.log("Файлы не выбраны");
+            selectedFiles = [files[0]];
+            updateFilePreview();
         }
     }
 
@@ -151,39 +204,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const dt = e.dataTransfer;
         const files = dt.files;
         if (files && files.length > 0) {
-            console.log("Файлы получены при перетаскивании:", files.length);
-            processFiles(files);
-        } else {
-            console.log("Файлы не получены при перетаскивании");
+            selectedFiles = [files[0]];
+            updateFilePreview();
         }
     }
 
-    // Обработка файлов
-    function processFiles(files) {
-        console.log("Обработка файлов:", files.length, "текущий режим:", currentMode);
-
-        if (currentMode === 'single') {
-            // В режиме одиночного анализа берем только первый файл
-            selectedFiles = files.length > 0 ? [files[0]] : [];
-        } else {
-            // В режиме сравнения добавляем файлы к уже выбранным
-            const newFiles = Array.from(files);
-
-            // Ограничиваем количество файлов до 4
-            if (selectedFiles.length + newFiles.length > 4) {
-                const remainingSlots = 4 - selectedFiles.length;
-                alert(`Вы можете выбрать максимум 4 изображения. Добавлено только ${remainingSlots} из выбранных.`);
-                selectedFiles = [...selectedFiles, ...newFiles.slice(0, remainingSlots)];
-            } else {
-                selectedFiles = [...selectedFiles, ...newFiles];
-            }
-        }
-
-        console.log("Выбранные файлы:", selectedFiles.length);
-        updateFilePreview();
-    }
-
-    // Обновление предпросмотра файлов
+    // Обновление предпросмотра файлов для одиночного режима
     function updateFilePreview() {
         previewContainer.innerHTML = '';
 
@@ -221,20 +247,94 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Удаление файла
+    // Удаление файла в одиночном режиме
     function removeFile(index) {
         selectedFiles.splice(index, 1);
         updateFilePreview();
+    }
+
+    // ОБРАБОТКА ФАЙЛОВ ДЛЯ РЕЖИМА СРАВНЕНИЯ
+
+    // Обработка выбора файла для слота
+    function handleSlotFileSelect(slotIndex, file) {
+        slotFiles[slotIndex] = file;
+        updateSlotPreview(slotIndex);
+    }
+
+    // Обновление предпросмотра для слота
+    function updateSlotPreview(slotIndex) {
+        const slot = imageSlots[slotIndex];
+        const file = slotFiles[slotIndex];
+
+        // Удаляем существующее изображение, если оно есть
+        const existingImg = slot.querySelector('.preview-image');
+        if (existingImg) {
+            slot.removeChild(existingImg);
+        }
+
+        if (file) {
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                // Добавляем класс, что в слоте есть изображение
+                slot.classList.add('has-image');
+
+                // Скрываем иконку и текст
+                const uploadLabel = slot.querySelector('.upload-label');
+                uploadLabel.style.opacity = '0';
+
+                // Создаем элемент изображения
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'preview-image';
+                img.alt = file.name;
+
+                slot.appendChild(img);
+            };
+
+            reader.readAsDataURL(file);
+        } else {
+            // Удаляем класс, возвращаем видимость иконки и текста
+            slot.classList.remove('has-image');
+            const uploadLabel = slot.querySelector('.upload-label');
+            uploadLabel.style.opacity = '1';
+        }
+    }
+
+    // Обновление предпросмотра для всех слотов
+    function updateSlotPreviews() {
+        slotFiles.forEach((file, index) => {
+            updateSlotPreview(index);
+        });
+    }
+
+    // Удаление файла из слота
+    function removeSlotFile(slotIndex) {
+        slotFiles[slotIndex] = null;
+        updateSlotPreview(slotIndex);
     }
 
     // Обработка отправки формы
     function handleFormSubmit(e) {
         e.preventDefault();
 
-        // Проверка наличия файлов
-        if (selectedFiles.length === 0) {
-            alert('Пожалуйста, загрузите изображение');
-            return;
+        // Проверка наличия файлов в зависимости от режима
+        let hasFiles = false;
+
+        if (currentMode === 'single') {
+            hasFiles = selectedFiles.length > 0;
+            if (!hasFiles) {
+                alert('Пожалуйста, загрузите изображение');
+                return;
+            }
+        } else {
+            // В режиме сравнения проверяем, есть ли хотя бы 2 файла
+            const filesCount = slotFiles.filter(file => file !== null).length;
+            hasFiles = filesCount >= 2;
+            if (!hasFiles) {
+                alert('Пожалуйста, загрузите не менее 2 изображений для сравнения');
+                return;
+            }
         }
 
         // Проверка выбора повода
@@ -267,8 +367,11 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append('image', selectedFiles[0]);
         } else {
             endpoint = '/compare-outfits';
-            selectedFiles.forEach(file => {
-                formData.append('images', file);
+            // Добавляем только непустые файлы из слотов
+            slotFiles.forEach(file => {
+                if (file !== null) {
+                    formData.append('images', file);
+                }
             });
         }
 
@@ -305,9 +408,18 @@ document.addEventListener('DOMContentLoaded', function () {
     function resetApp() {
         uploadSection.classList.remove('hidden');
         resultSection.classList.add('hidden');
-        selectedFiles = [];
-        fileInput.value = '';
-        updateFilePreview();
+
+        if (currentMode === 'single') {
+            selectedFiles = [];
+            fileInput.value = '';
+            updateFilePreview();
+        } else {
+            slotFiles = [null, null, null, null];
+            slotInputs.forEach(input => {
+                input.value = '';
+            });
+            updateSlotPreviews();
+        }
     }
 
     // Простая функция для преобразования Markdown в HTML

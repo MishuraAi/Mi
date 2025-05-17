@@ -1,5 +1,5 @@
 /* 
-ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
+ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.2
 ФАЙЛ: styles.css
 НАЗНАЧЕНИЕ: Стили для веб-приложения
 ДАТА ОБНОВЛЕНИЯ: 2025-05-17
@@ -214,6 +214,7 @@ section h2 {
     margin-bottom: 25px;
 }
 
+/* Стили для одиночного режима */
 #file-drop-area {
     border: 2px dashed var(--text-secondary);
     border-radius: var(--border-radius);
@@ -227,7 +228,87 @@ section h2 {
 
 #file-drop-area.drag-over {
     border-color: var(--accent-primary);
-    background-color: rgba(138, 43, 226, 0.1);
+    background-color: rgba(0, 200, 255, 0.1);
+}
+
+/* Новый стиль для контейнера множественной загрузки */
+#multi-upload-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 15px;
+    margin-bottom: 20px;
+}
+
+.image-slot {
+    border: 2px dashed var(--text-secondary);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    position: relative;
+}
+
+.image-slot:hover {
+    border-color: var(--accent-primary);
+    background-color: rgba(0, 200, 255, 0.05);
+}
+
+.image-slot.has-image {
+    border-style: solid;
+    border-color: var(--accent-primary);
+}
+
+.image-slot.drag-over {
+    border-color: var(--accent-primary);
+    background-color: rgba(0, 200, 255, 0.1);
+}
+
+.image-slot .upload-icon {
+    width: 30px;
+    height: 30px;
+    margin-bottom: 10px;
+}
+
+.image-slot .upload-text {
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.image-slot .preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: calc(var(--border-radius) - 2px);
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.image-slot .remove-image {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.image-slot.has-image:hover .remove-image {
+    opacity: 1;
 }
 
 .upload-label {
@@ -236,6 +317,8 @@ section h2 {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    width: 100%;
+    height: 100%;
 }
 
 .upload-icon {
@@ -251,11 +334,11 @@ section h2 {
     font-size: 1rem;
 }
 
-#file-input {
+.file-input {
     display: none;
 }
 
-/* Контейнер предпросмотра */
+/* Контейнер предпросмотра для одиночного режима */
 #preview-container {
     display: flex;
     flex-wrap: wrap;
@@ -333,7 +416,7 @@ select:focus,
 textarea:focus {
     outline: none;
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 2px rgba(138, 43, 226, 0.3);
+    box-shadow: 0 0 0 2px rgba(0, 200, 255, 0.3);
 }
 
 textarea {
@@ -515,34 +598,6 @@ footer a:hover {
     display: none;
 }
 
-/* Стили для анимации курсора */
-.cursor-circle {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 8px;
-    /* Уменьшено в 3 раза с 24px */
-    height: 8px;
-    /* Уменьшено в 3 раза с 24px */
-    border-radius: 50%;
-    border: 1px solid var(--accent-primary);
-    /* Уменьшили толщину границы с 2px до 1px */
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 9999;
-    transition: transform 0.1s ease;
-}
-
-.particle-canvas {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 9998;
-}
-
 /* Анимации */
 @keyframes fadeIn {
     from {
@@ -612,11 +667,20 @@ footer a:hover {
         transform: none;
     }
 
+    #multi-upload-container {
+        grid-template-columns: 1fr;
+    }
+
+    .image-slot {
+        min-height: 120px;
+    }
+
     .preview-item {
         width: calc(50% - 10px);
     }
 
-    .remove-preview {
+    .remove-preview,
+    .image-slot .remove-image {
         opacity: 1;
         width: 26px;
         height: 26px;
@@ -630,10 +694,5 @@ footer a:hover {
     .primary-button:hover,
     .secondary-button:hover {
         transform: none;
-    }
-
-    .cursor-circle,
-    .particle-canvas {
-        display: none;
     }
 }

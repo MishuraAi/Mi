@@ -1,10 +1,10 @@
-<!DOCTYPE html>
 <!-- 
-ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.1
+ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.2
 ФАЙЛ: index.html
 НАЗНАЧЕНИЕ: Основной HTML файл веб-приложения
 ДАТА ОБНОВЛЕНИЯ: 2025-05-17
 -->
+<!DOCTYPE html>
 <html lang="ru">
 
 <head>
@@ -28,12 +28,12 @@
 
         <div class="mode-selector">
             <button id="single-mode" class="mode-button active">
-                <!-- <img src="./images/single-mode-icon.svg" alt="" class="button-icon"> -->
+                <!-- <img src="/webapp/images/single-mode-icon.svg" alt="" class="button-icon"> -->
                 <span class="button-text">Одиночный анализ</span>
                 <span class="glow-border"></span>
             </button>
             <button id="compare-mode" class="mode-button">
-                <!-- <img src="./images/compare-mode-icon.svg" alt="" class="button-icon"> -->
+                <!-- <img src="/webapp/images/compare-mode-icon.svg" alt="" class="button-icon"> -->
                 <span class="button-text">Сравнение вещей</span>
                 <span class="glow-border"></span>
             </button>
@@ -48,21 +48,82 @@
 
                     <form id="analysis-form" enctype="multipart/form-data">
                         <div class="upload-container">
-                            <div id="file-drop-area">
-                                <label for="file-input" class="upload-label">
-                                    <!-- <img src="./images/upload-icon.svg" alt="Загрузить" class="upload-icon"> -->
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60"
-                                        fill="none" stroke="#b3b3b3" stroke-width="1.5" stroke-linecap="round"
-                                        stroke-linejoin="round" class="upload-icon">
-                                        <path d="M18 15v3H6v-3"></path>
-                                        <path d="M12 3v10"></path>
-                                        <path d="M9 6l3-3 3 3"></path>
-                                    </svg>
-                                    <span class="upload-text">Выберите файл или перетащите сюда</span>
-                                </label>
-                                <input type="file" id="file-input" name="image" accept="image/*" multiple>
+                            <!-- Контейнер для одиночной загрузки (показан по умолчанию) -->
+                            <div id="single-upload-container">
+                                <div id="file-drop-area">
+                                    <label for="file-input" class="upload-label">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60"
+                                            height="60" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
+                                            <path d="M18 15v3H6v-3"></path>
+                                            <path d="M12 3v10"></path>
+                                            <path d="M9 6l3-3 3 3"></path>
+                                        </svg>
+                                        <span class="upload-text">Выберите файл или перетащите сюда</span>
+                                    </label>
+                                    <input type="file" id="file-input" name="image" accept="image/*" class="file-input">
+                                </div>
+                                <div id="preview-container" class="hidden"></div>
                             </div>
-                            <div id="preview-container" class="hidden"></div>
+
+                            <!-- Контейнер для множественной загрузки (скрыт по умолчанию) -->
+                            <div id="multi-upload-container" class="hidden">
+                                <!-- Слот 1 -->
+                                <div class="image-slot">
+                                    <label class="upload-label">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
+                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
+                                            <path d="M12 5v14M5 12h14"></path>
+                                        </svg>
+                                        <span class="upload-text">Выберите фото 1</span>
+                                    </label>
+                                    <input type="file" class="file-input slot-input" accept="image/*">
+                                    <div class="remove-image">✕</div>
+                                </div>
+
+                                <!-- Слот 2 -->
+                                <div class="image-slot">
+                                    <label class="upload-label">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
+                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
+                                            <path d="M12 5v14M5 12h14"></path>
+                                        </svg>
+                                        <span class="upload-text">Выберите фото 2</span>
+                                    </label>
+                                    <input type="file" class="file-input slot-input" accept="image/*">
+                                    <div class="remove-image">✕</div>
+                                </div>
+
+                                <!-- Слот 3 -->
+                                <div class="image-slot">
+                                    <label class="upload-label">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
+                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
+                                            <path d="M12 5v14M5 12h14"></path>
+                                        </svg>
+                                        <span class="upload-text">Выберите фото 3</span>
+                                    </label>
+                                    <input type="file" class="file-input slot-input" accept="image/*">
+                                    <div class="remove-image">✕</div>
+                                </div>
+
+                                <!-- Слот 4 -->
+                                <div class="image-slot">
+                                    <label class="upload-label">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30"
+                                            height="30" fill="none" stroke="#b3b3b3" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
+                                            <path d="M12 5v14M5 12h14"></path>
+                                        </svg>
+                                        <span class="upload-text">Выберите фото 4</span>
+                                    </label>
+                                    <input type="file" class="file-input slot-input" accept="image/*">
+                                    <div class="remove-image">✕</div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -97,7 +158,7 @@
                     <div class="result-header">
                         <h2>Анализ стилиста</h2>
                         <button id="back-button" class="secondary-button">
-                            <!-- <img src="./images/back-button-icon.svg" alt="" class="button-icon"> -->
+                            <!-- <img src="/webapp/images/back-button-icon.svg" alt="" class="button-icon"> -->
                             <span class="button-text">Назад</span>
                             <span class="glow-border"></span>
                         </button>
@@ -112,7 +173,7 @@
         </main>
 
         <footer>
-            <p>© 2025 Мешура | <a href="#" id="about-link">Created by Dubaki</a></p>
+            <p>© 2025 Мешура | <a href="#" id="about-link">О сервисе</a></p>
         </footer>
     </div>
 
@@ -125,13 +186,13 @@
                 искусственного интеллекта.</p>
             <p>Наш сервис предоставляет профессиональные рекомендации по сочетанию одежды, подбору аксессуаров и
                 созданию гармоничных образов для различных случаев.</p>
-            <p>Версия: 0.3.1</p>
+            <p>Версия: 0.3.2</p>
         </div>
     </div>
 
     <!-- Подключаем скрипты -->
     <script src="/webapp/script.js"></script>
-    <script src="/webapp/cursor-effect.js"></script>
+    <script src="/webapp/neon-cursor.js"></script>
 </body>
 
 </html>

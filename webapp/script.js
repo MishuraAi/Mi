@@ -1,7 +1,9 @@
-/* 
-ИИ СТИЛИСТ - ВЕРСИЯ: 0.3.2
+/*
+ПРОЕКТ: МИШУРА - ИИ СТИЛИСТ
+ВЕРСИЯ ДИЗАЙНА: SereneFlow 1.0
 ФАЙЛ: script.js
-НАЗНАЧЕНИЕ: Клиентский JavaScript для веб-приложения
+НАЗНАЧЕНИЕ: Клиентский JavaScript для веб-приложения "Мишура" с дизайном "SereneFlow".
+МЕТОДОЛОГИЯ ПРАВОК: Файл предоставляется целиком с учетом всех изменений дизайна и интеграции эффекта курсора.
 ДАТА ОБНОВЛЕНИЯ: 2025-05-17
 */
 
@@ -9,541 +11,566 @@ document.addEventListener('DOMContentLoaded', function () {
     // Элементы DOM
     const singleModeBtn = document.getElementById('single-mode');
     const compareModeBtn = document.getElementById('compare-mode');
-    const fileInput = document.getElementById('file-input');
+
+    // Для одиночного режима
+    const fileInputSingle = document.getElementById('file-input-single');
     const fileDropArea = document.getElementById('file-drop-area');
+    const previewContainerSingle = document.getElementById('preview-container-single');
+
+    // Контейнеры режимов
     const singleUploadContainer = document.getElementById('single-upload-container');
     const multiUploadContainer = document.getElementById('multi-upload-container');
-    const previewContainer = document.getElementById('preview-container');
+
     const analysisForm = document.getElementById('analysis-form');
     const uploadSection = document.getElementById('upload-section');
     const resultSection = document.getElementById('result-section');
     const backButton = document.getElementById('back-button');
-    const submitButton = document.getElementById('submit-button');
+    // const submitButton = document.getElementById('submit-button'); // Не используется напрямую, используется form submit
     const resultContent = document.getElementById('result-content');
     const loadingIndicator = document.getElementById('loading-indicator');
+
+    // Модальное окно
     const aboutLink = document.getElementById('about-link');
     const aboutModal = document.getElementById('about-modal');
-    const closeModal = document.querySelector('.close-modal');
+    const closeAboutModal = document.getElementById('close-about-modal');
+
+    // Тексты описания режимов
     const singleModeText = document.querySelector('.single-mode-text');
     const compareModeText = document.querySelector('.compare-mode-text');
 
     // Элементы для многослотовой загрузки
-    const imageSlots = document.querySelectorAll('.image-slot');
-    const slotInputs = document.querySelectorAll('.slot-input');
+    const imageSlots = document.querySelectorAll('.image-slot'); // Получаем все слоты
+    const slotInputs = document.querySelectorAll('.slot-input'); // Получаем все инпуты в слотах
 
     // Состояние приложения
     let currentMode = 'single'; // 'single' или 'compare'
-    let selectedFiles = []; // Массив выбранных файлов для одиночного режима
+    let selectedFileSingle = null; // Для одиночного режима теперь один файл
     let slotFiles = [null, null, null, null]; // Массив файлов для слотов в режиме сравнения
+
+    // --- ИНТЕГРАЦИЯ ЭФФЕКТА КУРСОРА (бывший cursor-effect.js) ---
+    // Настройки курсора (цвета из SereneFlow)
+    const CURSOR_MAIN_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-primary').trim() || '#307A7A';
+    const CURSOR_INTERACTIVE_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-secondary').trim() || '#FF8C69';
+    let customCursor, trailContainer, trailPoints = [], lastPositions = [], mouseX, mouseY, lastUpdate = 0;
+    const MAX_TRAIL_LENGTH_CURSOR = 15; // Уменьшил для более спокойного эффекта
+
+    function initCustomCursor() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+            return;
+        }
+
+        document.body.style.cursor = 'none';
+
+        customCursor = createCursorElement();
+        trailContainer = createTrailContainerElement();
+        document.body.appendChild(customCursor);
+        document.body.appendChild(trailContainer);
+
+        for (let i = 0; i < MAX_TRAIL_LENGTH_CURSOR; i++) {
+            const point = createTrailPointElement(i);
+            trailContainer.appendChild(point);
+            trailPoints.push(point);
+        }
+
+        mouseX = window.innerWidth / 2;
+        mouseY = window.innerHeight / 2;
+
+        document.addEventListener('mousemove', handleMouseMoveCursor);
+        document.addEventListener('mousedown', handleMouseDownCursor);
+        document.addEventListener('mouseup', handleMouseUpCursor);
+        document.addEventListener('mouseover', handleMouseOverInteractive);
+        document.addEventListener('mouseout', handleMouseOutInteractive);
+
+        // Убрал MutationObserver и fullReinit для упрощения и если не было явных проблем
+        // setInterval(ensureCursorInDOMVisual, 500); // Можно вернуть, если курсор будет пропадать
+        animateTrailCursor();
+    }
+
+    function createCursorElement() {
+        const el = document.createElement('div');
+        el.id = 'serene-cursor'; // Новое ID
+        Object.assign(el.style, {
+            position: 'fixed',
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            backgroundColor: CURSOR_MAIN_COLOR,
+            // boxShadow: `0 0 8px ${CURSOR_MAIN_COLOR}, 0 0 15px ${CURSOR_MAIN_COLOR}`, // Убрал тень для чистоты
+            pointerEvents: 'none',
+            zIndex: '2147483647',
+            transform: 'translate(-50%, -50%)',
+            transition: 'transform 0.1s ease-out, background-color 0.2s ease, width 0.2s ease, height 0.2s ease', // Добавил width/height
+        });
+        return el;
+    }
+
+    function createTrailContainerElement() {
+        const el = document.createElement('div');
+        el.id = 'serene-trail'; // Новое ID
+        Object.assign(el.style, {
+            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+            pointerEvents: 'none', zIndex: '2147483646', overflow: 'hidden',
+        });
+        return el;
+    }
+
+    function createTrailPointElement(index) {
+        const el = document.createElement('div');
+        el.className = 'serene-trail-point'; // Новое имя класса
+        const trailColor = index % 2 === 0 ? 'rgba(255, 255, 255, 0.6)' : CURSOR_MAIN_COLOR; // Белый и основной акцентный
+        Object.assign(el.style, {
+            position: 'absolute',
+            width: '8px', // Уменьшил
+            height: '8px', // Уменьшил
+            borderRadius: '50%',
+            backgroundColor: trailColor,
+            opacity: '0',
+            transform: 'translate(-50%, -50%)',
+            transition: 'opacity 0.3s ease-out, width 0.3s ease-out, height 0.3s ease-out', // Плавнее
+            // boxShadow: `0 0 5px ${trailColor}` // Тень для точек хвоста тоже можно убрать для чистоты
+        });
+        return el;
+    }
+
+    // function ensureCursorInDOMVisual() { // Если понадобится
+    //     if (customCursor && !document.body.contains(customCursor)) document.body.appendChild(customCursor);
+    //     if (trailContainer && !document.body.contains(trailContainer)) document.body.appendChild(trailContainer);
+    // }
+
+    function updateCursorPositionVisual(x, y) {
+        // ensureCursorInDOMVisual(); // Если курсор пропадает
+        mouseX = x;
+        mouseY = y;
+        if (customCursor) {
+            customCursor.style.left = x + 'px';
+            customCursor.style.top = y + 'px';
+        }
+    }
+
+    function animateTrailCursor() {
+        const now = Date.now();
+        if (now - lastUpdate < 20) { // Немного увеличил интервал для плавности
+            requestAnimationFrame(animateTrailCursor);
+            return;
+        }
+        lastUpdate = now;
+
+        lastPositions.unshift({ x: mouseX, y: mouseY });
+        if (lastPositions.length > MAX_TRAIL_LENGTH_CURSOR) {
+            lastPositions.pop();
+        }
+
+        trailPoints.forEach((point, i) => {
+            if (i < lastPositions.length) {
+                const pos = lastPositions[i];
+                const progress = i / MAX_TRAIL_LENGTH_CURSOR;
+                const size = 8 - (progress * 6); // Меньше и меньше меняется
+                const opacity = 0.6 - progress * 0.5; // Меньше изначальная прозрачность
+
+                point.style.left = pos.x + 'px';
+                point.style.top = pos.y + 'px';
+                point.style.width = `${size}px`;
+                point.style.height = `${size}px`;
+                point.style.opacity = opacity.toString();
+            } else {
+                point.style.opacity = '0';
+            }
+        });
+        requestAnimationFrame(animateTrailCursor);
+    }
+
+    function handleMouseMoveCursor(e) {
+        updateCursorPositionVisual(e.clientX, e.clientY);
+    }
+
+    function handleMouseDownCursor() {
+        if (customCursor) customCursor.style.transform = 'translate(-50%, -50%) scale(1.5)'; // Меньше увеличение
+    }
+
+    function handleMouseUpCursor() {
+        if (customCursor) customCursor.style.transform = 'translate(-50%, -50%) scale(1)';
+    }
+
+    function handleMouseOverInteractive(e) {
+        if (customCursor && e.target.closest('a, button, select, textarea, input[type="file"], .upload-label, .upload-label-slot, .image-slot, .mode-button, .remove-image, .remove-preview-single, .close-modal')) {
+            customCursor.style.backgroundColor = CURSOR_INTERACTIVE_COLOR;
+            // customCursor.style.boxShadow = `0 0 10px ${CURSOR_INTERACTIVE_COLOR}, 0 0 20px ${CURSOR_INTERACTIVE_COLOR}`;
+            customCursor.style.width = '14px'; // Увеличиваем курсор
+            customCursor.style.height = '14px';
+        }
+    }
+
+    function handleMouseOutInteractive(e) {
+        if (customCursor && e.target.closest('a, button, select, textarea, input[type="file"], .upload-label, .upload-label-slot, .image-slot, .mode-button, .remove-image, .remove-preview-single, .close-modal')) {
+            // Проверяем, не перешли ли на другой интерактивный элемент внутри этого же
+            if (!e.relatedTarget || !e.relatedTarget.closest('a, button, select, textarea, input[type="file"], .upload-label, .upload-label-slot, .image-slot, .mode-button, .remove-image, .remove-preview-single, .close-modal')) {
+                customCursor.style.backgroundColor = CURSOR_MAIN_COLOR;
+                // customCursor.style.boxShadow = `0 0 8px ${CURSOR_MAIN_COLOR}, 0 0 15px ${CURSOR_MAIN_COLOR}`;
+                customCursor.style.width = '10px';
+                customCursor.style.height = '10px';
+            }
+        }
+    }
+    // --- КОНЕЦ ИНТЕГРАЦИИ ЭФФЕКТА КУРСОРА ---
+
 
     // Инициализация
     initApp();
 
-    // Функция инициализации приложения
     function initApp() {
-        // Установка обработчиков событий
         setupEventListeners();
-
-        // Проверка размера экрана и адаптация интерфейса
-        adaptForScreenSize();
-
-        // Проверка мобильного устройства для добавления эффекта нажатия
-        if (isMobileDevice()) {
-            addTouchEffects();
-        }
+        switchMode(currentMode); // Устанавливаем начальный режим
+        initCustomCursor(); // Инициализация кастомного курсора
+        // adaptForScreenSize(); // Не требуется, CSS обрабатывает
+        // addTouchEffects(); // Пока убрал, т.к. glow-эффекты ушли
     }
 
-    // Настройка обработчиков событий
     function setupEventListeners() {
-        // Переключение режимов
         singleModeBtn.addEventListener('click', () => switchMode('single'));
         compareModeBtn.addEventListener('click', () => switchMode('compare'));
 
-        // Обработка файлов для одиночного режима
-        fileInput.addEventListener('change', handleFileSelect);
-
-        // Drag and drop для одиночного режима
+        // Одиночный режим
+        fileInputSingle.addEventListener('change', handleFileSelectSingle);
+        fileDropArea.addEventListener('click', () => fileInputSingle.click()); // Клик по области открывает инпут
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             fileDropArea.addEventListener(eventName, preventDefaults, false);
         });
-
         ['dragenter', 'dragover'].forEach(eventName => {
-            fileDropArea.addEventListener(eventName, highlight, false);
+            fileDropArea.addEventListener(eventName, () => fileDropArea.classList.add('drag-over'), false);
         });
-
         ['dragleave', 'drop'].forEach(eventName => {
-            fileDropArea.addEventListener(eventName, unhighlight, false);
+            fileDropArea.addEventListener(eventName, () => fileDropArea.classList.remove('drag-over'), false);
         });
+        fileDropArea.addEventListener('drop', handleDropSingle, false);
 
-        fileDropArea.addEventListener('drop', handleDrop, false);
+        // Множественный режим (слоты)
+        imageSlots.forEach((slot) => {
+            const input = slot.querySelector('.slot-input');
+            const removeBtn = slot.querySelector('.remove-image');
 
-        // Настройка обработчиков для слотов изображений
-        imageSlots.forEach((slot, index) => {
-            // Обработка клика по слоту
-            slot.addEventListener('click', () => {
-                if (!slot.classList.contains('has-image')) {
-                    slotInputs[index].click();
+            slot.addEventListener('click', (e) => {
+                // Клик по слоту триггерит инпут, если нет картинки или если клик не по кнопке удаления
+                if (!slot.classList.contains('has-image') && e.target !== removeBtn && !removeBtn.contains(e.target)) {
+                    input.click();
                 }
             });
 
-            // Обработка выбора файла
-            slotInputs[index].addEventListener('change', (e) => {
+            input.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {
-                    handleSlotFileSelect(index, e.target.files[0]);
+                    const slotIndex = parseInt(e.target.dataset.slotIndex, 10);
+                    handleSlotFileSelect(slotIndex, e.target.files[0]);
                 }
             });
 
-            // Обработка drag and drop
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const slotIndex = parseInt(input.dataset.slotIndex, 10);
+                removeSlotFile(slotIndex);
+            });
+
+            // Drag and drop для слотов
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                 slot.addEventListener(eventName, preventDefaults, false);
+                slot.addEventListener(eventName, (e) => e.stopPropagation(), false); // Остановка всплытия, чтобы не триггерить drop-зону одиночного режима
             });
-
             ['dragenter', 'dragover'].forEach(eventName => {
-                slot.addEventListener(eventName, function (e) {
-                    slot.classList.add('drag-over');
-                }, false);
+                slot.addEventListener(eventName, () => slot.classList.add('drag-over'), false);
             });
-
             ['dragleave', 'drop'].forEach(eventName => {
-                slot.addEventListener(eventName, function (e) {
-                    slot.classList.remove('drag-over');
-                }, false);
+                slot.addEventListener(eventName, () => slot.classList.remove('drag-over'), false);
             });
-
-            slot.addEventListener('drop', function (e) {
+            slot.addEventListener('drop', (e) => {
                 if (e.dataTransfer.files.length > 0) {
-                    handleSlotFileSelect(index, e.dataTransfer.files[0]);
+                    const slotIndex = parseInt(input.dataset.slotIndex, 10);
+                    handleSlotFileSelect(slotIndex, e.dataTransfer.files[0]);
                 }
             }, false);
-
-            // Обработка удаления изображения
-            const removeBtn = slot.querySelector('.remove-image');
-            if (removeBtn) {
-                removeBtn.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Предотвращаем открытие диалога выбора файла
-                    removeSlotFile(index);
-                });
-            }
         });
 
-        // Форма анализа
+
         analysisForm.addEventListener('submit', handleFormSubmit);
+        backButton.addEventListener('click', resetToUploadView);
 
-        // Кнопка "Назад"
-        backButton.addEventListener('click', resetApp);
-
-        // Модальное окно
         aboutLink.addEventListener('click', e => {
             e.preventDefault();
             aboutModal.classList.remove('hidden');
         });
-
-        closeModal.addEventListener('click', () => {
+        closeAboutModal.addEventListener('click', () => {
             aboutModal.classList.add('hidden');
         });
-
-        // Закрытие модального окна при клике вне его содержимого
         aboutModal.addEventListener('click', e => {
             if (e.target === aboutModal) {
                 aboutModal.classList.add('hidden');
             }
         });
-
-        // Обработка изменения размера окна
-        window.addEventListener('resize', adaptForScreenSize);
     }
 
-    // Функция переключения режимов
     function switchMode(mode) {
         currentMode = mode;
+        selectedFileSingle = null; // Сброс при смене режима
+        slotFiles = [null, null, null, null]; // Сброс слотов
 
-        // Обновление состояния кнопок
         if (mode === 'single') {
             singleModeBtn.classList.add('active');
             compareModeBtn.classList.remove('active');
             singleModeText.style.display = 'block';
             compareModeText.style.display = 'none';
-
-            // Показываем одиночную загрузку, скрываем множественную
             singleUploadContainer.classList.remove('hidden');
             multiUploadContainer.classList.add('hidden');
-        } else {
+        } else { // compare mode
             singleModeBtn.classList.remove('active');
             compareModeBtn.classList.add('active');
             singleModeText.style.display = 'none';
             compareModeText.style.display = 'block';
-
-            // Показываем множественную загрузку, скрываем одиночную
             singleUploadContainer.classList.add('hidden');
             multiUploadContainer.classList.remove('hidden');
         }
-
-        // Сброс выбранных файлов
-        selectedFiles = [];
-        slotFiles = [null, null, null, null];
-        updateFilePreview();
-        updateSlotPreviews();
-
-        // Для отладки
+        updateFilePreviewSingle();
+        updateAllSlotPreviews();
         console.log("Режим изменен на:", mode);
     }
 
-    // ОБРАБОТКА ФАЙЛОВ ДЛЯ ОДИНОЧНОГО РЕЖИМА
-
-    // Обработка выбора файлов
-    function handleFileSelect(e) {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            selectedFiles = [files[0]];
-            updateFilePreview();
+    // --- Одиночный режим ---
+    function handleFileSelectSingle(e) {
+        const file = e.target.files[0];
+        if (file) {
+            selectedFileSingle = file;
+            updateFilePreviewSingle();
         }
     }
 
-    // Обработка перетаскивания файлов
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        if (files && files.length > 0) {
-            selectedFiles = [files[0]];
-            updateFilePreview();
+    function handleDropSingle(e) {
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            selectedFileSingle = file;
+            updateFilePreviewSingle();
         }
     }
 
-    // Обновление предпросмотра файлов для одиночного режима
-    function updateFilePreview() {
-        previewContainer.innerHTML = '';
-
-        if (selectedFiles.length > 0) {
+    function updateFilePreviewSingle() {
+        previewContainerSingle.innerHTML = ''; // Очищаем предыдущее превью
+        if (selectedFileSingle) {
             fileDropArea.classList.add('hidden');
-            previewContainer.classList.remove('hidden');
+            previewContainerSingle.classList.remove('hidden');
 
-            selectedFiles.forEach((file, index) => {
-                const reader = new FileReader();
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item-single';
 
-                reader.onload = function (e) {
-                    const previewItem = document.createElement('div');
-                    previewItem.className = 'preview-item';
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'preview-image-single';
+                img.alt = selectedFileSingle.name;
 
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'preview-image';
-                    img.alt = file.name;
+                const removeBtn = document.createElement('div');
+                removeBtn.className = 'remove-preview-single';
+                removeBtn.innerHTML = '✕';
+                removeBtn.title = 'Удалить изображение';
+                removeBtn.addEventListener('click', () => {
+                    selectedFileSingle = null;
+                    fileInputSingle.value = ''; // Сброс значения инпута
+                    updateFilePreviewSingle();
+                });
 
-                    const removeBtn = document.createElement('div');
-                    removeBtn.className = 'remove-preview';
-                    removeBtn.innerHTML = '✕';
-                    removeBtn.addEventListener('click', () => removeFile(index));
-
-                    previewItem.appendChild(img);
-                    previewItem.appendChild(removeBtn);
-                    previewContainer.appendChild(previewItem);
-                };
-
-                reader.readAsDataURL(file);
-            });
+                previewItem.appendChild(img);
+                previewItem.appendChild(removeBtn);
+                previewContainerSingle.appendChild(previewItem);
+            };
+            reader.readAsDataURL(selectedFileSingle);
         } else {
             fileDropArea.classList.remove('hidden');
-            previewContainer.classList.add('hidden');
+            previewContainerSingle.classList.add('hidden');
         }
     }
 
-    // Удаление файла в одиночном режиме
-    function removeFile(index) {
-        selectedFiles.splice(index, 1);
-        updateFilePreview();
-    }
-
-    // ОБРАБОТКА ФАЙЛОВ ДЛЯ РЕЖИМА СРАВНЕНИЯ
-
-    // Обработка выбора файла для слота
+    // --- Множественный режим (слоты) ---
     function handleSlotFileSelect(slotIndex, file) {
         slotFiles[slotIndex] = file;
         updateSlotPreview(slotIndex);
     }
 
-    // Обновление предпросмотра для слота
     function updateSlotPreview(slotIndex) {
         const slot = imageSlots[slotIndex];
         const file = slotFiles[slotIndex];
-
-        // Удаляем существующее изображение, если оно есть
-        const existingImg = slot.querySelector('.preview-image');
-        if (existingImg) {
-            slot.removeChild(existingImg);
-        }
+        const previewImgEl = slot.querySelector('.preview-image-slot');
+        const removeBtnEl = slot.querySelector('.remove-image');
 
         if (file) {
             const reader = new FileReader();
-
-            reader.onload = function (e) {
-                // Добавляем класс, что в слоте есть изображение
+            reader.onload = (e) => {
+                previewImgEl.src = e.target.result;
+                previewImgEl.classList.remove('hidden');
                 slot.classList.add('has-image');
-
-                // Скрываем иконку и текст
-                const uploadLabel = slot.querySelector('.upload-label');
-                uploadLabel.style.opacity = '0';
-
-                // Создаем элемент изображения
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.className = 'preview-image';
-                img.alt = file.name;
-
-                slot.appendChild(img);
+                removeBtnEl.classList.remove('hidden');
             };
-
             reader.readAsDataURL(file);
         } else {
-            // Удаляем класс, возвращаем видимость иконки и текста
+            previewImgEl.src = '#'; // Сброс src
+            previewImgEl.classList.add('hidden');
             slot.classList.remove('has-image');
-            const uploadLabel = slot.querySelector('.upload-label');
-            uploadLabel.style.opacity = '1';
+            removeBtnEl.classList.add('hidden');
+            // Очищаем также сам file input, чтобы не было "фантомных" файлов
+            const inputEl = slot.querySelector('.slot-input');
+            if (inputEl) inputEl.value = '';
         }
     }
 
-    // Обновление предпросмотра для всех слотов
-    function updateSlotPreviews() {
-        slotFiles.forEach((file, index) => {
-            updateSlotPreview(index);
-        });
+    function updateAllSlotPreviews() {
+        slotFiles.forEach((file, index) => updateSlotPreview(index));
     }
 
-    // Удаление файла из слота
     function removeSlotFile(slotIndex) {
         slotFiles[slotIndex] = null;
         updateSlotPreview(slotIndex);
     }
 
-    // Обработка отправки формы
+    // --- Отправка формы и результаты ---
     function handleFormSubmit(e) {
         e.preventDefault();
-
-        // Проверка наличия файлов в зависимости от режима
-        let hasFiles = false;
+        let filesToUpload = [];
+        let endpoint = '';
 
         if (currentMode === 'single') {
-            hasFiles = selectedFiles.length > 0;
-            if (!hasFiles) {
-                alert('Пожалуйста, загрузите изображение');
+            if (!selectedFileSingle) {
+                alert('Пожалуйста, загрузите изображение для анализа.');
                 return;
             }
-        } else {
-            // В режиме сравнения проверяем, есть ли хотя бы 2 файла
-            const filesCount = slotFiles.filter(file => file !== null).length;
-            hasFiles = filesCount >= 2;
-            if (!hasFiles) {
-                alert('Пожалуйста, загрузите не менее 2 изображений для сравнения');
+            filesToUpload.push(selectedFileSingle);
+            endpoint = '/analyze-outfit';
+        } else { // compare mode
+            filesToUpload = slotFiles.filter(file => file !== null);
+            if (filesToUpload.length < 2) {
+                alert('Пожалуйста, загрузите минимум 2 изображения для сравнения.');
                 return;
             }
+            endpoint = '/compare-outfits';
         }
 
-        // Проверка выбора повода
         const occasion = document.getElementById('occasion').value;
         if (!occasion) {
-            alert('Пожалуйста, выберите повод');
+            alert('Пожалуйста, выберите повод.');
             return;
         }
 
-        // Отображение индикатора загрузки
         uploadSection.classList.add('hidden');
         resultSection.classList.remove('hidden');
         loadingIndicator.classList.remove('hidden');
-        resultContent.innerHTML = '';
+        resultContent.innerHTML = ''; // Очищаем предыдущие результаты
 
-        // Формирование данных для отправки
         const formData = new FormData();
-        const preferences = document.getElementById('preferences').value;
-
         formData.append('occasion', occasion);
+        const preferences = document.getElementById('preferences').value;
         if (preferences) {
             formData.append('preferences', preferences);
         }
 
-        // Выбор API эндпоинта в зависимости от режима
-        let endpoint;
-
         if (currentMode === 'single') {
-            endpoint = '/analyze-outfit';
-            formData.append('image', selectedFiles[0]);
+            formData.append('image', filesToUpload[0]);
         } else {
-            endpoint = '/compare-outfits';
-            // Добавляем только непустые файлы из слотов
-            slotFiles.forEach(file => {
-                if (file !== null) {
-                    formData.append('images', file);
-                }
-            });
+            filesToUpload.forEach(file => formData.append('images', file));
         }
 
-        // Отправка запроса
         fetch(endpoint, {
             method: 'POST',
             body: formData
         })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    // Попытка прочитать ошибку как JSON, если это возможно
+                    return response.json().then(errData => {
+                        throw new Error(errData.message || `Ошибка сервера: ${response.status}`);
+                    }).catch(() => {
+                        // Если тело ответа не JSON или пустое
+                        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 loadingIndicator.classList.add('hidden');
-
-                if (data.status === 'success') {
-                    // Преобразование Markdown в HTML
+                if (data.status === 'success' && data.advice) {
                     resultContent.innerHTML = markdownToHtml(data.advice);
                 } else {
-                    resultContent.innerHTML = `<div class="error-message">
-                    <h3>Произошла ошибка</h3>
-                    <p>${data.message || 'Не удалось выполнить анализ. Пожалуйста, попробуйте снова.'}</p>
-                </div>`;
+                    resultContent.innerHTML = `<div class="error-message"><h3>Произошла ошибка</h3><p>${data.message || 'Не удалось получить анализ. Пожалуйста, попробуйте снова.'}</p></div>`;
                 }
             })
             .catch(error => {
                 loadingIndicator.classList.add('hidden');
-                resultContent.innerHTML = `<div class="error-message">
-                <h3>Ошибка соединения</h3>
-                <p>Не удалось отправить запрос на сервер. Пожалуйста, проверьте подключение к интернету и попробуйте снова.</p>
-            </div>`;
+                resultContent.innerHTML = `<div class="error-message"><h3>Ошибка</h3><p>${error.message || 'Не удалось отправить запрос. Проверьте подключение и попробуйте снова.'}</p></div>`;
                 console.error('Error:', error);
             });
     }
 
-    // Сброс приложения
-    function resetApp() {
+    function resetToUploadView() {
         uploadSection.classList.remove('hidden');
         resultSection.classList.add('hidden');
-
-        if (currentMode === 'single') {
-            selectedFiles = [];
-            fileInput.value = '';
-            updateFilePreview();
-        } else {
-            slotFiles = [null, null, null, null];
-            slotInputs.forEach(input => {
-                input.value = '';
-            });
-            updateSlotPreviews();
-        }
+        // Сбрасываем форму и файлы не здесь, а при переключении режима или успешной отправке, если нужно
+        // Это позволяет пользователю вернуться и посмотреть, что он отправлял.
+        // Если нужен полный сброс:
+        // analysisForm.reset();
+        // selectedFileSingle = null;
+        // slotFiles = [null, null, null, null];
+        // updateFilePreviewSingle();
+        // updateAllSlotPreviews();
     }
 
-    // Простая функция для преобразования Markdown в HTML
-    function markdownToHtml(markdown) {
-        if (!markdown) return '';
-
-        let html = markdown;
-
-        // Заголовки
-        html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
-        html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
-        html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
-
-        // Жирный текст
-        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-        // Курсив
-        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-        // Списки
-        html = html.replace(/^\s*-\s*(.*$)/gm, '<li>$1</li>');
-
-        // Группировка элементов списка в <ul>
-        let inList = false;
-        const lines = html.split('\n');
-        html = lines.map(line => {
-            if (line.includes('<li>')) {
-                if (!inList) {
-                    inList = true;
-                    return '<ul>' + line;
-                }
-                return line;
-            } else if (inList) {
-                inList = false;
-                return '</ul>' + line;
-            }
-            return line;
-        }).join('\n');
-
-        if (inList) {
-            html += '</ul>';
-        }
-
-        // Параграфы (игнорируем строки, которые уже содержат HTML-теги)
-        const paragraphs = html.split('\n\n');
-        html = paragraphs.map(para => {
-            // Если параграф содержит HTML-теги, оставляем как есть
-            if (para.trim().startsWith('<') || para.trim() === '') {
-                return para;
-            }
-            // Иначе оборачиваем в теги <p>
-            return '<p>' + para + '</p>';
-        }).join('\n\n');
-
-        return html;
-    }
-
-    // Вспомогательные функции для Drag and Drop
+    // --- Вспомогательные функции ---
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
 
-    function highlight() {
-        fileDropArea.classList.add('drag-over');
-    }
-
-    function unhighlight() {
-        fileDropArea.classList.remove('drag-over');
-    }
-
-    // Проверка, является ли устройство мобильным
-    function isMobileDevice() {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-    }
-
-    // Адаптация интерфейса для различных размеров экрана
-    function adaptForScreenSize() {
-        if (window.innerWidth < 768) {
-            // Включаем режим мобильной версии
-            addTouchEffects();
-        }
-    }
-
-    // Добавление эффектов касания для мобильных устройств
-    function addTouchEffects() {
-        const buttons = document.querySelectorAll('.mode-button, .primary-button, .secondary-button');
-
-        buttons.forEach(button => {
-            // Удаляем существующие обработчики, чтобы избежать дублирования
-            button.removeEventListener('touchstart', handleTouchStart);
-            button.removeEventListener('touchend', handleTouchEnd);
-
-            // Добавляем новые обработчики
-            button.addEventListener('touchstart', handleTouchStart);
-            button.addEventListener('touchend', handleTouchEnd);
-        });
-    }
-
-    // Обработчик начала касания
-    function handleTouchStart(e) {
-        // Сначала удаляем все активные эффекты свечения
-        document.querySelectorAll('.glow-active').forEach(el => {
-            if (el !== this.querySelector('.glow-border')) {
-                el.classList.remove('glow-active');
+    function markdownToHtml(markdown) {
+        if (!markdown) return '';
+        let html = markdown;
+        // Заголовки (убедимся, что # в начале строки)
+        html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+        // Жирный текст
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+        // Курсив
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+        // Списки (улучшенная обработка)
+        html = html.replace(/^\s*[-*+]\s+(.*)$/gm, '<li>$1</li>');
+        // Оборачиваем группы <li> в <ul>
+        html = html.replace(/<\/li>\s*<li>/g, '</li><li>'); // Убираем пробелы между li
+        let inList = false;
+        const lines = html.split('\n');
+        html = lines.map(line => {
+            if (line.trim().startsWith('<li>')) {
+                if (!inList) {
+                    inList = true;
+                    return '<ul>' + line;
+                }
+                return line;
+            } else if (inList && line.trim() !== '') { // Если строка не пустая и мы были в списке
+                inList = false;
+                return '</ul>' + line;
+            } else if (inList && line.trim() === '') { // Пустая строка внутри списка
+                return line; // Просто пропускаем ее или можно добавить <br>
             }
-        });
-
-        // Добавляем эффект свечения для текущей кнопки
-        const glowBorder = this.querySelector('.glow-border');
-        if (glowBorder) {
-            glowBorder.style.opacity = '0.7'; // Используем конкретное значение вместо var()
-            glowBorder.classList.add('glow-active');
+            return line;
+        }).join('\n');
+        if (inList) { // Если последний элемент был списком
+            html += '</ul>';
         }
-    }
-
-    // Обработчик окончания касания
-    function handleTouchEnd(e) {
-        // Если это не кнопка режима или это не активная кнопка режима, убираем свечение
-        if (!this.classList.contains('mode-button') || !this.classList.contains('active')) {
-            const glowBorder = this.querySelector('.glow-border');
-            if (glowBorder) {
-                glowBorder.style.opacity = '0';
+        // Параграфы (обрабатываем оставшиеся строки, не являющиеся частью тегов)
+        // Пропускаем строки, уже содержащие HTML теги или пустые
+        html = html.split('\n').map(line => {
+            const trimmedLine = line.trim();
+            if (trimmedLine === '' || trimmedLine.match(/^<\/?(ul|li|h[1-6]|strong|em|p|br)/)) {
+                return line; // Оставляем как есть
             }
-        }
+            return '<p>' + line + '</p>'; // Оборачиваем в <p>
+        }).join('\n').replace(/<\/p>\n<p>/g, '</p><p>'); // Убираем лишние переносы между параграфами
+        // Убираем теги <p> вокруг <ul>
+        html = html.replace(/<p><ul>/g, '<ul>').replace(/<\/ul><\/p>/g, '</ul>');
+
+        return html.replace(/\n/g, '<br>'); // Заменяем оставшиеся переносы строк на <br>
     }
 });

@@ -565,10 +565,17 @@ textarea {
     font-size: 0.95rem;
     text-align: center;
     transition: all 0.3s ease;
+    color: var(--text-primary);
+    /* Сделан более заметным текст */
+    font-weight: 500;
+    /* Сделан более жирным текст */
+    text-shadow: 0 0 10px rgba(0, 200, 255, 0.3);
+    /* Добавлено свечение текста */
 }
 
 .image-slot:hover .upload-text {
     color: var(--accent-primary);
+    text-shadow: 0 0 10px rgba(0, 200, 255, 0.7);
 }
 
 .image-slot .preview-image {
@@ -1055,7 +1062,33 @@ footer a:hover::after {
     }
 
     .image-slot {
-        min-height: 150px;
+        min-height: 120px;
+        /* Улучшенный стиль для мобильной версии */
+        border-width: 3px;
+        /* Толще граница */
+        border-color: rgba(0, 200, 255, 0.6);
+        /* Ярче цвет границы */
+        background-color: rgba(0, 200, 255, 0.1);
+        /* Заметнее фон */
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(0, 200, 255, 0.08);
+    }
+
+    .image-slot .upload-icon {
+        opacity: 1;
+        /* Полная видимость */
+        width: 35px;
+        /* Чуть меньше размер */
+        height: 35px;
+        margin-bottom: 8px;
+        animation-play-state: running;
+        /* Всегда анимируется */
+    }
+
+    .image-slot .upload-text {
+        font-weight: 600;
+        /* Более жирный текст на мобильных */
+        color: var(--accent-primary);
+        /* Сразу цветной текст */
     }
 
     .preview-item {

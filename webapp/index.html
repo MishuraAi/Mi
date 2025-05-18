@@ -6,8 +6,221 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="mobile-web-app-capable" content="yes">
     <title>МИШУРА - Ваш персональный стилист</title>
-    <!-- Подключаем внешние стили -->
-    <link rel="stylesheet" href="styles-enhanced.css">
+    <style>
+        /* Базовые стили прямо в HTML для избежания 404 ошибок */
+        :root {
+            --primary-color: #00C2FF;
+            --secondary-color: #FF3E9A;
+            --extra-color: #39D976;
+            --background-color: #F7F9FC;
+            --card-color: #FFFFFF;
+            --text-primary: #212B36;
+            --text-secondary: #637381;
+            --shadow-sm: 0 2px 8px rgba(33, 43, 54, 0.08);
+            --shadow-md: 0 4px 16px rgba(33, 43, 54, 0.12);
+            --radius-md: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            height: 80px;
+            background-color: var(--card-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .header-left {
+            position: absolute;
+            left: 16px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-right {
+            position: absolute;
+            right: 16px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-title-container {
+            text-align: center;
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .main-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .main-button {
+            min-height: 200px;
+            background-color: var(--card-color);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .main-button:active {
+            transform: scale(0.98);
+        }
+
+        #consultation-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background-color: var(--primary-color);
+        }
+
+        #try-on-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background-color: var(--extra-color);
+        }
+
+        .main-button-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        #consultation-button .main-button-icon {
+            background-color: rgba(0, 194, 255, 0.1);
+            color: var(--primary-color);
+        }
+
+        #try-on-button .main-button-icon {
+            background-color: rgba(57, 217, 118, 0.1);
+            color: var(--extra-color);
+        }
+
+        .main-button-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .main-button-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .bottom-nav {
+            height: 64px;
+            background-color: var(--card-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .nav-icon {
+            margin-bottom: 4px;
+        }
+
+        .nav-text {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .nav-item.active .nav-text {
+            color: var(--primary-color);
+        }
+
+        .nav-item.active .nav-icon {
+            color: var(--primary-color);
+        }
+
+        .fab {
+            position: fixed;
+            right: 16px;
+            bottom: 80px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-md);
+            cursor: pointer;
+        }
+    </style>
 </head>
 
 <body>
@@ -113,9 +326,144 @@
         </div>
     </div>
 
-    <!-- Подключаем скрипты -->
-    <script src="cursor-effect.js"></script>
-    <script src="script.js"></script>
+    <!-- Встроенный JavaScript для обработки кликов -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Упрощенный логгер для отладки
+            const logger = {
+                info: (message, ...args) => console.log(`[INFO] МишураApp: ${message}`, ...args),
+                warn: (message, ...args) => console.warn(`[WARN] МишураApp: ${message}`, ...args),
+                error: (message, ...args) => console.error(`[ERROR] МишураApp: ${message}`, ...args),
+                debug: (message, ...args) => console.debug(`[DEBUG] МишураApp: ${message}`, ...args)
+            };
+
+            logger.info("DOM полностью загружен. Инициализация приложения...");
+
+            // Элементы DOM для нового интерфейса
+            const consultationButton = document.getElementById('consultation-button');
+            const tryOnButton = document.getElementById('try-on-button');
+            const navItems = document.querySelectorAll('.nav-item');
+            const fabButton = document.querySelector('.fab');
+            const menuButton = document.querySelector('.header-left');
+            const searchButton = document.querySelector('.header-right');
+            const headerTitle = document.querySelector('.header-title');
+
+            initApp();
+
+            function initApp() {
+                logger.info("initApp: Старт инициализации.");
+                setupEventListeners();
+                logger.info("initApp: Инициализация завершена.");
+            }
+
+            function setupEventListeners() {
+                logger.debug("setupEventListeners: Настройка слушателей...");
+
+                // Основные кнопки действий
+                if (consultationButton) {
+                    consultationButton.addEventListener('click', function (event) {
+                        logger.info("Нажата кнопка 'Получить консультацию'");
+                        showToast("Переход к получению консультации");
+                        event.stopPropagation();
+                    });
+                }
+
+                if (tryOnButton) {
+                    tryOnButton.addEventListener('click', function (event) {
+                        logger.info("Нажата кнопка 'Примерить'");
+                        showToast("Переход к виртуальной примерке");
+                        event.stopPropagation();
+                    });
+                }
+
+                // Нижняя навигация
+                navItems.forEach(item => {
+                    item.addEventListener('click', function (event) {
+                        const navText = item.querySelector('.nav-text')?.textContent || "Неизвестная вкладка";
+                        logger.info(`Нажата вкладка '${navText}'`);
+
+                        // Обновляем активный класс
+                        navItems.forEach(navItem => navItem.classList.remove('active'));
+                        item.classList.add('active');
+
+                        // Логика навигации
+                        showToast(`Переход в раздел: ${navText}`);
+                        event.stopPropagation();
+                    });
+                });
+
+                // FAB кнопка
+                if (fabButton) {
+                    fabButton.addEventListener('click', function (event) {
+                        logger.info("Нажата плавающая кнопка (FAB)");
+                        showToast("Загрузка фотографии");
+                        event.stopPropagation();
+                    });
+                }
+
+                // Кнопка меню
+                if (menuButton) {
+                    menuButton.addEventListener('click', function (event) {
+                        logger.info("Нажата кнопка меню");
+                        showToast("Открытие меню");
+                        event.stopPropagation();
+                    });
+                }
+
+                // Кнопка поиска
+                if (searchButton) {
+                    searchButton.addEventListener('click', function (event) {
+                        logger.info("Нажата кнопка поиска");
+                        showToast("Открытие поиска");
+                        event.stopPropagation();
+                    });
+                }
+
+                // Анимация заголовка
+                if (headerTitle) {
+                    headerTitle.addEventListener('click', function (event) {
+                        logger.info("Нажат заголовок");
+                        showToast("Возврат на главную");
+                        event.stopPropagation();
+                    });
+                }
+
+                logger.debug("setupEventListeners: Слушатели настроены.");
+            }
+
+            // Простой тост для демонстрации действий
+            function showToast(message) {
+                const toast = document.createElement('div');
+                toast.textContent = message;
+                toast.style.position = 'fixed';
+                toast.style.bottom = '100px';
+                toast.style.left = '50%';
+                toast.style.transform = 'translateX(-50%)';
+                toast.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                toast.style.color = 'white';
+                toast.style.padding = '10px 16px';
+                toast.style.borderRadius = '20px';
+                toast.style.zIndex = '9999';
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease-in-out';
+
+                document.body.appendChild(toast);
+
+                // Показываем тост
+                setTimeout(() => {
+                    toast.style.opacity = '1';
+                }, 10);
+
+                // Скрываем и удаляем через 2 секунды
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => {
+                        document.body.removeChild(toast);
+                    }, 300);
+                }, 2000);
+            }
+        });
+    </script>
 </body>
 
 </html>

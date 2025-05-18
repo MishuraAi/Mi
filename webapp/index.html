@@ -4,140 +4,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#00C2FF">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>МИШУРА - Ваш персональный стилист</title>
-    <link rel="stylesheet" href="/webapp/styles-enhanced.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
+    <style>
+        /* Базовые стили прямо в HTML для быстрого тестирования */
+        :root {
+            --primary-color: #00C2FF;
+            --secondary-color: #FF3E9A;
+            --extra-color: #39D976;
+            --background-color: #F7F9FC;
+            --card-color: #FFFFFF;
+            --text-primary: #212B36;
+            --text-secondary: #637381;
+            --shadow-sm: 0 2px 8px rgba(33, 43, 54, 0.08);
+            --shadow-md: 0 4px 16px rgba(33, 43, 54, 0.12);
+            --radius-md: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            height: 80px;
+            background-color: var(--card-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .header-left {
+            position: absolute;
+            left: 16px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-right {
+            position: absolute;
+            right: 16px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-title-container {
+            text-align: center;
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .main-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .main-button {
+            min-height: 200px;
+            background-color: var(--card-color);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .main-button:active {
+            transform: scale(0.98);
+        }
+
+        #consultation-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background-color: var(--primary-color);
+        }
+
+        #try-on-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background-color: var(--extra-color);
+        }
+
+        .main-button-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        #consultation-button .main-button-icon {
+            background-color: rgba(0, 194, 255, 0.1);
+            color: var(--primary-color);
+        }
+
+        #try-on-button .main-button-icon {
+            background-color: rgba(57, 217, 118, 0.1);
+            color: var(--extra-color);
+        }
+
+        .main-button-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .main-button-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .bottom-nav {
+            height: 64px;
+            background-color: var(--card-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px;
+        }
+
+        .nav-icon {
+            margin-bottom: 4px;
+        }
+
+        .nav-text {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .nav-item.active .nav-text {
+            color: var(--primary-color);
+        }
+
+        .nav-item.active .nav-icon {
+            color: var(--primary-color);
+        }
+
+        .fab {
+            position: fixed;
+            right: 16px;
+            bottom: 80px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-md);
+        }
+    </style>
 </head>
 
 <body>
-    <div class="phone-container">
-        <div class="status-bar">
-            <div class="time">9:41</div>
-            <div class="icons">
-                <div class="icon">📶</div>
-                <div class="icon">📱</div>
-                <div class="icon">🔋</div>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-left" id="menu-button">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
             </div>
-        </div>
-        <div class="app-container">
-            <header class="header">
-                <div class="header-left">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="3" y1="12" x2="21" y2="12"></line>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
-                </div>
-                <div class="header-title-container">
-                    <div class="header-title">МИШУРА</div>
-                    <div class="header-subtitle">Ваш персональный стилист</div>
-                </div>
-                <div class="header-right">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                </div>
-            </header>
+            <div class="header-title-container">
+                <div class="header-title">МИШУРА</div>
+                <div class="header-subtitle">Ваш персональный стилист</div>
+            </div>
+            <div class="header-right" id="search-button">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
+        </header>
 
-            <main class="main-content">
-                <div class="main-buttons">
-                    <div class="main-button" id="consultation-button">
-                        <div class="main-button-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path
-                                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
-                                </path>
-                            </svg>
-                        </div>
-                        <div class="main-button-title">Получить консультацию</div>
-                        <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
-                    </div>
-
-                    <div class="main-button" id="try-on-button">
-                        <div class="main-button-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                                <line x1="3" y1="6" x2="21" y2="6"></line>
-                                <path d="M16 10a4 4 0 0 1-8 0"></path>
-                            </svg>
-                        </div>
-                        <div class="main-button-title">Примерить</div>
-                        <div class="main-button-description">Виртуальная примерка образов на вашей фотографии</div>
-                    </div>
-                </div>
-            </main>
-
-            <nav class="bottom-nav">
-                <div class="nav-item active">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+        <main class="main-content">
+            <div class="main-buttons">
+                <div class="main-button" id="consultation-button">
+                    <div class="main-button-icon">
+                        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                        </svg>
-                    </div>
-                    <div class="nav-text">Главная</div>
-                </div>
-
-                <div class="nav-item">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                            <path
+                                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
                             </path>
                         </svg>
                     </div>
-                    <div class="nav-text">Гардероб</div>
+                    <div class="main-button-title">Получить консультацию</div>
+                    <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
                 </div>
 
-                <div class="nav-item">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                <div class="main-button" id="try-on-button">
+                    <div class="main-button-icon">
+                        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <path d="M16 10a4 4 0 0 1-8 0"></path>
                         </svg>
                     </div>
-                    <div class="nav-text">Советы</div>
+                    <div class="main-button-title">Примерить</div>
+                    <div class="main-button-description">Виртуальная примерка образов на вашей фотографии</div>
                 </div>
-
-                <div class="nav-item">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                            <line x1="8" y1="21" x2="16" y2="21"></line>
-                            <line x1="12" y1="17" x2="12" y2="21"></line>
-                        </svg>
-                    </div>
-                    <div class="nav-text">Консультации</div>
-                </div>
-            </nav>
-
-            <div class="fab">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                    <circle cx="12" cy="13" r="4"></circle>
-                </svg>
             </div>
+        </main>
+
+        <nav class="bottom-nav">
+            <div class="nav-item active">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </div>
+                <div class="nav-text">Главная</div>
+            </div>
+
+            <div class="nav-item">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <div class="nav-text">Гардероб</div>
+            </div>
+
+            <div class="nav-item">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="nav-text">Советы</div>
+            </div>
+
+            <div class="nav-item">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+                <div class="nav-text">Консультации</div>
+            </div>
+        </nav>
+
+        <div class="fab" id="fab-button">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+            </svg>
         </div>
     </div>
 
-    <script src="/webapp/script.js"></script>
-    <script src="/webapp/cursor-effect.js"></script>
+    <script>
+        // Встроенный JavaScript для тестирования
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log("DOM загружен, начало инициализации");
+
+            // Проверяем наличие элементов перед добавлением обработчиков
+            const consultationButton = document.getElementById('consultation-button');
+            const tryOnButton = document.getElementById('try-on-button');
+            const menuButton = document.getElementById('menu-button');
+            const searchButton = document.getElementById('search-button');
+            const fabButton = document.getElementById('fab-button');
+            const navItems = document.querySelectorAll('.nav-item');
+
+            // Безопасно добавляем обработчики только если элементы существуют
+            if (consultationButton) {
+                consultationButton.addEventListener('click', function () {
+                    alert('Переход к получению консультации');
+                });
+            }
+
+            if (tryOnButton) {
+                tryOnButton.addEventListener('click', function () {
+                    alert('Переход к примерке');
+                });
+            }
+
+            if (menuButton) {
+                menuButton.addEventListener('click', function () {
+                    alert('Открыто меню');
+                });
+            }
+
+            if (searchButton) {
+                searchButton.addEventListener('click', function () {
+                    alert('Открыт поиск');
+                });
+            }
+
+            if (fabButton) {
+                fabButton.addEventListener('click', function () {
+                    alert('Открыта камера');
+                });
+            }
+
+            navItems.forEach(function (item) {
+                item.addEventListener('click', function () {
+                    // Убираем класс active у всех табов
+                    navItems.forEach(tab => tab.classList.remove('active'));
+                    // Добавляем класс active текущему
+                    this.classList.add('active');
+
+                    const tabName = this.querySelector('.nav-text').textContent;
+                    alert('Переход в раздел: ' + tabName);
+                });
+            });
+
+            console.log("Инициализация завершена успешно");
+        });
+    </script>
 </body>
 
 </html>

@@ -220,28 +220,13 @@
             box-shadow: var(--shadow-md);
             cursor: pointer;
         }
-
-        /* Стиль для тоста */
-        .toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 10px 16px;
-            border-radius: 20px;
-            z-index: 9999;
-            opacity: 1;
-            transition: opacity 0.3s ease-in-out;
-        }
     </style>
 </head>
 
 <body>
     <div class="app-container">
         <header class="header">
-            <div class="header-left" id="menu-button" onclick="showMessage('Открытие меню')">
+            <div class="header-left" id="menu-button" onclick="alert('Открытие меню')">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -249,10 +234,10 @@
                 </svg>
             </div>
             <div class="header-title-container">
-                <div class="header-title" onclick="showMessage('Возврат на главную')">МИШУРА</div>
+                <div class="header-title" onclick="alert('Возврат на главную')">МИШУРА</div>
                 <div class="header-subtitle">Ваш персональный стилист</div>
             </div>
-            <div class="header-right" id="search-button" onclick="showMessage('Открытие поиска')">
+            <div class="header-right" id="search-button" onclick="alert('Открытие поиска')">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -262,8 +247,7 @@
 
         <main class="main-content">
             <div class="main-buttons">
-                <div class="main-button" id="consultation-button"
-                    onclick="showMessage('Переход к получению консультации')">
+                <div class="main-button" id="consultation-button" onclick="alert('Переход к получению консультации')">
                     <div class="main-button-icon">
                         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -276,7 +260,7 @@
                     <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
                 </div>
 
-                <div class="main-button" id="try-on-button" onclick="showMessage('Переход к виртуальной примерке')">
+                <div class="main-button" id="try-on-button" onclick="alert('Переход к виртуальной примерке')">
                     <div class="main-button-icon">
                         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -292,7 +276,7 @@
         </main>
 
         <nav class="bottom-nav">
-            <div class="nav-item active" onclick="activateTab(this, 'Главная')">
+            <div class="nav-item active" onclick="changeTab(this, 'Главная')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -302,7 +286,7 @@
                 <div class="nav-text">Главная</div>
             </div>
 
-            <div class="nav-item" onclick="activateTab(this, 'Гардероб')">
+            <div class="nav-item" onclick="changeTab(this, 'Гардероб')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -311,7 +295,7 @@
                 <div class="nav-text">Гардероб</div>
             </div>
 
-            <div class="nav-item" onclick="activateTab(this, 'Советы')">
+            <div class="nav-item" onclick="changeTab(this, 'Советы')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
@@ -322,7 +306,7 @@
                 <div class="nav-text">Советы</div>
             </div>
 
-            <div class="nav-item" onclick="activateTab(this, 'Консультации')">
+            <div class="nav-item" onclick="changeTab(this, 'Консультации')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -334,7 +318,7 @@
             </div>
         </nav>
 
-        <div class="fab" id="fab-button" onclick="showMessage('Загрузка фотографии')">
+        <div class="fab" id="fab-button" onclick="alert('Загрузка фотографии')">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
@@ -342,53 +326,20 @@
         </div>
     </div>
 
-    <!-- Максимально простой и прямой JavaScript -->
+    <!-- Самый простой скрипт для смены вкладок -->
     <script>
-        // Функция для отображения сообщения (тоста)
-        function showMessage(message) {
-            console.log("Сообщение:", message);
-
-            // Создаем всплывающий тост
-            var toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.innerText = message;
-            document.body.appendChild(toast);
-
-            // Удаляем тост через 2 секунды
-            setTimeout(function () {
-                toast.style.opacity = '0';
-                setTimeout(function () {
-                    document.body.removeChild(toast);
-                }, 300);
-            }, 2000);
-
-            // Также выводим сообщение в консоль для отладки
-            console.log("Показываем сообщение:", message);
-        }
-
-        // Функция для активации вкладки в нижней навигации
-        function activateTab(tab, tabName) {
+        function changeTab(tab, tabName) {
             // Убираем класс active со всех вкладок
             var tabs = document.querySelectorAll('.nav-item');
-            tabs.forEach(function (t) {
-                t.classList.remove('active');
-            });
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
 
             // Добавляем класс active к выбранной вкладке
             tab.classList.add('active');
 
             // Показываем сообщение
-            showMessage('Переход в раздел: ' + tabName);
+            alert('Переход в раздел: ' + tabName);
         }
-
-        // Проверка работы JavaScript
-        console.log("JavaScript загружен и работает");
-
-        // Выводим сообщение при загрузке страницы
-        window.onload = function () {
-            console.log("Страница полностью загружена");
-        };
     </script>
 </body>
-
-</html>

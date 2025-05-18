@@ -1,50 +1,54 @@
 /*
 ПРОЕКТ: МИШУРА - ИИ СТИЛИСТ
-ВЕРСИЯ ДИЗАЙНА: SereneFlow 1.0
+ВЕРСИЯ ДИЗАЙНА: 2.0
 ФАЙЛ: styles-enhanced.css
-НАЗНАЧЕНИЕ: Основной CSS-файл веб-приложения с дизайном "SereneFlow".
-МЕТОДОЛОГИЯ ПРАВОК: Файл предоставляется целиком с учетом всех изменений дизайна.
-ДАТА ОБНОВЛЕНИЯ: 2025-05-17
+НАЗНАЧЕНИЕ: Основной CSS-файл с новым дизайном "МИШУРА" и мобильными анимациями
+МЕТОДОЛОГИЯ ПРАВОК: Полная замена файла для избежания ошибок при интеграции
+ДАТА ОБНОВЛЕНИЯ: 2025-05-19
 */
 
-/* 1. Переменные SereneFlow */
+/* 1. Переменные и основные настройки */
 :root {
+    /* Основная цветовая палитра */
+    --primary-color: #00C2FF;
+    --secondary-color: #FF3E9A;
+    --tertiary-color: #4D4DFF;
+    --accent-color: #FFB800;
+    --extra-color: #39D976;
+    /* Цвет для "Примерить" */
+    --background-color: #F7F9FC;
+    --card-color: #FFFFFF;
+    --text-primary: #212B36;
+    --text-secondary: #637381;
+    --text-tertiary: #919EAB;
+
+    /* Градиенты */
+    --gradient-primary: linear-gradient(135deg, #00C2FF, #01E9FF);
+    --gradient-secondary: linear-gradient(135deg, #FF3E9A, #FF7676);
+    --gradient-tertiary: linear-gradient(135deg, #4D4DFF, #6B78FF);
+    --gradient-accent: linear-gradient(135deg, #FFB800, #FFD600);
+    --gradient-extra: linear-gradient(135deg, #39D976, #53F291);
+    /* Градиент для "Примерить" */
+
+    /* Тени */
+    --shadow-sm: 0 2px 8px rgba(33, 43, 54, 0.08);
+    --shadow-md: 0 4px 16px rgba(33, 43, 54, 0.12);
+    --shadow-lg: 0 8px 24px rgba(33, 43, 54, 0.16);
+
+    /* Радиусы */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-full: 50%;
+
+    /* Анимации */
+    --transition-fast: 0.15s;
+    --transition-normal: 0.25s;
+    --transition-slow: 0.4s;
+
     /* Шрифты */
     --font-primary: 'Inter', 'Montserrat', sans-serif;
-    /* Inter как основной, Montserrat как запасной */
     --font-secondary: 'Montserrat', sans-serif;
-
-    /* Цветовая палитра SereneFlow */
-    --color-bg-light: #F7F8FA;
-    /* Очень светлый, почти imperceptible gradient of cool gray */
-    --color-bg-light-to: #EFF1F5;
-    --color-content-bg: #FFFFFF;
-    /* Чистый белый для карточек */
-    --color-text-primary: #2F4F4F;
-    /* Dark Slate Gray для основного текста */
-    --color-text-secondary: #757575;
-    /* Medium Gray для второстепенного текста */
-    --color-text-placeholder: #A0A0A0;
-    --color-accent-primary: #307A7A;
-    /* Глубокий, десатурированный изумрудно-бирюзовый */
-    --color-accent-primary-hover: #286868;
-    --color-accent-secondary: #FF8C69;
-    /* Мягкий коралловый/персиковый (для предупреждений или второстепенных акцентов) */
-    --color-accent-secondary-hover: #E07B5A;
-    --color-border: #DADDDF;
-    /* Светлая граница для инпутов и разделителей */
-    --color-border-focus: var(--color-accent-primary);
-    --color-shadow: rgba(47, 79, 79, 0.1);
-    /* Мягкая тень от Dark Slate Gray */
-    --color-error: #D32F2F;
-    --color-success: #388E3C;
-
-    /* Размеры и отступы */
-    --border-radius-small: 4px;
-    --border-radius-medium: 8px;
-    --border-radius-large: 12px;
-    --spacing-unit: 8px;
-    --transition-duration: 0.25s;
 }
 
 /* 2. Глобальные стили и сброс */
@@ -54,799 +58,462 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    /* Убираем стандартную подсветку тапа */
 }
 
 html {
     font-size: 16px;
-    /* Базовый размер шрифта */
     scroll-behavior: smooth;
 }
 
 body {
     font-family: var(--font-primary);
-    background: linear-gradient(180deg, var(--color-bg-light) 0%, var(--color-bg-light-to) 100%);
-    color: var(--color-text-primary);
+    background: linear-gradient(180deg, var(--background-color) 0%, var(--background-color) 100%);
+    color: var(--text-primary);
     line-height: 1.6;
-    padding: calc(var(--spacing-unit) * 2);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    padding: 0;
+    margin: 0;
 }
 
-.container {
+/* 3. Структура приложения */
+.phone-container {
     width: 100%;
-    max-width: 760px;
-    /* Чуть уже для элегантности */
+    max-width: 480px;
+    height: 100vh;
     margin: 0 auto;
-    padding: calc(var(--spacing-unit) * 2) 0;
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-}
-
-/* 3. Заголовок */
-.app-header {
-    text-align: center;
-    margin-bottom: calc(var(--spacing-unit) * 5);
-    padding-top: calc(var(--spacing-unit) * 2);
-}
-
-.app-header h1 {
-    font-family: var(--font-secondary);
-    /* Montserrat для заголовка, как и было */
-    font-size: 2.75rem;
-    /* Немного уменьшено для утонченности */
-    font-weight: 700;
-    color: var(--color-accent-primary);
-    margin-bottom: var(--spacing-unit);
-    letter-spacing: -0.5px;
-}
-
-.app-header .tagline {
-    font-size: 1.1rem;
-    color: var(--color-text-secondary);
-    font-weight: 400;
-}
-
-/* 4. Карточки */
-.card {
-    background-color: var(--color-content-bg);
-    border-radius: var(--border-radius-large);
-    box-shadow: 0 4px 12px var(--color-shadow);
-    margin-bottom: calc(var(--spacing-unit) * 4);
     overflow: hidden;
-    transition: box-shadow var(--transition-duration) ease, transform var(--transition-duration) ease;
-}
-
-.card:hover {
-    box-shadow: 0 8px 24px rgba(47, 79, 79, 0.15);
-    /* Усиленная тень при наведении */
-    transform: translateY(-2px);
-}
-
-.card-content {
-    padding: calc(var(--spacing-unit) * 4);
-}
-
-.card-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin-bottom: calc(var(--spacing-unit) * 2);
-}
-
-.description {
-    font-size: 0.95rem;
-    color: var(--color-text-secondary);
-    margin-bottom: calc(var(--spacing-unit) * 3);
-    line-height: 1.7;
-}
-
-/* 5. Кнопки */
-.mode-selector {
-    display: flex;
-    justify-content: center;
-    gap: calc(var(--spacing-unit) * 2);
-    margin-bottom: calc(var(--spacing-unit) * 4);
-}
-
-.mode-button,
-.primary-button,
-.secondary-button {
-    font-family: var(--font-primary);
-    padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3);
-    font-size: 0.95rem;
-    font-weight: 600;
-    border-radius: var(--border-radius-medium);
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: background-color var(--transition-duration) ease,
-        color var(--transition-duration) ease,
-        border-color var(--transition-duration) ease,
-        transform var(--transition-duration) ease,
-        box-shadow var(--transition-duration) ease;
-    text-align: center;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.mode-button {
-    background-color: var(--color-content-bg);
-    color: var(--color-text-secondary);
-    border: 1px solid var(--color-border);
-}
-
-.mode-button:hover {
-    background-color: var(--color-bg-light-to);
-    border-color: var(--color-accent-primary);
-    color: var(--color-accent-primary);
-}
-
-.mode-button.active {
-    background-color: var(--color-accent-primary);
-    color: var(--color-content-bg);
-    border-color: var(--color-accent-primary);
-    box-shadow: 0 2px 8px rgba(48, 122, 122, 0.3);
-}
-
-.primary-button {
-    background-color: var(--color-accent-primary);
-    color: var(--color-content-bg);
-    border-color: var(--color-accent-primary);
-    width: 100%;
-    /* Для кнопки "Получить анализ" */
-}
-
-.primary-button:hover {
-    background-color: var(--color-accent-primary-hover);
-    border-color: var(--color-accent-primary-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(48, 122, 122, 0.2);
-}
-
-.secondary-button {
-    background-color: transparent;
-    color: var(--color-accent-primary);
-    border: 1px solid var(--color-accent-primary);
-}
-
-.secondary-button:hover {
-    background-color: rgba(48, 122, 122, 0.05);
-    /* Легкий фон при наведении */
-    border-color: var(--color-accent-primary-hover);
-    color: var(--color-accent-primary-hover);
-}
-
-/* 6. Формы */
-.form-group {
-    margin-bottom: calc(var(--spacing-unit) * 2.5);
-}
-
-.form-group label {
-    display: block;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--color-text-primary);
-    margin-bottom: var(--spacing-unit);
-}
-
-select,
-textarea {
-    width: 100%;
-    padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 1.5);
-    border-radius: var(--border-radius-medium);
-    background-color: var(--color-bg-light);
-    /* Слегка отличный от фона карточки */
-    border: 1px solid var(--color-border);
-    color: var(--color-text-primary);
-    font-family: var(--font-primary);
-    font-size: 0.95rem;
-    transition: border-color var(--transition-duration) ease, box-shadow var(--transition-duration) ease;
-    outline: none;
-}
-
-select:hover,
-textarea:hover {
-    border-color: #B0BEC5;
-    /* Slightly darker border on hover */
-}
-
-select:focus,
-textarea:focus {
-    border-color: var(--color-border-focus);
-    box-shadow: 0 0 0 3px rgba(48, 122, 122, 0.15);
-}
-
-textarea {
-    min-height: 100px;
-    resize: vertical;
-    line-height: 1.5;
-}
-
-select {
-    appearance: none;
-    /* Убираем стандартную стрелку */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23757575' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right calc(var(--spacing-unit) * 1.5) center;
-    background-size: 16px 16px;
-    padding-right: calc(var(--spacing-unit) * 4);
-    /* Место для стрелки */
-}
-
-::placeholder {
-    color: var(--color-text-placeholder);
-    opacity: 1;
-}
-
-.file-input-hidden {
-    display: none;
-}
-
-/* 7. Область загрузки файлов */
-.upload-area {
-    margin-bottom: calc(var(--spacing-unit) * 3);
-}
-
-#file-drop-area {
-    border: 2px dashed var(--color-border);
-    border-radius: var(--border-radius-medium);
-    padding: calc(var(--spacing-unit) * 4);
-    text-align: center;
-    transition: border-color var(--transition-duration) ease, background-color var(--transition-duration) ease;
-    cursor: pointer;
-}
-
-#file-drop-area:hover,
-#file-drop-area.drag-over {
-    border-color: var(--color-accent-primary);
-    background-color: rgba(48, 122, 122, 0.03);
-}
-
-.upload-label {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text-secondary);
+    background-color: var(--background-color);
 }
 
-.upload-icon {
-    width: 48px;
-    height: 48px;
-    stroke: var(--color-accent-primary);
-    /* Цвет иконки */
-    margin-bottom: var(--spacing-unit);
-    transition: transform var(--transition-duration) ease;
-}
-
-#file-drop-area:hover .upload-icon {
-    transform: scale(1.1);
-}
-
-.upload-text {
-    font-size: 0.95rem;
-}
-
-.upload-text b {
-    color: var(--color-accent-primary);
-    font-weight: 600;
-}
-
-/* Предпросмотр для одиночной загрузки */
-#preview-container-single {
-    margin-top: calc(var(--spacing-unit) * 2);
-    display: flex;
-    /* Для одного элемента, чтобы не было переноса */
-    justify-content: center;
-    /* Центрируем превью, если оно одно */
-}
-
-.preview-item-single {
-    position: relative;
-    max-width: 200px;
-    /* Максимальная ширина превью */
-    max-height: 200px;
-    border-radius: var(--border-radius-medium);
-    overflow: hidden;
-    border: 1px solid var(--color-border);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.preview-image-single {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.remove-preview-single {
-    position: absolute;
-    top: var(--spacing-unit);
-    right: var(--spacing-unit);
-    background-color: rgba(47, 79, 79, 0.6);
-    /* Dark Slate Gray полупрозрачный */
-    color: var(--color-content-bg);
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color var(--transition-duration) ease, transform var(--transition-duration) ease;
-}
-
-.remove-preview-single:hover {
-    background-color: var(--color-accent-primary);
-    transform: scale(1.1);
-}
-
-
-/* Множественная загрузка (слоты) */
-#multi-upload-container {
-    margin-top: calc(var(--spacing-unit) * 2);
-}
-
-.slots-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: calc(var(--spacing-unit) * 2);
-}
-
-.image-slot {
-    aspect-ratio: 1 / 1;
-    /* Делаем слоты квадратными */
-    border: 2px dashed var(--color-border);
-    border-radius: var(--border-radius-medium);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    transition: border-color var(--transition-duration) ease, background-color var(--transition-duration) ease;
-    overflow: hidden;
-    /* Чтобы img не вылезал за рамки */
-}
-
-.image-slot:hover,
-.image-slot.drag-over {
-    border-color: var(--color-accent-primary);
-    background-color: rgba(48, 122, 122, 0.03);
-}
-
-.image-slot.has-image {
-    border-style: solid;
-    border-color: var(--color-accent-primary);
-}
-
-.upload-label-slot {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: var(--color-text-secondary);
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    /* Чтобы было поверх img, пока его нет */
-    top: 0;
-    left: 0;
-    z-index: 1;
-}
-
-.image-slot.has-image .upload-label-slot {
-    display: none;
-    /* Скрываем лейбл, когда есть картинка */
-}
-
-.upload-icon-slot {
-    width: 32px;
-    height: 32px;
-    stroke: var(--color-text-placeholder);
-    margin-bottom: calc(var(--spacing-unit) * 0.5);
-}
-
-.image-slot:hover .upload-icon-slot {
-    stroke: var(--color-accent-primary);
-}
-
-.upload-text-slot {
-    font-size: 0.85rem;
-}
-
-.preview-image-slot {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 0;
-    /* Под лейблом */
-}
-
-.remove-image {
-    position: absolute;
-    top: calc(var(--spacing-unit) * 0.5);
-    right: calc(var(--spacing-unit) * 0.5);
-    background-color: rgba(47, 79, 79, 0.7);
-    color: var(--color-content-bg);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    z-index: 2;
-    /* Поверх всего в слоте */
-    transition: background-color var(--transition-duration) ease, transform var(--transition-duration) ease;
-}
-
-.remove-image:hover {
-    background-color: var(--color-accent-secondary);
-    transform: scale(1.1);
-}
-
-/* 8. Секция результатов */
-.result-header {
+.status-bar {
+    height: 44px;
+    padding: 0 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: calc(var(--spacing-unit) * 3);
-    padding-bottom: calc(var(--spacing-unit) * 1.5);
-    border-bottom: 1px solid var(--color-border);
+    background-color: var(--background-color);
 }
 
-#loading-indicator {
+.time {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.icons {
+    display: flex;
+    gap: 5px;
+}
+
+.app-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 4. Заголовок */
+.header {
+    height: 80px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: calc(var(--spacing-unit) * 5) 0;
-    text-align: center;
-}
-
-#loading-indicator p {
-    font-size: 1rem;
-    color: var(--color-text-secondary);
-    margin-top: calc(var(--spacing-unit) * 2);
-}
-
-/* Улучшенный спиннер */
-.spinner {
-    display: inline-block;
+    padding: 0 16px;
+    box-shadow: var(--shadow-sm);
+    background-color: var(--card-color);
     position: relative;
-    width: 60px;
-    height: 60px;
 }
 
-.spinner div {
-    box-sizing: border-box;
-    display: block;
+.header-left {
     position: absolute;
-    width: 48px;
-    height: 48px;
-    margin: 6px;
-    border: 5px solid var(--color-accent-primary);
-    border-radius: 50%;
-    animation: spinner 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-    border-color: var(--color-accent-primary) transparent transparent transparent;
-}
-
-.spinner div:nth-child(1) {
-    animation-delay: -0.45s;
-}
-
-.spinner div:nth-child(2) {
-    animation-delay: -0.3s;
-}
-
-.spinner div:nth-child(3) {
-    animation-delay: -0.15s;
-}
-
-@keyframes spinner {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
-
-#result-content {
-    line-height: 1.7;
-    font-size: 0.95rem;
-}
-
-#result-content h1,
-#result-content h2,
-#result-content h3 {
-    font-family: var(--font-secondary);
-    color: var(--color-text-primary);
-    margin-top: calc(var(--spacing-unit) * 2.5);
-    margin-bottom: calc(var(--spacing-unit) * 1.5);
-}
-
-#result-content h1 {
-    font-size: 1.8rem;
-    font-weight: 600;
-    color: var(--color-accent-primary);
-}
-
-#result-content h2 {
-    font-size: 1.4rem;
-    font-weight: 600;
-    padding-bottom: calc(var(--spacing-unit) * 0.5);
-    border-bottom: 1px solid var(--color-border);
-}
-
-#result-content h3 {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    /* Не такой яркий, как h2 */
-}
-
-#result-content p {
-    margin-bottom: calc(var(--spacing-unit) * 1.5);
-}
-
-#result-content ul,
-#result-content ol {
-    margin-left: calc(var(--spacing-unit) * 2.5);
-    margin-bottom: calc(var(--spacing-unit) * 1.5);
-    padding-left: var(--spacing-unit);
-}
-
-#result-content li {
-    margin-bottom: var(--spacing-unit);
-}
-
-#result-content strong {
-    font-weight: 600;
-    color: var(--color-accent-primary);
-}
-
-#result-content em {
-    font-style: italic;
-    color: var(--color-text-secondary);
-}
-
-.error-message {
-    background-color: rgba(211, 47, 47, 0.05);
-    /* Светлый фон для ошибки */
-    color: var(--color-error);
-    padding: calc(var(--spacing-unit) * 2);
-    border-radius: var(--border-radius-medium);
-    border: 1px solid var(--color-error);
-}
-
-.error-message h3 {
-    color: var(--color-error);
-    margin-top: 0;
-}
-
-/* 9. Модальное окно */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(47, 79, 79, 0.5);
-    /* Полупрозрачный Dark Slate Gray */
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
     display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    transition: background-color var(--transition-normal);
+}
+
+.header-left:active {
+    background-color: rgba(0, 194, 255, 0.1);
+}
+
+.header-right {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    transition: background-color var(--transition-normal);
+}
+
+.header-right:active {
+    background-color: rgba(0, 194, 255, 0.1);
+}
+
+.header-title-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.header-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+}
+
+.header-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+/* 5. Основной контент */
+.main-content {
+    flex: 1;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition-duration) ease, visibility 0s var(--transition-duration) linear;
-}
-
-.modal:not(.hidden) {
-    opacity: 1;
-    visibility: visible;
-    transition-delay: 0s;
-}
-
-.modal-content {
-    background-color: var(--color-content-bg);
-    /* Используем .card стили */
-    border-radius: var(--border-radius-large);
-    box-shadow: 0 8px 30px rgba(47, 79, 79, 0.2);
-    max-width: 500px;
-    width: calc(100% - var(--spacing-unit) * 4);
-    max-height: 90vh;
     overflow-y: auto;
-    position: relative;
-    /* Для позиционирования .close-modal */
-    padding: calc(var(--spacing-unit) * 3);
-    /* Паддинг внутри .modal-content вместо .card-content */
-    transform: scale(0.95);
-    transition: transform var(--transition-duration) ease;
 }
 
-.modal:not(.hidden) .modal-content {
-    transform: scale(1);
+/* 6. Основные кнопки */
+.main-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+    max-width: 320px;
 }
 
-.modal-content .card-title {
-    /* Стили для заголовка внутри модального окна */
-    margin-bottom: calc(var(--spacing-unit) * 2);
-}
-
-.modal-content p {
-    margin-bottom: var(--spacing-unit);
-    color: var(--color-text-secondary);
-    font-size: 0.9rem;
-}
-
-.modal-content p:last-of-type {
-    margin-bottom: 0;
-}
-
-
-.close-modal {
-    position: absolute;
-    top: calc(var(--spacing-unit) * 1.5);
-    right: calc(var(--spacing-unit) * 1.5);
-    font-size: 1.8rem;
-    font-weight: 300;
-    /* Более тонкий крестик */
-    color: var(--color-text-placeholder);
-    background: none;
-    border: none;
-    cursor: pointer;
-    line-height: 1;
-    padding: calc(var(--spacing-unit) * 0.5);
-    transition: color var(--transition-duration) ease, transform var(--transition-duration) ease;
-}
-
-.close-modal:hover {
-    color: var(--color-accent-primary);
-    transform: rotate(90deg);
-}
-
-/* 10. Подвал */
-.app-footer {
+.main-button {
+    background: var(--card-color);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
-    padding: calc(var(--spacing-unit) * 3) 0 calc(var(--spacing-unit) * 2);
-    color: var(--color-text-secondary);
-    font-size: 0.85rem;
-    margin-top: auto;
-    /* Прижимаем футер к низу */
-    border-top: 1px solid var(--color-border);
+    transition: all var(--transition-normal);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    height: 220px;
+    justify-content: center;
+    user-select: none;
+    touch-action: manipulation;
 }
 
-.app-footer a {
-    color: var(--color-accent-primary);
-    text-decoration: none;
+/* Эффект волны для тапа по кнопке (Ripple effect) */
+.main-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1) translate(-50%, -50%);
+    transform-origin: 0% 0%;
+}
+
+.main-button:active::after {
+    opacity: 1;
+    transform: scale(20) translate(-50%, -50%);
+    transition: transform var(--transition-slow) ease-out, opacity var(--transition-normal) ease-out;
+}
+
+/* Анимация нажатия на кнопку */
+.main-button:active {
+    transform: scale(0.96);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Первая кнопка - Получить консультацию */
+.main-button:nth-child(1)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: var(--gradient-primary);
+    transition: height var(--transition-normal);
+}
+
+.main-button:nth-child(1):active::before {
+    height: 100%;
+    opacity: 0.08;
+}
+
+/* Вторая кнопка - Примерить */
+.main-button:nth-child(2)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: var(--gradient-extra);
+    transition: height var(--transition-normal);
+}
+
+.main-button:nth-child(2):active::before {
+    height: 100%;
+    opacity: 0.08;
+}
+
+.main-button-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition-normal);
+}
+
+.main-button:active .main-button-icon {
+    transform: scale(1.1);
+}
+
+.main-button:nth-child(1) .main-button-icon {
+    background: rgba(0, 194, 255, 0.1);
+    color: #00C2FF;
+}
+
+.main-button:nth-child(2) .main-button-icon {
+    background: rgba(57, 217, 118, 0.1);
+    color: #39D976;
+}
+
+.main-button-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    transition: transform var(--transition-fast);
+}
+
+.main-button:active .main-button-title {
+    transform: translateY(-2px);
+}
+
+.main-button-description {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* 7. Нижняя навигационная панель */
+.bottom-nav {
+    height: 64px;
+    background-color: var(--card-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+    width: 60px;
+    height: 50px;
+    justify-content: center;
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+/* Эффект нажатия на табы нижней панели */
+.nav-item:active {
+    transform: scale(0.92);
+}
+
+/* Эффект волны для табов */
+.nav-item::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(0, 194, 255, 0.2);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1) translate(-50%, -50%);
+    transform-origin: 0% 0%;
+}
+
+.nav-item:active::after {
+    opacity: 1;
+    transform: scale(15) translate(-50%, -50%);
+    transition: transform var(--transition-normal) ease-out, opacity var(--transition-normal) ease-out;
+}
+
+.nav-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition-fast);
+}
+
+.nav-item:active .nav-icon {
+    transform: scale(1.15);
+}
+
+.nav-text {
+    font-size: 10px;
+    color: var(--text-secondary);
     font-weight: 500;
-    transition: color var(--transition-duration) ease;
 }
 
-.app-footer a:hover {
-    color: var(--color-accent-primary-hover);
-    text-decoration: underline;
+.nav-item.active .nav-icon {
+    color: var(--primary-color);
 }
 
-/* 11. Служебные классы */
+.nav-item.active .nav-text {
+    color: var(--primary-color);
+}
+
+/* 8. Плавающая кнопка (FAB) */
+.fab {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-full);
+    position: absolute;
+    bottom: 80px;
+    right: 16px;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    overflow: hidden;
+}
+
+.fab:active {
+    transform: scale(0.92);
+    box-shadow: var(--shadow-md);
+}
+
+/* Эффект волны для кнопки FAB */
+.fab::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.3);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1) translate(-50%, -50%);
+    transform-origin: 0% 0%;
+}
+
+.fab:active::after {
+    opacity: 1;
+    transform: scale(15) translate(-50%, -50%);
+    transition: transform var(--transition-normal) ease-out, opacity var(--transition-normal) ease-out;
+}
+
+/* 9. Общие служебные классы */
 .hidden {
     display: none !important;
 }
 
-/* 12. Адаптивность */
-@media (max-width: 768px) {
-    body {
-        padding: var(--spacing-unit);
+/* 10. Адаптивность для настольных устройств */
+@media (min-width: 768px) {
+    .phone-container {
+        max-width: 480px;
+        height: 812px;
+        border-radius: 40px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        background-color: #000;
+        margin: 20px auto;
+        padding: 8px;
     }
 
-    .container {
-        padding: var(--spacing-unit) 0;
+    .app-container {
+        border-radius: 32px;
+        background-color: var(--background-color);
     }
 
-    .app-header h1 {
-        font-size: 2.25rem;
+    /* На десктопе добавляем эффекты при наведении */
+    .main-button:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
     }
 
-    .app-header .tagline {
-        font-size: 1rem;
+    .main-button:nth-child(1):hover::before,
+    .main-button:nth-child(2):hover::before {
+        height: 100%;
+        opacity: 0.1;
     }
 
-    .card-content {
-        padding: calc(var(--spacing-unit) * 2.5);
+    .main-button:hover .main-button-icon {
+        transform: scale(1.1);
     }
 
-    .card-title {
-        font-size: 1.3rem;
+    .main-button:hover .main-button-title {
+        transform: translateY(-2px);
     }
 
-    .mode-selector {
-        flex-direction: column;
-        gap: var(--spacing-unit);
-        margin-bottom: calc(var(--spacing-unit) * 3);
+    .nav-item:hover {
+        transform: translateY(-3px);
     }
 
-    .mode-button {
-        width: 100%;
+    .nav-item:hover .nav-icon {
+        transform: scale(1.15);
     }
 
-    .slots-container {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        /* Уменьшаем для мобильных */
-        gap: var(--spacing-unit);
+    .fab:hover {
+        transform: scale(1.1) translateY(-5px) rotate(5deg);
+        box-shadow: 0 12px 30px rgba(0, 194, 255, 0.4);
     }
-
-    .upload-icon-slot {
-        width: 28px;
-        height: 28px;
-    }
-
-    .upload-text-slot {
-        font-size: 0.8rem;
-    }
-
-    #preview-container-single {
-        justify-content: flex-start;
-        /* Не центрируем если одна картинка, чтобы удалить было удобно */
-    }
-
-    .preview-item-single {
-        max-width: 150px;
-        max-height: 150px;
-    }
-
-    #result-content h1 {
-        font-size: 1.6rem;
-    }
-
-    #result-content h2 {
-        font-size: 1.25rem;
-    }
-
-    #result-content h3 {
-        font-size: 1.05rem;
-    }
-
-    #result-content p,
-    #result-content li {
-        font-size: 0.9rem;
-    }
-
-    .modal-content {
-        width: calc(100% - var(--spacing-unit) * 2);
-        padding: calc(var(--spacing-unit) * 2);
-    }
-
-    .close-modal {
-        top: var(--spacing-unit);
-        right: var(--spacing-unit);
-    }
-}
-
-/* Неоновый курсор (стили теперь будут в JS или можно убрать полностью, если не нужен) */
-/* Эти стили будут создаваться динамически через JS, если курсор включен. */
-/* Оставлять их здесь не обязательно, если JS полностью управляет созданием элементов. */
-#neon-cursor {
-    /* Стили будут добавлены JS */
-}
-
-.neon-trail-point {
-    /* Стили будут добавлены JS */
 }

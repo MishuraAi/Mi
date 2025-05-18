@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>МИШУРА - ИИ Стилист</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#00C2FF">
+    <title>МИШУРА - Ваш персональный стилист</title>
     <link rel="stylesheet" href="/webapp/styles-enhanced.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,184 +16,128 @@
 </head>
 
 <body>
-    <div class="container">
-        <header class="app-header">
-            <h1>Мишура</h1>
-            <p class="tagline">Ваш персональный ИИ-стилист</p>
-        </header>
-
-        <div class="mode-selector">
-            <button id="single-mode" class="mode-button active">
-                <span class="button-text">Один предмет</span>
-            </button>
-            <button id="compare-mode" class="mode-button">
-                <span class="button-text">Сравнить образы</span>
-            </button>
+    <div class="phone-container">
+        <div class="status-bar">
+            <div class="time">9:41</div>
+            <div class="icons">
+                <div class="icon">📶</div>
+                <div class="icon">📱</div>
+                <div class="icon">🔋</div>
+            </div>
         </div>
-
-        <main>
-            <section id="upload-section" class="card">
-                <div class="card-content">
-                    <h2 class="card-title">Загрузите вашу одежду</h2>
-                    <p class="description single-mode-text">Загрузите фотографию одного предмета одежды для детального
-                        анализа.</p>
-                    <p class="description compare-mode-text" style="display: none;">Загрузите от 2 до 4 фотографий для
-                        сравнения и выбора лучшего варианта.</p>
-
-                    <form id="analysis-form" enctype="multipart/form-data">
-                        <div class="upload-area">
-                            <div id="single-upload-container">
-                                <div id="file-drop-area">
-                                    <label for="file-input-single" class="upload-label">
-                                        <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                            width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"
-                                            stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                            <polyline points="17 8 12 3 7 8"></polyline>
-                                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                                        </svg>
-                                        <span class="upload-text">Перетащите фото сюда или <b>выберите файл</b></span>
-                                    </label>
-                                    <input type="file" id="file-input-single" name="image" accept="image/*"
-                                        class="file-input-hidden">
-                                </div>
-                                <div id="preview-container-single" class="preview-container hidden">
-                                </div>
-                            </div>
-
-                            <div id="multi-upload-container" class="hidden">
-                                <div class="slots-container">
-                                    <div class="image-slot" data-slot-id="0">
-                                        <label class="upload-label-slot">
-                                            <svg class="upload-icon-slot" xmlns="http://www.w3.org/2000/svg"
-                                                viewBox="0 0 24 24" width="32" height="32" fill="none"
-                                                stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                                stroke-linejoin="round">
-                                                <path d="M12 5v14m-7-7h14"></path>
-                                            </svg>
-                                            <span class="upload-text-slot">Фото 1</span>
-                                        </label>
-                                        <input type="file" class="file-input-hidden slot-input" accept="image/*"
-                                            data-slot-index="0">
-                                        <div class="remove-image hidden">✕</div>
-                                        <img class="preview-image-slot hidden" src="#" alt="Предпросмотр 1" />
-                                    </div>
-                                    <div class="image-slot" data-slot-id="1">
-                                        <label class="upload-label-slot">
-                                            <svg class="upload-icon-slot" xmlns="http://www.w3.org/2000/svg"
-                                                viewBox="0 0 24 24" width="32" height="32" fill="none"
-                                                stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                                stroke-linejoin="round">
-                                                <path d="M12 5v14m-7-7h14"></path>
-                                            </svg>
-                                            <span class="upload-text-slot">Фото 2</span>
-                                        </label>
-                                        <input type="file" class="file-input-hidden slot-input" accept="image/*"
-                                            data-slot-index="1">
-                                        <div class="remove-image hidden">✕</div>
-                                        <img class="preview-image-slot hidden" src="#" alt="Предпросмотр 2" />
-                                    </div>
-                                    <div class="image-slot" data-slot-id="2">
-                                        <label class="upload-label-slot">
-                                            <svg class="upload-icon-slot" xmlns="http://www.w3.org/2000/svg"
-                                                viewBox="0 0 24 24" width="32" height="32" fill="none"
-                                                stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                                stroke-linejoin="round">
-                                                <path d="M12 5v14m-7-7h14"></path>
-                                            </svg>
-                                            <span class="upload-text-slot">Фото 3</span>
-                                        </label>
-                                        <input type="file" class="file-input-hidden slot-input" accept="image/*"
-                                            data-slot-index="2">
-                                        <div class="remove-image hidden">✕</div>
-                                        <img class="preview-image-slot hidden" src="#" alt="Предпросмотр 3" />
-                                    </div>
-                                    <div class="image-slot" data-slot-id="3">
-                                        <label class="upload-label-slot">
-                                            <svg class="upload-icon-slot" xmlns="http://www.w3.org/2000/svg"
-                                                viewBox="0 0 24 24" width="32" height="32" fill="none"
-                                                stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                                stroke-linejoin="round">
-                                                <path d="M12 5v14m-7-7h14"></path>
-                                            </svg>
-                                            <span class="upload-text-slot">Фото 4</span>
-                                        </label>
-                                        <input type="file" class="file-input-hidden slot-input" accept="image/*"
-                                            data-slot-index="3">
-                                        <div class="remove-image hidden">✕</div>
-                                        <img class="preview-image-slot hidden" src="#" alt="Предпросмотр 4" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="occasion">Для какого случая образ?</label>
-                            <select id="occasion" name="occasion" required>
-                                <option value="" disabled selected>Выберите повод...</option>
-                                <option value="повседневный">Повседневный</option>
-                                <option value="деловой">Деловая встреча</option>
-                                <option value="торжественный">Торжественное мероприятие</option>
-                                <option value="свидание">Свидание</option>
-                                <option value="спортивный">Спорт / Активный отдых</option>
-                                <option value="отдых">Отдых / Путешествие</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="preferences">Ваши предпочтения (необязательно)</label>
-                            <textarea id="preferences" name="preferences"
-                                placeholder="Например: люблю минимализм, предпочитаю яркие цвета, избегаю облегающих вещей..."></textarea>
-                        </div>
-
-                        <button type="submit" id="submit-button" class="primary-button">
-                            <span class="button-text">Получить анализ</span>
-                        </button>
-                    </form>
+        <div class="app-container">
+            <header class="header">
+                <div class="header-left">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
                 </div>
-            </section>
+                <div class="header-title-container">
+                    <div class="header-title">МИШУРА</div>
+                    <div class="header-subtitle">Ваш персональный стилист</div>
+                </div>
+                <div class="header-right">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </div>
+            </header>
 
-            <section id="result-section" class="card hidden">
-                <div class="card-content">
-                    <div class="result-header">
-                        <h2 class="card-title">Рекомендации стилиста</h2>
-                        <button id="back-button" class="secondary-button">
-                            <span class="button-text">Назад</span>
-                        </button>
-                    </div>
-                    <div id="loading-indicator" class="hidden">
-                        <div class="spinner">
-                            <div></div>
-                            <div></div>
-                            <div></div>
-                            <div></div>
+            <main class="main-content">
+                <div class="main-buttons">
+                    <div class="main-button" id="consultation-button">
+                        <div class="main-button-icon">
+                            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path
+                                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
+                                </path>
+                            </svg>
                         </div>
-                        <p>Анализируем... Это займет немного времени.</p>
+                        <div class="main-button-title">Получить консультацию</div>
+                        <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
                     </div>
-                    <div id="result-content">
+
+                    <div class="main-button" id="try-on-button">
+                        <div class="main-button-icon">
+                            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <path d="M16 10a4 4 0 0 1-8 0"></path>
+                            </svg>
+                        </div>
+                        <div class="main-button-title">Примерить</div>
+                        <div class="main-button-description">Виртуальная примерка образов на вашей фотографии</div>
                     </div>
                 </div>
-            </section>
-        </main>
+            </main>
 
-        <footer class="app-footer">
-            <p>© 2025 Мишура | <a href="#" id="about-link">О сервисе</a></p>
-        </footer>
-    </div>
+            <nav class="bottom-nav">
+                <div class="nav-item active">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                    </div>
+                    <div class="nav-text">Главная</div>
+                </div>
 
-    <div id="about-modal" class="modal hidden">
-        <div class="modal-content card">
-            <span class="close-modal" id="close-about-modal" title="Закрыть">&times;</span>
-            <h2 class="card-title">О сервисе "Мишура"</h2>
-            <p>"Мишура" – это ваш умный помощник в мире стиля, который использует передовые технологии искусственного
-                интеллекта для анализа вашей одежды.</p>
-            <p>Мы стремимся предоставить вам профессиональные и персонализированные рекомендации, чтобы помочь вам
-                создавать гармоничные и уверенные образы для любого случая.</p>
-            <p>Версия: SereneFlow 1.0 (на базе ИИ Стилист 0.3.x)</p>
+                <div class="nav-item">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div class="nav-text">Гардероб</div>
+                </div>
+
+                <div class="nav-item">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div class="nav-text">Советы</div>
+                </div>
+
+                <div class="nav-item">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    </div>
+                    <div class="nav-text">Консультации</div>
+                </div>
+            </nav>
+
+            <div class="fab">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                    <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+            </div>
         </div>
     </div>
 
     <script src="/webapp/script.js"></script>
+    <script src="/webapp/cursor-effect.js"></script>
 </body>
 
 </html>

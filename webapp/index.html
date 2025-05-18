@@ -220,13 +220,97 @@
             box-shadow: var(--shadow-md);
             cursor: pointer;
         }
+
+        /* Стиль для DOM-модального окна */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s linear 0.2s, opacity 0.2s;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px 24px;
+            border-radius: 16px;
+            max-width: 80%;
+            min-width: 280px;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+            transform: translateY(20px);
+            transition: transform 0.2s;
+            color: var(--text-primary);
+        }
+
+        .modal-message {
+            margin-bottom: 20px;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .modal-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 0;
+            width: 100%;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .modal-button:active {
+            transform: scale(0.98);
+        }
+
+        .modal-overlay.show {
+            visibility: visible;
+            opacity: 1;
+            transition-delay: 0s;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: translateY(0);
+        }
+
+        /* Стиль для всплывающего уведомления */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
     </style>
 </head>
 
 <body>
     <div class="app-container">
         <header class="header">
-            <div class="header-left" id="menu-button" onclick="alert('Открытие меню')">
+            <div class="header-left" id="menu-button">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -234,10 +318,10 @@
                 </svg>
             </div>
             <div class="header-title-container">
-                <div class="header-title" onclick="alert('Возврат на главную')">МИШУРА</div>
+                <div class="header-title">МИШУРА</div>
                 <div class="header-subtitle">Ваш персональный стилист</div>
             </div>
-            <div class="header-right" id="search-button" onclick="alert('Открытие поиска')">
+            <div class="header-right" id="search-button">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -247,7 +331,7 @@
 
         <main class="main-content">
             <div class="main-buttons">
-                <div class="main-button" id="consultation-button" onclick="alert('Переход к получению консультации')">
+                <div class="main-button" id="consultation-button">
                     <div class="main-button-icon">
                         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -260,7 +344,7 @@
                     <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
                 </div>
 
-                <div class="main-button" id="try-on-button" onclick="alert('Переход к виртуальной примерке')">
+                <div class="main-button" id="try-on-button">
                     <div class="main-button-icon">
                         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -276,7 +360,7 @@
         </main>
 
         <nav class="bottom-nav">
-            <div class="nav-item active" onclick="changeTab(this, 'Главная')">
+            <div class="nav-item active" data-tab="Главная">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -286,7 +370,7 @@
                 <div class="nav-text">Главная</div>
             </div>
 
-            <div class="nav-item" onclick="changeTab(this, 'Гардероб')">
+            <div class="nav-item" data-tab="Гардероб">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -295,7 +379,7 @@
                 <div class="nav-text">Гардероб</div>
             </div>
 
-            <div class="nav-item" onclick="changeTab(this, 'Советы')">
+            <div class="nav-item" data-tab="Советы">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
@@ -306,7 +390,7 @@
                 <div class="nav-text">Советы</div>
             </div>
 
-            <div class="nav-item" onclick="changeTab(this, 'Консультации')">
+            <div class="nav-item" data-tab="Консультации">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -318,7 +402,7 @@
             </div>
         </nav>
 
-        <div class="fab" id="fab-button" onclick="alert('Загрузка фотографии')">
+        <div class="fab" id="fab-button">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
@@ -326,20 +410,109 @@
         </div>
     </div>
 
-    <!-- Самый простой скрипт для смены вкладок -->
+    <!-- Модальное окно DOM-based -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal-content">
+            <div class="modal-message" id="modalMessage">Сообщение</div>
+            <button class="modal-button" id="modalButton">ОК</button>
+        </div>
+    </div>
+
+    <!-- Элемент для всплывающего уведомления -->
+    <div class="notification" id="notification">
+        Уведомление
+    </div>
+
+    <!-- Скрипт без использования alert() -->
     <script>
-        function changeTab(tab, tabName) {
-            // Убираем класс active со всех вкладок
-            var tabs = document.querySelectorAll('.nav-item');
-            for (var i = 0; i < tabs.length; i++) {
-                tabs[i].classList.remove('active');
+        document.addEventListener('DOMContentLoaded', function () {
+            // Получаем ссылки на DOM-элементы
+            const consultationButton = document.getElementById('consultation-button');
+            const tryOnButton = document.getElementById('try-on-button');
+            const menuButton = document.getElementById('menu-button');
+            const searchButton = document.getElementById('search-button');
+            const headerTitle = document.querySelector('.header-title');
+            const fabButton = document.getElementById('fab-button');
+            const navItems = document.querySelectorAll('.nav-item');
+
+            // Получаем ссылки на элементы уведомлений
+            const modal = document.getElementById('modal');
+            const modalMessage = document.getElementById('modalMessage');
+            const modalButton = document.getElementById('modalButton');
+            const notification = document.getElementById('notification');
+
+            // Функция для показа всплывающего уведомления
+            function showNotification(message) {
+                console.log("Показываем уведомление:", message);
+
+                notification.textContent = message;
+                notification.classList.add('show');
+
+                setTimeout(function () {
+                    notification.classList.remove('show');
+                }, 2000);
             }
 
-            // Добавляем класс active к выбранной вкладке
-            tab.classList.add('active');
+            // Функция для показа модального окна
+            function showModal(message) {
+                console.log("Показываем модальное окно:", message);
 
-            // Показываем сообщение
-            alert('Переход в раздел: ' + tabName);
-        }
+                modalMessage.textContent = message;
+                modal.classList.add('show');
+            }
+
+            // Закрытие модального окна при нажатии на кнопку ОК
+            modalButton.addEventListener('click', function () {
+                modal.classList.remove('show');
+            });
+
+            // Назначаем обработчики событий
+            consultationButton.addEventListener('click', function () {
+                showNotification('Переход к получению консультации');
+            });
+
+            tryOnButton.addEventListener('click', function () {
+                showNotification('Переход к виртуальной примерке');
+            });
+
+            menuButton.addEventListener('click', function () {
+                showNotification('Открытие меню');
+            });
+
+            searchButton.addEventListener('click', function () {
+                showNotification('Открытие поиска');
+            });
+
+            headerTitle.addEventListener('click', function () {
+                showNotification('Возврат на главную');
+            });
+
+            fabButton.addEventListener('click', function () {
+                showNotification('Загрузка фотографии');
+            });
+
+            // Обрабатываем нажатия на вкладки
+            navItems.forEach(function (item) {
+                item.addEventListener('click', function () {
+                    const tabName = item.getAttribute('data-tab');
+
+                    // Удаляем класс active у всех вкладок
+                    navItems.forEach(function (tab) {
+                        tab.classList.remove('active');
+                    });
+
+                    // Добавляем класс active к нажатой вкладке
+                    item.classList.add('active');
+
+                    // Показываем уведомление
+                    showNotification('Переход в раздел: ' + tabName);
+                });
+            });
+
+            // Проверка, что JavaScript загружен
+            console.log("JavaScript полностью загружен и работает");
+        });
     </script>
 </body>
+
+</html>

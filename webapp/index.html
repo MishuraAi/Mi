@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>МИШУРА - Ваш персональный стилист</title>
     <style>
-        /* Базовые стили прямо в HTML для избежания 404 ошибок */
+        /* Базовые стили прямо в HTML */
         :root {
             --primary-color: #00C2FF;
             --secondary-color: #FF3E9A;
@@ -220,13 +220,28 @@
             box-shadow: var(--shadow-md);
             cursor: pointer;
         }
+
+        /* Стиль для тоста */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 20px;
+            z-index: 9999;
+            opacity: 1;
+            transition: opacity 0.3s ease-in-out;
+        }
     </style>
 </head>
 
 <body>
     <div class="app-container">
         <header class="header">
-            <div class="header-left" id="menu-button">
+            <div class="header-left" id="menu-button" onclick="showMessage('Открытие меню')">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -234,10 +249,10 @@
                 </svg>
             </div>
             <div class="header-title-container">
-                <div class="header-title">МИШУРА</div>
+                <div class="header-title" onclick="showMessage('Возврат на главную')">МИШУРА</div>
                 <div class="header-subtitle">Ваш персональный стилист</div>
             </div>
-            <div class="header-right" id="search-button">
+            <div class="header-right" id="search-button" onclick="showMessage('Открытие поиска')">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -247,7 +262,8 @@
 
         <main class="main-content">
             <div class="main-buttons">
-                <div class="main-button" id="consultation-button">
+                <div class="main-button" id="consultation-button"
+                    onclick="showMessage('Переход к получению консультации')">
                     <div class="main-button-icon">
                         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -260,7 +276,7 @@
                     <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
                 </div>
 
-                <div class="main-button" id="try-on-button">
+                <div class="main-button" id="try-on-button" onclick="showMessage('Переход к виртуальной примерке')">
                     <div class="main-button-icon">
                         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -276,7 +292,7 @@
         </main>
 
         <nav class="bottom-nav">
-            <div class="nav-item active">
+            <div class="nav-item active" onclick="activateTab(this, 'Главная')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -286,7 +302,7 @@
                 <div class="nav-text">Главная</div>
             </div>
 
-            <div class="nav-item">
+            <div class="nav-item" onclick="activateTab(this, 'Гардероб')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -295,7 +311,7 @@
                 <div class="nav-text">Гардероб</div>
             </div>
 
-            <div class="nav-item">
+            <div class="nav-item" onclick="activateTab(this, 'Советы')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
@@ -306,7 +322,7 @@
                 <div class="nav-text">Советы</div>
             </div>
 
-            <div class="nav-item">
+            <div class="nav-item" onclick="activateTab(this, 'Консультации')">
                 <div class="nav-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -318,7 +334,7 @@
             </div>
         </nav>
 
-        <div class="fab" id="fab-button">
+        <div class="fab" id="fab-button" onclick="showMessage('Загрузка фотографии')">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
@@ -326,143 +342,52 @@
         </div>
     </div>
 
-    <!-- Встроенный JavaScript для обработки кликов -->
+    <!-- Максимально простой и прямой JavaScript -->
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // Упрощенный логгер для отладки
-            const logger = {
-                info: (message, ...args) => console.log(`[INFO] МишураApp: ${message}`, ...args),
-                warn: (message, ...args) => console.warn(`[WARN] МишураApp: ${message}`, ...args),
-                error: (message, ...args) => console.error(`[ERROR] МишураApp: ${message}`, ...args),
-                debug: (message, ...args) => console.debug(`[DEBUG] МишураApp: ${message}`, ...args)
-            };
+        // Функция для отображения сообщения (тоста)
+        function showMessage(message) {
+            console.log("Сообщение:", message);
 
-            logger.info("DOM полностью загружен. Инициализация приложения...");
+            // Создаем всплывающий тост
+            var toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = message;
+            document.body.appendChild(toast);
 
-            // Элементы DOM для нового интерфейса
-            const consultationButton = document.getElementById('consultation-button');
-            const tryOnButton = document.getElementById('try-on-button');
-            const navItems = document.querySelectorAll('.nav-item');
-            const fabButton = document.querySelector('.fab');
-            const menuButton = document.querySelector('.header-left');
-            const searchButton = document.querySelector('.header-right');
-            const headerTitle = document.querySelector('.header-title');
-
-            initApp();
-
-            function initApp() {
-                logger.info("initApp: Старт инициализации.");
-                setupEventListeners();
-                logger.info("initApp: Инициализация завершена.");
-            }
-
-            function setupEventListeners() {
-                logger.debug("setupEventListeners: Настройка слушателей...");
-
-                // Основные кнопки действий
-                if (consultationButton) {
-                    consultationButton.addEventListener('click', function (event) {
-                        logger.info("Нажата кнопка 'Получить консультацию'");
-                        showToast("Переход к получению консультации");
-                        event.stopPropagation();
-                    });
-                }
-
-                if (tryOnButton) {
-                    tryOnButton.addEventListener('click', function (event) {
-                        logger.info("Нажата кнопка 'Примерить'");
-                        showToast("Переход к виртуальной примерке");
-                        event.stopPropagation();
-                    });
-                }
-
-                // Нижняя навигация
-                navItems.forEach(item => {
-                    item.addEventListener('click', function (event) {
-                        const navText = item.querySelector('.nav-text')?.textContent || "Неизвестная вкладка";
-                        logger.info(`Нажата вкладка '${navText}'`);
-
-                        // Обновляем активный класс
-                        navItems.forEach(navItem => navItem.classList.remove('active'));
-                        item.classList.add('active');
-
-                        // Логика навигации
-                        showToast(`Переход в раздел: ${navText}`);
-                        event.stopPropagation();
-                    });
-                });
-
-                // FAB кнопка
-                if (fabButton) {
-                    fabButton.addEventListener('click', function (event) {
-                        logger.info("Нажата плавающая кнопка (FAB)");
-                        showToast("Загрузка фотографии");
-                        event.stopPropagation();
-                    });
-                }
-
-                // Кнопка меню
-                if (menuButton) {
-                    menuButton.addEventListener('click', function (event) {
-                        logger.info("Нажата кнопка меню");
-                        showToast("Открытие меню");
-                        event.stopPropagation();
-                    });
-                }
-
-                // Кнопка поиска
-                if (searchButton) {
-                    searchButton.addEventListener('click', function (event) {
-                        logger.info("Нажата кнопка поиска");
-                        showToast("Открытие поиска");
-                        event.stopPropagation();
-                    });
-                }
-
-                // Анимация заголовка
-                if (headerTitle) {
-                    headerTitle.addEventListener('click', function (event) {
-                        logger.info("Нажат заголовок");
-                        showToast("Возврат на главную");
-                        event.stopPropagation();
-                    });
-                }
-
-                logger.debug("setupEventListeners: Слушатели настроены.");
-            }
-
-            // Простой тост для демонстрации действий
-            function showToast(message) {
-                const toast = document.createElement('div');
-                toast.textContent = message;
-                toast.style.position = 'fixed';
-                toast.style.bottom = '100px';
-                toast.style.left = '50%';
-                toast.style.transform = 'translateX(-50%)';
-                toast.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-                toast.style.color = 'white';
-                toast.style.padding = '10px 16px';
-                toast.style.borderRadius = '20px';
-                toast.style.zIndex = '9999';
+            // Удаляем тост через 2 секунды
+            setTimeout(function () {
                 toast.style.opacity = '0';
-                toast.style.transition = 'opacity 0.3s ease-in-out';
+                setTimeout(function () {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 2000);
 
-                document.body.appendChild(toast);
+            // Также выводим сообщение в консоль для отладки
+            console.log("Показываем сообщение:", message);
+        }
 
-                // Показываем тост
-                setTimeout(() => {
-                    toast.style.opacity = '1';
-                }, 10);
+        // Функция для активации вкладки в нижней навигации
+        function activateTab(tab, tabName) {
+            // Убираем класс active со всех вкладок
+            var tabs = document.querySelectorAll('.nav-item');
+            tabs.forEach(function (t) {
+                t.classList.remove('active');
+            });
 
-                // Скрываем и удаляем через 2 секунды
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    setTimeout(() => {
-                        document.body.removeChild(toast);
-                    }, 300);
-                }, 2000);
-            }
-        });
+            // Добавляем класс active к выбранной вкладке
+            tab.classList.add('active');
+
+            // Показываем сообщение
+            showMessage('Переход в раздел: ' + tabName);
+        }
+
+        // Проверка работы JavaScript
+        console.log("JavaScript загружен и работает");
+
+        // Выводим сообщение при загрузке страницы
+        window.onload = function () {
+            console.log("Страница полностью загружена");
+        };
     </script>
 </body>
 

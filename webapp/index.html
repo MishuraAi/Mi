@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>МИШУРА - Ваш персональный стилист</title>
     <style>
-        /* Базовые стили прямо в HTML */
+        /* Базовые стили */
         :root {
             --primary-color: #00C2FF;
             --secondary-color: #FF3E9A;
@@ -221,34 +221,252 @@
             cursor: pointer;
         }
 
-        /* Стиль для встроенного уведомления */
-        .inline-notification {
-            background-color: var(--primary-color);
-            color: white;
-            text-align: center;
-            padding: 12px;
-            margin: 10px 0;
+        /* Стили для диалогов и оверлеев */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .dialog {
+            max-width: 90%;
+            width: 320px;
+            background-color: var(--card-color);
             border-radius: var(--radius-md);
-            font-weight: 500;
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.3s ease;
         }
 
-        /* Специальные стили для разных типов уведомлений */
-        .inline-notification.success {
-            background-color: var(--extra-color);
+        .overlay.active .dialog {
+            transform: translateY(0);
+            opacity: 1;
         }
 
-        .inline-notification.warning {
-            background-color: #FFB800;
+        .dialog-header {
+            margin-bottom: 16px;
+            text-align: center;
         }
 
-        /* Область для отображения сообщений внутри контента */
-        #message-area {
-            width: 100%;
-            max-width: 320px;
-            margin-top: 20px;
+        .dialog-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .dialog-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .dialog-content {
+            margin-bottom: 24px;
+        }
+
+        .dialog-footer {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Стили для фото-загрузки */
+        .upload-area {
+            border: 2px dashed var(--primary-color);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 24px;
+            background-color: rgba(0, 194, 255, 0.05);
+            position: relative;
+        }
+
+        .upload-icon {
+            font-size: 36px;
+            color: var(--primary-color);
+            margin-bottom: 16px;
+        }
+
+        .upload-text {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .upload-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Стили для отображения прогресса */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background-color: var(--background-color);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--primary-color);
+            transition: width 0.3s ease;
+        }
+
+        /* Стили для тостов */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            z-index: 2000;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        /* Стили для анализа одежды и результатов */
+        .results-container {
+            width: 100%;
+            text-align: left;
+        }
+
+        .result-section {
+            margin-bottom: 16px;
+            border-radius: var(--radius-md);
+            background-color: white;
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .result-section-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+        }
+
+        .result-section-content {
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .result-image {
+            width: 100%;
+            height: auto;
+            border-radius: var(--radius-md);
+            margin-bottom: 16px;
+        }
+
+        .occasion-selector {
+            width: 100%;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(0, 194, 255, 0.2);
+            background-color: white;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='%2300C2FF' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+
+        .preferences-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(0, 194, 255, 0.2);
+            background-color: white;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        /* Анимация загрузки */
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 16px;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 4px solid rgba(0, 194, 255, 0.2);
+            border-top-color: var(--primary-color);
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -303,9 +521,6 @@
                     <div class="main-button-description">Виртуальная примерка образов на вашей фотографии</div>
                 </div>
             </div>
-
-            <!-- Область для отображения сообщений -->
-            <div id="message-area"></div>
         </main>
 
         <nav class="bottom-nav">
@@ -359,95 +574,382 @@
         </div>
     </div>
 
-    <!-- Ультрапростой JavaScript без внешних элементов -->
+    <!-- Диалог для консультации стилиста -->
+    <div class="overlay" id="consultation-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <div class="dialog-title">Получить консультацию</div>
+                <div class="dialog-subtitle">Загрузите фото одежды для анализа</div>
+            </div>
+            <div class="dialog-content">
+                <div class="upload-area" id="consultation-upload-area">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" fill="none"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                    </div>
+                    <div class="upload-text">Нажмите, чтобы выбрать фото<br>или перетащите файл сюда</div>
+                    <input type="file" id="consultation-upload-input" class="upload-input" accept="image/*">
+                </div>
+
+                <select class="occasion-selector" id="occasion-selector">
+                    <option value="повседневный">Повседневный</option>
+                    <option value="деловой">Деловой</option>
+                    <option value="вечеринка">Вечеринка</option>
+                    <option value="свидание">Свидание</option>
+                    <option value="спорт">Спорт/Активный отдых</option>
+                </select>
+
+                <textarea class="preferences-input" id="preferences-input"
+                    placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ' и т.д.)"></textarea>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-primary" id="analyze-button">Проанализировать</button>
+                <button class="btn btn-secondary" id="consultation-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Диалог для результатов анализа -->
+    <div class="overlay" id="results-overlay">
+        <div class="dialog" style="width: 90%; max-width: 500px;">
+            <div class="dialog-header">
+                <div class="dialog-title">Анализ одежды</div>
+                <div class="dialog-subtitle">Рекомендации Мишуры</div>
+            </div>
+            <div class="dialog-content">
+                <div class="results-container" id="results-container">
+                    <!-- Динамически заполняется результатами анализа -->
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-primary" id="results-close">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Диалог для виртуальной примерки -->
+    <div class="overlay" id="try-on-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <div class="dialog-title">Виртуальная примерка</div>
+                <div class="dialog-subtitle">Загрузите ваше фото для примерки образов</div>
+            </div>
+            <div class="dialog-content">
+                <div class="upload-area" id="try-on-upload-area">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" fill="none"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <div class="upload-text">Загрузите ваше фото для примерки<br>Рекомендуется в полный рост</div>
+                    <input type="file" id="try-on-upload-input" class="upload-input" accept="image/*">
+                </div>
+
+                <select class="occasion-selector" id="try-on-style-selector">
+                    <option value="casual">Повседневный стиль</option>
+                    <option value="business">Деловой стиль</option>
+                    <option value="elegant">Элегантный стиль</option>
+                    <option value="sports">Спортивный стиль</option>
+                </select>
+            </div>
+            <div class="dialog-footer">
+                <button class="btn btn-primary" id="try-on-button-submit">Примерить</button>
+                <button class="btn btn-secondary" id="try-on-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Диалог загрузки -->
+    <div class="overlay" id="loading-overlay">
+        <div class="dialog">
+            <div class="loading-indicator">
+                <div class="loading-spinner"></div>
+                <div id="loading-text">Анализируем...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Тост для сообщений -->
+    <div class="toast" id="toast"></div>
+
+    <!-- JavaScript -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // Получаем область для отображения сообщений
-            var messageArea = document.getElementById('message-area');
+            console.log('МИШУРА App: Инициализация приложения');
 
-            // Функция для добавления видимого уведомления прямо в контент
-            function addVisibleMessage(message, type) {
-                console.log("Добавляем видимое сообщение:", message);
+            // Элементы DOM
+            const consultationButton = document.getElementById('consultation-button');
+            const tryOnButton = document.getElementById('try-on-button');
+            const fabButton = document.getElementById('fab-button');
+            const menuButton = document.getElementById('menu-button');
+            const searchButton = document.getElementById('search-button');
+            const navItems = document.querySelectorAll('.nav-item');
 
-                // Создаем элемент уведомления
-                var notification = document.createElement('div');
-                notification.className = 'inline-notification';
-                if (type) {
-                    notification.className += ' ' + type;
-                }
-                notification.textContent = message;
+            // Элементы диалога консультации
+            const consultationOverlay = document.getElementById('consultation-overlay');
+            const consultationCancel = document.getElementById('consultation-cancel');
+            const analyzeButton = document.getElementById('analyze-button');
+            const consultationUploadInput = document.getElementById('consultation-upload-input');
+            const occasionSelector = document.getElementById('occasion-selector');
+            const preferencesInput = document.getElementById('preferences-input');
 
-                // Добавляем его в область сообщений
-                messageArea.prepend(notification); // добавляем в начало
+            // Элементы диалога результатов
+            const resultsOverlay = document.getElementById('results-overlay');
+            const resultsClose = document.getElementById('results-close');
+            const resultsContainer = document.getElementById('results-container');
 
-                // Ограничиваем количество сообщений
-                while (messageArea.children.length > 3) {
-                    messageArea.removeChild(messageArea.lastChild);
-                }
+            // Элементы диалога примерки
+            const tryOnOverlay = document.getElementById('try-on-overlay');
+            const tryOnCancel = document.getElementById('try-on-cancel');
+            const tryOnUploadInput = document.getElementById('try-on-upload-input');
+            const tryOnStyleSelector = document.getElementById('try-on-style-selector');
+            const tryOnButtonSubmit = document.getElementById('try-on-button-submit');
 
-                // Устанавливаем таймер на удаление сообщения через 5 секунд
-                setTimeout(function () {
-                    if (notification.parentNode === messageArea) {
-                        messageArea.removeChild(notification);
-                    }
-                }, 5000);
+            // Элементы загрузки
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const loadingText = document.getElementById('loading-text');
+
+            // Тост для сообщений
+            const toast = document.getElementById('toast');
+
+            // Состояние приложения
+            const appState = {
+                consultationImage: null,
+                tryOnImage: null
+            };
+
+            // Функция для показа тоста
+            function showToast(message, duration = 2000) {
+                toast.textContent = message;
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, duration);
             }
 
-            // Получаем ссылки на элементы интерфейса
-            var consultationButton = document.getElementById('consultation-button');
-            var tryOnButton = document.getElementById('try-on-button');
-            var menuButton = document.getElementById('menu-button');
-            var searchButton = document.getElementById('search-button');
-            var headerTitle = document.querySelector('.header-title');
-            var fabButton = document.getElementById('fab-button');
-            var navItems = document.querySelectorAll('.nav-item');
+            // Функция для открытия оверлея
+            function openOverlay(overlay) {
+                overlay.classList.add('active');
+            }
 
-            // Назначаем обработчики событий
-            consultationButton.addEventListener('click', function () {
-                addVisibleMessage('Переход к получению консультации');
-            });
+            // Функция для закрытия оверлея
+            function closeOverlay(overlay) {
+                overlay.classList.remove('active');
+            }
 
-            tryOnButton.addEventListener('click', function () {
-                addVisibleMessage('Переход к виртуальной примерке', 'success');
-            });
+            // Функция для показа/скрытия загрузки
+            function toggleLoading(show, message = 'Анализируем...') {
+                if (show) {
+                    loadingText.textContent = message;
+                    openOverlay(loadingOverlay);
+                } else {
+                    closeOverlay(loadingOverlay);
+                }
+            }
 
-            menuButton.addEventListener('click', function () {
-                addVisibleMessage('Открытие меню');
-            });
+            // Функция для анализа одежды
+            async function analyzeOutfit() {
+                if (!appState.consultationImage) {
+                    showToast('Пожалуйста, загрузите изображение одежды');
+                    return;
+                }
 
-            searchButton.addEventListener('click', function () {
-                addVisibleMessage('Открытие поиска');
-            });
+                const occasion = occasionSelector.value;
+                const preferences = preferencesInput.value;
 
-            headerTitle.addEventListener('click', function () {
-                addVisibleMessage('Возврат на главную');
-            });
+                toggleLoading(true, 'Анализируем вашу одежду...');
 
-            fabButton.addEventListener('click', function () {
-                addVisibleMessage('Загрузка фотографии', 'success');
-            });
+                try {
+                    // Создаем FormData для отправки на сервер
+                    const formData = new FormData();
+                    formData.append('image', appState.consultationImage);
+                    formData.append('occasion', occasion);
+                    if (preferences) {
+                        formData.append('preferences', preferences);
+                    }
 
-            // Обрабатываем нажатия на вкладки
-            navItems.forEach(function (item) {
-                item.addEventListener('click', function () {
-                    var tabName = this.getAttribute('data-tab');
-
-                    // Удаляем класс active у всех вкладок
-                    navItems.forEach(function (tab) {
-                        tab.classList.remove('active');
+                    // Отправляем запрос на сервер
+                    const response = await fetch('/analyze-outfit', {
+                        method: 'POST',
+                        body: formData
                     });
 
-                    // Добавляем класс active к нажатой вкладке
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        // Закрываем диалог загрузки и консультации
+                        toggleLoading(false);
+                        closeOverlay(consultationOverlay);
+
+                        // Форматируем и отображаем результаты
+                        displayResults(data.advice);
+                    } else {
+                        toggleLoading(false);
+                        showToast('Произошла ошибка при анализе: ' + data.message);
+                    }
+                } catch (error) {
+                    console.error('Ошибка при анализе одежды:', error);
+                    toggleLoading(false);
+                    showToast('Ошибка соединения с сервером. Попробуйте позже.');
+                }
+            }
+
+            // Функция для отображения результатов анализа
+            function displayResults(advice) {
+                // Очищаем контейнер результатов
+                resultsContainer.innerHTML = '';
+
+                // Преобразуем текстовые результаты в HTML
+                // Предполагается, что совет в формате Markdown с заголовками
+                const sections = advice.split('###').filter(section => section.trim() !== '');
+
+                sections.forEach(section => {
+                    const sectionDiv = document.createElement('div');
+                    sectionDiv.className = 'result-section';
+
+                    const lines = section.trim().split('\n');
+                    const title = lines[0].trim();
+                    const content = lines.slice(1).join('\n').trim();
+
+                    const titleEl = document.createElement('div');
+                    titleEl.className = 'result-section-title';
+                    titleEl.textContent = title;
+
+                    const contentEl = document.createElement('div');
+                    contentEl.className = 'result-section-content';
+                    contentEl.innerHTML = parseMarkdown(content);
+
+                    sectionDiv.appendChild(titleEl);
+                    sectionDiv.appendChild(contentEl);
+                    resultsContainer.appendChild(sectionDiv);
+                });
+
+                // Открываем оверлей с результатами
+                openOverlay(resultsOverlay);
+            }
+
+            // Простая функция для преобразования базового Markdown в HTML
+            function parseMarkdown(markdown) {
+                // Заменяем маркеры списка
+                let html = markdown.replace(/\*\s(.*)/g, '<li>$1</li>');
+                // Добавляем теги списка
+                if (html.includes('<li>')) {
+                    html = '<ul>' + html + '</ul>';
+                }
+                // Заменяем двойные переносы строк на параграфы
+                html = html.replace(/\n\n/g, '</p><p>');
+                // Оборачиваем весь текст в параграф
+                html = '<p>' + html + '</p>';
+
+                return html;
+            }
+
+            // Функция для виртуальной примерки
+            function tryOnOutfit() {
+                if (!appState.tryOnImage) {
+                    showToast('Пожалуйста, загрузите ваше фото');
+                    return;
+                }
+
+                const style = tryOnStyleSelector.value;
+
+                toggleLoading(true, 'Создаем виртуальную примерку...');
+
+                // Имитация задержки для демонстрации
+                setTimeout(() => {
+                    toggleLoading(false);
+                    closeOverlay(tryOnOverlay);
+                    showToast('Функция виртуальной примерки находится в разработке', 3000);
+                }, 2000);
+
+                // В реальном приложении здесь должен быть код для отправки запроса на сервер
+                // и получения результатов виртуальной примерки
+            }
+
+            // Обработчики событий для консультации
+            consultationButton.addEventListener('click', function () {
+                // Сбрасываем предыдущие данные
+                appState.consultationImage = null;
+                consultationUploadInput.value = '';
+                openOverlay(consultationOverlay);
+            });
+
+            consultationCancel.addEventListener('click', function () {
+                closeOverlay(consultationOverlay);
+            });
+
+            consultationUploadInput.addEventListener('change', function (e) {
+                if (e.target.files && e.target.files[0]) {
+                    appState.consultationImage = e.target.files[0];
+                    showToast('Фото загружено успешно!');
+                }
+            });
+
+            analyzeButton.addEventListener('click', analyzeOutfit);
+
+            // Обработчики событий для результатов
+            resultsClose.addEventListener('click', function () {
+                closeOverlay(resultsOverlay);
+            });
+
+            // Обработчики событий для примерки
+            tryOnButton.addEventListener('click', function () {
+                // Сбрасываем предыдущие данные
+                appState.tryOnImage = null;
+                tryOnUploadInput.value = '';
+                openOverlay(tryOnOverlay);
+            });
+
+            tryOnCancel.addEventListener('click', function () {
+                closeOverlay(tryOnOverlay);
+            });
+
+            tryOnUploadInput.addEventListener('change', function (e) {
+                if (e.target.files && e.target.files[0]) {
+                    appState.tryOnImage = e.target.files[0];
+                    showToast('Ваше фото загружено успешно!');
+                }
+            });
+
+            tryOnButtonSubmit.addEventListener('click', tryOnOutfit);
+
+            // Обработчик для кнопки камеры (FAB)
+            fabButton.addEventListener('click', function () {
+                // Открываем диалог консультации
+                consultationButton.click();
+            });
+
+            // Обработчик для кнопки меню
+            menuButton.addEventListener('click', function () {
+                showToast('Меню в разработке');
+            });
+
+            // Обработчик для кнопки поиска
+            searchButton.addEventListener('click', function () {
+                showToast('Поиск в разработке');
+            });
+
+            // Обработчики для нижней навигации
+            navItems.forEach(item => {
+                item.addEventListener('click', function () {
+                    const tabName = this.getAttribute('data-tab');
+
+                    // Обновляем активный класс
+                    navItems.forEach(navItem => navItem.classList.remove('active'));
                     this.classList.add('active');
 
-                    // Показываем уведомление
-                    addVisibleMessage('Переход в раздел: ' + tabName, 'warning');
+                    showToast(`Раздел "${tabName}" в разработке`);
                 });
             });
 
-            // Проверка работы JavaScript
-            console.log("JavaScript полностью загружен");
-            addVisibleMessage("Приложение готово к работе", "success");
+            console.log('МИШУРА App: Инициализация завершена');
+            showToast('Приложение готово к работе');
         });
     </script>
 </body>

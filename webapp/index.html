@@ -221,88 +221,34 @@
             cursor: pointer;
         }
 
-        /* Стиль для DOM-модального окна */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            visibility: hidden;
-            opacity: 0;
-            transition: visibility 0s linear 0.2s, opacity 0.2s;
-        }
-
-        .modal-content {
-            background-color: white;
-            padding: 20px 24px;
-            border-radius: 16px;
-            max-width: 80%;
-            min-width: 280px;
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
-            transform: translateY(20px);
-            transition: transform 0.2s;
-            color: var(--text-primary);
-        }
-
-        .modal-message {
-            margin-bottom: 20px;
-            font-size: 16px;
+        /* Стиль для встроенного уведомления */
+        .inline-notification {
+            background-color: var(--primary-color);
+            color: white;
             text-align: center;
-        }
-
-        .modal-button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 0;
-            width: 100%;
-            border-radius: 8px;
-            font-size: 16px;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: var(--radius-md);
             font-weight: 500;
-            cursor: pointer;
         }
 
-        .modal-button:active {
-            transform: scale(0.98);
+        /* Специальные стили для разных типов уведомлений */
+        .inline-notification.success {
+            background-color: var(--extra-color);
         }
 
-        .modal-overlay.show {
-            visibility: visible;
-            opacity: 1;
-            transition-delay: 0s;
+        .inline-notification.warning {
+            background-color: #FFB800;
         }
 
-        .modal-overlay.show .modal-content {
-            transform: translateY(0);
-        }
-
-        /* Стиль для всплывающего уведомления */
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background-color: var(--primary-color);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 30px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .notification.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-            visibility: visible;
+        /* Область для отображения сообщений внутри контента */
+        #message-area {
+            width: 100%;
+            max-width: 320px;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
     </style>
 </head>
@@ -357,6 +303,9 @@
                     <div class="main-button-description">Виртуальная примерка образов на вашей фотографии</div>
                 </div>
             </div>
+
+            <!-- Область для отображения сообщений -->
+            <div id="message-area"></div>
         </main>
 
         <nav class="bottom-nav">
@@ -410,91 +359,78 @@
         </div>
     </div>
 
-    <!-- Модальное окно DOM-based -->
-    <div class="modal-overlay" id="modal">
-        <div class="modal-content">
-            <div class="modal-message" id="modalMessage">Сообщение</div>
-            <button class="modal-button" id="modalButton">ОК</button>
-        </div>
-    </div>
-
-    <!-- Элемент для всплывающего уведомления -->
-    <div class="notification" id="notification">
-        Уведомление
-    </div>
-
-    <!-- Скрипт без использования alert() -->
+    <!-- Ультрапростой JavaScript без внешних элементов -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // Получаем ссылки на DOM-элементы
-            const consultationButton = document.getElementById('consultation-button');
-            const tryOnButton = document.getElementById('try-on-button');
-            const menuButton = document.getElementById('menu-button');
-            const searchButton = document.getElementById('search-button');
-            const headerTitle = document.querySelector('.header-title');
-            const fabButton = document.getElementById('fab-button');
-            const navItems = document.querySelectorAll('.nav-item');
+            // Получаем область для отображения сообщений
+            var messageArea = document.getElementById('message-area');
 
-            // Получаем ссылки на элементы уведомлений
-            const modal = document.getElementById('modal');
-            const modalMessage = document.getElementById('modalMessage');
-            const modalButton = document.getElementById('modalButton');
-            const notification = document.getElementById('notification');
+            // Функция для добавления видимого уведомления прямо в контент
+            function addVisibleMessage(message, type) {
+                console.log("Добавляем видимое сообщение:", message);
 
-            // Функция для показа всплывающего уведомления
-            function showNotification(message) {
-                console.log("Показываем уведомление:", message);
-
+                // Создаем элемент уведомления
+                var notification = document.createElement('div');
+                notification.className = 'inline-notification';
+                if (type) {
+                    notification.className += ' ' + type;
+                }
                 notification.textContent = message;
-                notification.classList.add('show');
 
+                // Добавляем его в область сообщений
+                messageArea.prepend(notification); // добавляем в начало
+
+                // Ограничиваем количество сообщений
+                while (messageArea.children.length > 3) {
+                    messageArea.removeChild(messageArea.lastChild);
+                }
+
+                // Устанавливаем таймер на удаление сообщения через 5 секунд
                 setTimeout(function () {
-                    notification.classList.remove('show');
-                }, 2000);
+                    if (notification.parentNode === messageArea) {
+                        messageArea.removeChild(notification);
+                    }
+                }, 5000);
             }
 
-            // Функция для показа модального окна
-            function showModal(message) {
-                console.log("Показываем модальное окно:", message);
-
-                modalMessage.textContent = message;
-                modal.classList.add('show');
-            }
-
-            // Закрытие модального окна при нажатии на кнопку ОК
-            modalButton.addEventListener('click', function () {
-                modal.classList.remove('show');
-            });
+            // Получаем ссылки на элементы интерфейса
+            var consultationButton = document.getElementById('consultation-button');
+            var tryOnButton = document.getElementById('try-on-button');
+            var menuButton = document.getElementById('menu-button');
+            var searchButton = document.getElementById('search-button');
+            var headerTitle = document.querySelector('.header-title');
+            var fabButton = document.getElementById('fab-button');
+            var navItems = document.querySelectorAll('.nav-item');
 
             // Назначаем обработчики событий
             consultationButton.addEventListener('click', function () {
-                showNotification('Переход к получению консультации');
+                addVisibleMessage('Переход к получению консультации');
             });
 
             tryOnButton.addEventListener('click', function () {
-                showNotification('Переход к виртуальной примерке');
+                addVisibleMessage('Переход к виртуальной примерке', 'success');
             });
 
             menuButton.addEventListener('click', function () {
-                showNotification('Открытие меню');
+                addVisibleMessage('Открытие меню');
             });
 
             searchButton.addEventListener('click', function () {
-                showNotification('Открытие поиска');
+                addVisibleMessage('Открытие поиска');
             });
 
             headerTitle.addEventListener('click', function () {
-                showNotification('Возврат на главную');
+                addVisibleMessage('Возврат на главную');
             });
 
             fabButton.addEventListener('click', function () {
-                showNotification('Загрузка фотографии');
+                addVisibleMessage('Загрузка фотографии', 'success');
             });
 
             // Обрабатываем нажатия на вкладки
             navItems.forEach(function (item) {
                 item.addEventListener('click', function () {
-                    const tabName = item.getAttribute('data-tab');
+                    var tabName = this.getAttribute('data-tab');
 
                     // Удаляем класс active у всех вкладок
                     navItems.forEach(function (tab) {
@@ -502,15 +438,16 @@
                     });
 
                     // Добавляем класс active к нажатой вкладке
-                    item.classList.add('active');
+                    this.classList.add('active');
 
                     // Показываем уведомление
-                    showNotification('Переход в раздел: ' + tabName);
+                    addVisibleMessage('Переход в раздел: ' + tabName, 'warning');
                 });
             });
 
-            // Проверка, что JavaScript загружен
-            console.log("JavaScript полностью загружен и работает");
+            // Проверка работы JavaScript
+            console.log("JavaScript полностью загружен");
+            addVisibleMessage("Приложение готово к работе", "success");
         });
     </script>
 </body>

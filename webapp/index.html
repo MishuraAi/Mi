@@ -7,10 +7,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>МИШУРА - ИИ Стилист</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/webapp/styles.css">
     <style>
         /* Предотвращение FOUC (Flash Of Unstyled Content) */
-        body { display: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }
         body.loaded { display: flex; opacity: 1; } /* display: flex для phone-container */
     </style>
 </head>
@@ -88,7 +88,6 @@
                     <div class="mode-button active" data-mode="single" role="tab" aria-selected="true" tabindex="0">Один предмет</div>
                     <div class="mode-button" data-mode="compare" role="tab" aria-selected="false" tabindex="0">Сравнение</div>
                 </div>
-
                 <div id="single-analysis-mode" class="analysis-mode" role="tabpanel">
                     <div class="upload-area" id="single-upload-area" role="button" tabindex="0" aria-label="Загрузить одно фото">
                         <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
@@ -100,7 +99,6 @@
                         <div class="delete-image" data-target="single" role="button" tabindex="0" aria-label="Удалить изображение">✕</div>
                     </div>
                 </div>
-
                 <div id="compare-analysis-mode" class="analysis-mode hidden" role="tabpanel">
                     <div class="compare-container">
                         <div class="image-slots" aria-label="Слоты для сравнения изображений">
@@ -112,12 +110,10 @@
                         <div class="upload-text">Загрузите от 2 до 4 фотографий для сравнения</div>
                     </div>
                 </div>
-
                 <label for="occasion-selector" class="input-label hidden">Выберите повод:</label>
                 <select class="occasion-selector" id="occasion-selector" aria-label="Выберите повод">
                     <option value="повседневный">Повседневный</option> <option value="деловой">Деловой</option> <option value="вечеринка">Вечеринка</option> <option value="свидание">Свидание</option> <option value="спорт">Спорт/Активный отдых</option> <option value="особый случай">Особый случай</option>
                 </select>
-
                 <label for="preferences-input" class="input-label hidden">Ваши предпочтения:</label>
                 <textarea class="preferences-input" id="preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
             </div>
@@ -131,8 +127,7 @@
     <div class="overlay" id="results-overlay" role="dialog" aria-labelledby="results-dialog-title" aria-modal="true">
         <div class="dialog">
             <div class="dialog-header"><div class="dialog-title" id="results-dialog-title">Результаты анализа от Мишуры</div></div>
-            <div class="dialog-content" id="results-container" aria-live="polite">
-                </div>
+            <div class="dialog-content" id="results-container" aria-live="polite"></div>
             <div class="dialog-footer"><button class="btn btn-primary" id="results-close" role="button">Закрыть</button></div>
         </div>
     </div>
@@ -200,7 +195,8 @@
     </div>
 
     <div class="overlay" id="loading-overlay" role="alertdialog" aria-busy="true" aria-live="assertive">
-        <div class="dialog loading-dialog"> <div class="loading-indicator">
+        <div class="dialog loading-dialog">
+            <div class="loading-indicator">
                 <div class="loading-spinner" aria-hidden="true"></div>
                 <p id="loading-text">Загрузка...</p>
             </div>
@@ -227,47 +223,40 @@
         </symbol>
     </svg>
 
-    <script src="script.js" defer></script>
-    <script src="cursor-effect.js" defer></script>
+    <script src="/webapp/script.js" defer></script>
+    <script src="/webapp/cursor-effect.js" defer></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const body = document.body;
-            // Показываем тело документа после загрузки основного CSS (предотвращение FOUC)
-            const mainStyles = document.querySelector('link[href="styles.css"]');
+            // ИЗМЕНЕН ПУТЬ: ссылка на /webapp/styles.css
+            const mainStyles = document.querySelector('link[href="/webapp/styles.css"]');
             let stylesLoaded = false;
 
             function showBody() {
-                if (!stylesLoaded) { // Если уже показано, ничего не делаем
-                    stylesLoaded = true;
-                    body.classList.add('loaded');
-                    // console.log("[FOUC Guard] Body shown.");
-                }
+                if (body.classList.contains('loaded')) return;
+                body.classList.add('loaded');
             }
 
             if (mainStyles) {
-                // Проверка, если стили уже загружены (например, из кэша)
-                // Это более надежно, чем просто mainStyles.onload для некоторых браузеров/ситуаций
-                if (mainStyles.sheet) { // sheet доступен, если стили загружены
-                     // console.log("[FOUC Guard] Styles.css already loaded (sheet available).");
+                if (mainStyles.sheet) {
                     showBody();
                 } else {
                     mainStyles.onload = showBody;
                     mainStyles.onerror = function() {
-                        console.error("[FOUC Guard] Error loading styles.css. Showing body anyway.");
-                        showBody(); // Показать тело, даже если CSS не загрузился, чтобы не блокировать страницу
+                        console.error("[FOUC Guard] Error loading /webapp/styles.css. Showing body anyway.");
+                        showBody(); 
                     };
                 }
             } else {
-                 console.error("[FOUC Guard] Main stylesheet styles.css not found in head! Showing body.");
+                 console.error("[FOUC Guard] Main stylesheet /webapp/styles.css link not found in head! Showing body.");
                  showBody();
             }
-            // Дополнительный таймаут на случай, если onload/onerror не сработают (крайний случай)
             setTimeout(function() {
-                if (!stylesLoaded) {
-                    console.warn("[FOUC Guard] Fallback: Showing body due to timeout. CSS onload might not have fired.");
+                if (!body.classList.contains('loaded')) {
+                    console.warn("[FOUC Guard] Fallback: Showing body due to timeout. CSS onload/onerror for /webapp/styles.css might not have fired.");
                     showBody();
                 }
-            }, 500); // Таймаут можно настроить
+            }, 750);
         });
     </script>
 </body>

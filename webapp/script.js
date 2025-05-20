@@ -2,15 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Основной скрипт WebApp (script.js)
-<<<<<<< HEAD
-ВЕРСИЯ: 0.3.5 (Улучшенная поддержка загрузки на iOS и Android)
-=======
-<<<<<<< HEAD
-ВЕРСИЯ: 0.3.5 (Улучшенная поддержка загрузки на iOS и Android)
-=======
-ВЕРСИЯ: 0.3.4 (Добавлен тест загрузки и Telegram WebApp)
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
+ВЕРСИЯ: 0.3.5 (Исправления загрузки изображений и работы кнопок)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-20
 
 МЕТОДОЛОГИЯ РАБОТЫ И ОБНОВЛЕНИЯ КОДА:
@@ -25,16 +17,11 @@
 Основная логика клиентской части Telegram Mini App "МИШУРА".
 Управляет взаимодействием с пользователем, загрузкой изображений,
 отправкой запросов на API и отображением результатов.
-Включает диагностические сообщения для отладки в среде Telegram.
 ==========================================================================================
 */
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
-// ТОЛЬКО В РЕЖИМЕ ОТЛАДКИ - раскомментировать при необходимости
-console.log("МИШУРА script.js загружен!"); // Заменили alert на console.log
+// Консольное сообщение о загрузке скрипта (заменяет прежние alert) 
+console.log("МИШУРА script.js загружен и инициализируется!");
 
 // Инициализация Telegram WebApp API
 if (window.Telegram && window.Telegram.WebApp) {
@@ -43,20 +30,6 @@ if (window.Telegram && window.Telegram.WebApp) {
         Telegram.WebApp.ready(); // Сообщаем Telegram, что приложение готово
         console.log("Telegram.WebApp.ready() успешно вызван");
         
-<<<<<<< HEAD
-=======
-=======
-// САМЫЙ ПЕРВЫЙ КОД В ФАЙЛЕ для теста:
-alert("МИШУРА script.js загружен!"); // Первое уведомление для проверки загрузки скрипта
-
-if (window.Telegram && window.Telegram.WebApp) {
-    alert("Telegram WebApp API ДОСТУПЕН! Вызов ready()..."); // Уведомление о доступности API Telegram
-    try {
-        Telegram.WebApp.ready(); // Сообщаем Telegram, что приложение готово и можно показывать основные кнопки
-        alert("Telegram.WebApp.ready() УСПЕШНО вызван.");
-        console.log("Telegram WebApp Object:", window.Telegram.WebApp);
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         // Пример: Попробуем расширить приложение на весь экран, если это возможно
         if (Telegram.WebApp.isExpanded) {
             // Уже расширено
@@ -64,25 +37,10 @@ if (window.Telegram && window.Telegram.WebApp) {
             Telegram.WebApp.expand();
         }
     } catch (e) {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         console.error("Ошибка при работе с Telegram.WebApp:", e);
     }
 } else {
     console.warn("window.Telegram.WebApp не найден! Приложение запущено вне Telegram или API не инициализирован");
-<<<<<<< HEAD
-=======
-=======
-        alert("ОШИБКА при вызове Telegram.WebApp.ready() или expand(): " + e.message);
-        console.error("Ошибка при работе с Telegram.WebApp:", e);
-    }
-} else {
-    alert("Telegram WebApp API НЕ доступен. window.Telegram или window.Telegram.WebApp не найдены.");
-    console.error("window.Telegram.WebApp не найден! Приложение запущено вне Telegram или API не инициализирован.");
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -95,20 +53,11 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     logger.info("DOM полностью загружен. Инициализация основного приложения Мишура...");
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
 
     // Определяем тип устройства для специализированной обработки
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isAndroid = /Android/.test(navigator.userAgent);
     logger.info(`Определен тип устройства - iOS: ${isIOS}, Android: ${isAndroid}`);
-<<<<<<< HEAD
-=======
-=======
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
 
     // === ОСНОВНЫЕ ЭЛЕМЕНТЫ DOM ===
     const consultationButton = document.getElementById('consultation-button');
@@ -179,12 +128,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function initApp() {
         logger.info("Вызов initApp(): Настройка обработчиков и UI.");
+        
+        // Добавляем обработчик ошибок для отладки
+        window.onerror = function(message, source, lineno, colno, error) {
+            logger.error("Глобальная ошибка JavaScript:", {message, source, lineno, colno, error: error?.stack});
+            showToast("Произошла ошибка. Проверьте консоль.");
+            return false;
+        };
+        
         setupEventListeners();
         refreshUI();
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         const elementsPresent = checkDomElements();
         
         // Показываем тост только если все элементы найдены
@@ -235,15 +188,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-<<<<<<< HEAD
-=======
-=======
-        checkDomElements();
-        // showToast("Приложение МИШУРА готово к работе!"); // Можно убрать, если есть alert
-    }
-
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
     function checkDomElements() {
         const elementsToCheck = {
             consultationButton, tryOnButton, fabButton, menuButton, searchButton, headerTitle,
@@ -260,13 +204,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
         if (modeButtons.length === 0) logger.error("Кнопки режима (modeButtons) не найдены.");
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
-        // if (deleteImageButtons.length === 0) logger.warn("Кнопки удаления изображений (delete-image) не найдены статически.");
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         if (compareUploadInputs.length !== 4) logger.warn(`Найдено ${compareUploadInputs.length} инпутов для сравнения, ожидалось 4.`);
         return allFound;
     }
@@ -281,24 +218,12 @@ document.addEventListener('DOMContentLoaded', function () {
              logger.warn("Не удалось настроить Drag-n-Drop: uploadArea или inputElement не найдены.");
              return;
         }
-<<<<<<< HEAD
         
         // Добавляем классы для визуального отображения состояния перетаскивания
-=======
-<<<<<<< HEAD
-        
-        // Добавляем классы для визуального отображения состояния перетаскивания
-=======
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             uploadArea.addEventListener(eventName, preventDefaults, false);
             document.body.addEventListener(eventName, preventDefaults, false);
         });
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         
         ['dragenter', 'dragover'].forEach(eventName => {
             uploadArea.addEventListener(eventName, () => {
@@ -337,29 +262,6 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 logger.warn("Drag-n-Drop: Файлы не найдены в dataTransfer.");
                 showToast("Не удалось загрузить файл. Попробуйте выбрать файл через меню.");
-<<<<<<< HEAD
-=======
-=======
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, () => uploadArea.classList.add('drag-over'), false);
-        });
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('drag-over'), false);
-        });
-        uploadArea.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            if (dt && dt.files && dt.files.length > 0) {
-                const file = dt.files[0];
-                inputElement.files = dt.files; // Для согласованности с обычным выбором
-                if (slotIndex !== null) {
-                    fileHandlerCallback(file, slotIndex); // Для слотов сравнения
-                } else {
-                    fileHandlerCallback(file); // Для одиночной загрузки
-                }
-            } else {
-                logger.warn("Drag-n-Drop: Файлы не найдены в dataTransfer.");
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
             }
         }, false);
     }
@@ -367,12 +269,30 @@ document.addEventListener('DOMContentLoaded', function () {
     function setupEventListeners() {
         logger.debug("Настройка всех обработчиков событий.");
 
-        if (consultationButton) consultationButton.addEventListener('click', openConsultationModal);
+        // ВАЖНОЕ ИСПРАВЛЕНИЕ: Добавляем прямой обработчик для кнопки консультации
+        if (consultationButton) {
+            consultationButton.addEventListener('click', function() {
+                logger.info("Клик по кнопке 'Получить консультацию' зарегистрирован!");
+                openConsultationModal();
+            });
+            logger.debug("Добавлен обработчик клика для кнопки consultationButton");
+        } else {
+            logger.error("КРИТИЧЕСКАЯ ОШИБКА: Элемент consultationButton не найден в DOM!");
+        }
+
         if (tryOnButton) tryOnButton.addEventListener('click', () => {
             showToast("Функция 'Примерить' находится в разработке.");
             // openTryOnModal(); // Функционал будет добавлен позже
         });
-        if (fabButton) fabButton.addEventListener('click', handleFabClick);
+        
+        // ВАЖНОЕ ИСПРАВЛЕНИЕ: Используем прямой обработчик для FAB
+        if (fabButton) {
+            fabButton.addEventListener('click', function() {
+                logger.info("Клик по FAB кнопке");
+                openConsultationModal();
+            });
+        }
+        
         if (menuButton) menuButton.addEventListener('click', handleMenuClick);
         if (searchButton) searchButton.addEventListener('click', handleSearchClick);
         if (headerTitle) headerTitle.addEventListener('click', handleHomeClick);
@@ -380,10 +300,6 @@ document.addEventListener('DOMContentLoaded', function () {
         navItems.forEach(item => item.addEventListener('click', handleNavClick));
         modeButtons.forEach(button => button.addEventListener('click', handleModeSwitch));
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         // Улучшенная обработка загрузки одиночного изображения
         if (singleUploadInput) {
             // Добавляем оба события для более надежной работы
@@ -520,10 +436,34 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         if (tryOnResultDownload) tryOnResultDownload.addEventListener('click', handleResultDownload);
 
-        if (consultationCancel) consultationCancel.addEventListener('click', () => closeOverlay(consultationOverlay));
-        if (resultsClose) resultsClose.addEventListener('click', () => closeOverlay(resultsOverlay));
-        if (tryOnCancel) tryOnCancel.addEventListener('click', () => closeOverlay(tryOnOverlay));
-        if (tryOnResultClose) tryOnResultClose.addEventListener('click', () => closeOverlay(tryOnResultOverlay));
+        // ВАЖНОЕ ИСПРАВЛЕНИЕ: Прямые обработчики для кнопок управления оверлеями
+        if (consultationCancel) {
+            consultationCancel.addEventListener('click', function() {
+                logger.info("Клик по кнопке 'Отмена' в консультации");
+                if (consultationOverlay) closeOverlay(consultationOverlay);
+            });
+        }
+        
+        if (resultsClose) {
+            resultsClose.addEventListener('click', function() {
+                logger.info("Клик по кнопке 'Закрыть' в результатах");
+                if (resultsOverlay) closeOverlay(resultsOverlay);
+            });
+        }
+        
+        if (tryOnCancel) {
+            tryOnCancel.addEventListener('click', function() {
+                logger.info("Клик по кнопке 'Отмена' в примерке");
+                if (tryOnOverlay) closeOverlay(tryOnOverlay);
+            });
+        }
+        
+        if (tryOnResultClose) {
+            tryOnResultClose.addEventListener('click', function() {
+                logger.info("Клик по кнопке 'Закрыть' в результатах примерки");
+                if (tryOnResultOverlay) closeOverlay(tryOnResultOverlay);
+            });
+        }
 
         // Делегирование событий для динамически создаваемых кнопок удаления
         document.body.addEventListener('click', function(event) {
@@ -544,41 +484,23 @@ document.addEventListener('DOMContentLoaded', function () {
                     event.target.click(); // Эмулируем клик
                 }
             });
-<<<<<<< HEAD
-=======
-=======
-        if (singleUploadInput) singleUploadInput.addEventListener('change', handleSingleImageUpload);
-        if (singleUploadArea) singleUploadArea.addEventListener('click', () => singleUploadInput && singleUploadInput.click());
-        setupDragAndDrop(singleUploadArea, singleUploadInput, handleSingleImageFile);
-
-
-        compareUploadInputs.forEach(input => {
-            input.addEventListener('change', (e) => handleCompareImageUpload(e.target.files[0], parseInt(e.target.dataset.slot)));
-            const slotElement = input.closest('.image-slot');
-            if (slotElement) {
-                slotElement.addEventListener('click', (e) => {
-                    if (e.target === slotElement || slotElement.querySelector('.upload-icon').contains(e.target)) {
-                        input.click();
-                    }
-                });
-                 setupDragAndDrop(slotElement, input, handleCompareImageUpload, parseInt(input.dataset.slot));
-            }
-        });
-        
-        if (yourPhotoInput && yourPhotoUploadArea) {
-            yourPhotoInput.addEventListener('change', (e) => handleYourPhotoUpload(e.target.files[0]));
-            yourPhotoUploadArea.addEventListener('click', () => yourPhotoInput.click());
-            setupDragAndDrop(yourPhotoUploadArea, yourPhotoInput, handleYourPhotoUpload);
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         }
     }
 
+    // ВАЖНОЕ ИСПРАВЛЕНИЕ: Отдельная функция для открытия модального окна
     function openConsultationModal() {
         logger.info("Открытие модального окна консультации");
-        resetConsultationForm();
-        if (consultationOverlay) openOverlay(consultationOverlay);
-        else logger.error("Элемент consultationOverlay не найден!");
+        try {
+            resetConsultationForm();
+            if (consultationOverlay) {
+                openOverlay(consultationOverlay);
+                logger.debug("Модальное окно консультации успешно открыто");
+            }
+            else logger.error("Элемент consultationOverlay не найден!");
+        } catch (e) {
+            logger.error("Ошибка при открытии модального окна консультации:", e);
+            showToast("Не удалось открыть окно консультации. Попробуйте снова.");
+        }
     }
 
     function openTryOnModal() { // Пока не используется активно
@@ -588,7 +510,11 @@ document.addEventListener('DOMContentLoaded', function () {
         else logger.error("Элемент tryOnOverlay не найден!");
     }
 
-    function handleFabClick() { logger.info("Клик по FAB"); openConsultationModal(); }
+    function handleFabClick() { 
+        logger.info("Клик по FAB"); 
+        openConsultationModal(); 
+    }
+    
     function handleMenuClick() { logger.info("Клик по Меню"); showToast("Меню в разработке"); }
     function handleSearchClick() { logger.info("Клик по Поиску"); showToast("Поиск в разработке"); }
     function handleHomeClick() {
@@ -623,10 +549,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     
     function handleSingleImageFile(file) { // Общий обработчик для выбора и drop
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         if (!file) {
             logger.warn("handleSingleImageFile: Файл не предоставлен");
             return;
@@ -710,27 +632,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             logger.warn("handleSingleImageUpload: Файлы не выбраны");
         }
-<<<<<<< HEAD
-=======
-=======
-        if (!file) return;
-        logger.info("Обработка одиночного изображения:", file.name);
-        if (!validateImageFile(file)) {
-            if(singleUploadInput) singleUploadInput.value = ''; // Сброс инпута при невалидном файле
-            return;
-        }
-        appState.singleImage = file;
-        if (singlePreviewImage && singlePreviewContainer && singleUploadArea) {
-            displayImagePreview(file, singlePreviewImage, singlePreviewContainer, singleUploadArea);
-        }
-        showToast("Изображение загружено");
-        if(singleUploadInput) singleUploadInput.value = ''; // Сброс инпута для повторного выбора того же файла
-    }
-    
-    function handleSingleImageUpload(event) { // Вызывается при 'change' инпута
-        handleSingleImageFile(event.target.files[0]);
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
     }
 
     function handleCompareImageUpload(file, slotIndex) { // Общий обработчик для выбора и drop
@@ -738,10 +639,6 @@ document.addEventListener('DOMContentLoaded', function () {
              logger.warn("handleCompareImageUpload: Файл или индекс слота не предоставлены.");
              return;
         }
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         
         // Защита от двойной обработки
         if (appState.isImageUploading) {
@@ -851,24 +748,6 @@ document.addEventListener('DOMContentLoaded', function () {
             element.removeChild(indicator);
         }
         element.style.opacity = '1';
-<<<<<<< HEAD
-=======
-=======
-        logger.info(`Обработка изображения для сравнения в слот ${slotIndex}:`, file.name);
-        if (!validateImageFile(file)) {
-            const inputEl = document.querySelector(`.compare-upload-input[data-slot="${slotIndex}"]`);
-            if (inputEl) inputEl.value = '';
-            return;
-        }
-        appState.compareImages[slotIndex] = file;
-        const slotElement = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
-        if (slotElement) {
-            updateCompareSlotPreview(slotElement, file, slotIndex);
-        }
-        const inputEl = document.querySelector(`.compare-upload-input[data-slot="${slotIndex}"]`);
-        if (inputEl) inputEl.value = ''; // Сброс инпута
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
     }
 
     function updateCompareSlotPreview(slotElement, file, slotIndex) {
@@ -888,13 +767,6 @@ document.addEventListener('DOMContentLoaded', function () {
         removeButton.dataset.slot = slotIndex; // Сохраняем индекс слота
         // Обработчик будет добавлен делегированием
         slotElement.appendChild(removeButton);
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
-        showToast(`Фото добавлено в слот ${slotIndex + 1}`);
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
     }
     
     function handleRemoveCompareImageDelegated(event) {
@@ -910,10 +782,6 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div>
             <input type="file" class="compare-upload-input" accept="image/*" data-slot="${slotIndex}">`;
         const newInput = slot.querySelector('.compare-upload-input');
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         if (newInput) {
             newInput.addEventListener('change', (e) => 
                 handleCompareImageUpload(e.target.files[0], parseInt(e.target.dataset.slot)));
@@ -1079,51 +947,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let previewContainerElement = null;
         let imageInputElement = null;
 
-<<<<<<< HEAD
-=======
-=======
-        if (newInput) newInput.addEventListener('change', (e) => handleCompareImageUpload(e.target.files[0], parseInt(e.target.dataset.slot)));
-        // Перенастраиваем Drag-n-Drop для очищенного слота
-        const slotInputForDnd = slot.querySelector('.compare-upload-input');
-        if (slotInputForDnd) {
-            setupDragAndDrop(slot, slotInputForDnd, handleCompareImageUpload, slotIndex);
-        }
-        showToast(`Фото удалено из слота ${slotIndex + 1}`);
-    }
-
-
-    function handleYourPhotoUpload(file) { // Общий обработчик
-        if (!file) return;
-        logger.info("Загрузка фото пользователя:", file.name);
-        if (!validateImageFile(file)) { if(yourPhotoInput) yourPhotoInput.value = ''; return; }
-        appState.yourPhoto = file;
-        if (yourPhotoPreview && yourPhotoContainer && yourPhotoUploadArea) {
-            displayImagePreview(file, yourPhotoPreview, yourPhotoContainer, yourPhotoUploadArea);
-        }
-        showToast("Ваше фото загружено");
-        if(yourPhotoInput) yourPhotoInput.value = '';
-    }
-
-    function handleOutfitPhotoUpload(file) { // Общий обработчик
-        if (!file) return;
-        logger.info("Загрузка фото образа:", file.name);
-        if (!validateImageFile(file)) { if(outfitPhotoInput) outfitPhotoInput.value = ''; return; }
-        appState.outfitPhoto = file;
-        if (outfitPhotoPreview && outfitPhotoContainer && outfitPhotoUploadArea) {
-            displayImagePreview(file, outfitPhotoPreview, outfitPhotoContainer, outfitPhotoUploadArea);
-        }
-        showToast("Фото образа загружено");
-        if(outfitPhotoInput) outfitPhotoInput.value = '';
-    }
-
-    function handleDeleteImage(targetType, slotIndex = undefined) {
-        logger.info(`Удаление изображения: тип '${targetType}', слот '${slotIndex}'`);
-        let uploadAreaElement = null;
-        let previewContainerElement = null;
-        let imageInputElement = null;
-
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         switch (targetType) {
             case 'single':
                 appState.singleImage = null;
@@ -1149,10 +972,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
         }
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         if (imageInputElement) {
             try {
                 imageInputElement.value = '';
@@ -1190,12 +1009,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
         
-<<<<<<< HEAD
-=======
-=======
-        if (imageInputElement) imageInputElement.value = '';
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         if (previewContainerElement) previewContainerElement.style.display = 'none';
         if (uploadAreaElement) uploadAreaElement.style.display = 'flex';
         showToast("Изображение удалено");
@@ -1203,10 +1016,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handleAnalyzeClick() {
         logger.info("Клик по 'Проанализировать'");
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         
         // Проверка на активную загрузку
         if (appState.isImageUploading) {
@@ -1230,18 +1039,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 showToast("Максимум 4 изображения для сравнения"); 
                 return; 
             } // Соответствует HTML
-<<<<<<< HEAD
-=======
-=======
-        if (appState.consultationMode === 'single') {
-            if (!appState.singleImage) { showToast("Пожалуйста, загрузите изображение одежды"); return; }
-            analyzeSingleOutfit();
-        } else {
-            const validImages = appState.compareImages.filter(img => img !== null);
-            if (validImages.length < 2) { showToast("Загрузите минимум 2 изображения для сравнения"); return; }
-            if (validImages.length > 4) { showToast("Максимум 4 изображения для сравнения"); return; } // Соответствует HTML
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
             compareOutfits(validImages);
         }
     }
@@ -1257,10 +1054,6 @@ document.addEventListener('DOMContentLoaded', function () {
         logger.info("Клик по 'Скачать результат' (в разработке)");
         if (!tryOnResultImage || !tryOnResultImage.src || tryOnResultImage.src.startsWith('data:image/svg+xml') || tryOnResultImage.src.endsWith('#')) {
             showToast("Нет изображения для скачивания"); return;
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         }
         
         try {
@@ -1275,17 +1068,6 @@ document.addEventListener('DOMContentLoaded', function () {
             logger.error("Ошибка при скачивании изображения:", e);
             showToast("Не удалось скачать изображение");
         }
-<<<<<<< HEAD
-=======
-=======
-        }
-        const link = document.createElement('a');
-        link.href = tryOnResultImage.src;
-        link.download = 'mishura_try_on_result.jpg';
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        showToast("Изображение сохранено (демо)");
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
     }
 
     const API_BASE_URL = ''; // На Render это будет относительный путь к тому же домену
@@ -1301,10 +1083,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
             const response = await fetch(`${API_BASE_URL}/analyze-outfit`, { 
                 method: 'POST', 
                 body: formData 
@@ -1327,17 +1105,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error(errorMessage);
             }
             
-<<<<<<< HEAD
-=======
-=======
-            const response = await fetch(`${API_BASE_URL}/analyze-outfit`, { method: 'POST', body: formData });
-            hideLoading();
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: `HTTP ошибка сервера: ${response.status}` }));
-                throw new Error(errorData.message || `HTTP ошибка: ${response.status}`);
-            }
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
             const data = await response.json();
             if (data.status === 'success') {
                 logger.info("Анализ (одиночный) успешно получен от API.");
@@ -1365,10 +1132,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
             const response = await fetch(`${API_BASE_URL}/compare-outfits`, { 
                 method: 'POST', 
                 body: formData 
@@ -1389,16 +1152,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 
                 throw new Error(errorMessage);
-<<<<<<< HEAD
-=======
-=======
-            const response = await fetch(`${API_BASE_URL}/compare-outfits`, { method: 'POST', body: formData });
-            hideLoading();
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: `HTTP ошибка сервера: ${response.status}` }));
-                throw new Error(errorData.message || `HTTP ошибка: ${response.status}`);
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
             }
             
             const data = await response.json();
@@ -1462,16 +1215,24 @@ document.addEventListener('DOMContentLoaded', function () {
         appState.isLoading = false;
     }
 
+    // ВАЖНОЕ ИСПРАВЛЕНИЕ: Упрощена функция открытия оверлея
     function openOverlay(overlayElement) {
-        if (!overlayElement) { logger.error('Попытка открыть несуществующий оверлей'); return; }
-        // logger.debug(`Открытие оверлея: ${overlayElement.id}`);
+        if (!overlayElement) {
+            logger.error('Попытка открыть несуществующий оверлей');
+            return;
+        }
+        logger.debug(`Открытие оверлея: ${overlayElement.id}`);
         overlayElement.classList.add('active');
         document.body.style.overflow = 'hidden'; // Предотвращаем прокрутку фона
     }
 
+    // ВАЖНОЕ ИСПРАВЛЕНИЕ: Упрощена функция закрытия оверлея
     function closeOverlay(overlayElement) {
-        if (!overlayElement) { logger.error('Попытка закрыть несуществующий оверлей'); return; }
-        // logger.debug(`Закрытие оверлея: ${overlayElement.id}`);
+        if (!overlayElement) {
+            logger.error('Попытка закрыть несуществующий оверлей');
+            return;
+        }
+        logger.debug(`Закрытие оверлея: ${overlayElement.id}`);
         overlayElement.classList.remove('active');
         document.body.style.overflow = ''; // Восстанавливаем прокрутку фона
     }
@@ -1629,10 +1390,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 <input type="file" class="compare-upload-input" accept="image/*" data-slot="${index}">`;
             const newInput = slot.querySelector('.compare-upload-input');
             if (newInput) {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
                  newInput.addEventListener('change', (e) => 
                      handleCompareImageUpload(e.target.files[0], parseInt(e.target.dataset.slot)));
                      
@@ -1642,12 +1399,6 @@ document.addEventListener('DOMContentLoaded', function () {
                          handleCompareImageUpload(e.target.files[0], parseInt(e.target.dataset.slot)));
                  }
                  
-<<<<<<< HEAD
-=======
-=======
-                 newInput.addEventListener('change', (e) => handleCompareImageUpload(e.target.files[0], parseInt(e.target.dataset.slot)));
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
                  // Перенастраиваем Drag-n-Drop для очищенного слота
                 setupDragAndDrop(slot, newInput, handleCompareImageUpload, index);
             }
@@ -1656,10 +1407,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function resetTryOnForm() { // Пока не используется активно
         logger.debug("Сброс формы примерки.");
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         if (yourPhotoInput) {
             try {
                 yourPhotoInput.value = '';
@@ -1674,13 +1421,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Игнорируем ошибки сброса на iOS
             }
         }
-<<<<<<< HEAD
-=======
-=======
-        if (yourPhotoInput) yourPhotoInput.value = '';
-        if (outfitPhotoInput) outfitPhotoInput.value = '';
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         if (tryOnStyleSelector) tryOnStyleSelector.selectedIndex = 0;
 
         if (yourPhotoContainer) { yourPhotoContainer.style.display = 'none'; if (yourPhotoPreview) yourPhotoPreview.src = '#'; }
@@ -1699,10 +1439,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
     // Улучшенная валидация файлов с поддержкой iOS
     function validateImageFile(file) {
         if (!file) {
@@ -1744,16 +1480,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         
         // Проверка размера файла
-<<<<<<< HEAD
-=======
-=======
-    function validateImageFile(file) {
-        if (!file || !file.type || !file.type.startsWith('image/')) {
-            showToast("Пожалуйста, выберите файл изображения (например, JPEG, PNG).");
-            return false;
-        }
->>>>>>> f03b27e5a78874b48b85becbcad65f13220cf170
->>>>>>> d8514e41fa747ef3fa0b77d78b25572e3c1ff63a
         const maxSizeMB = 5; // Максимальный размер файла 5MB
         if (file.size > maxSizeMB * 1024 * 1024) {
             showToast(`Размер файла превышает ${maxSizeMB} МБ. Пожалуйста, выберите файл меньшего размера.`);

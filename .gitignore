@@ -1,32 +1,30 @@
-# Виртуальное окружение
+# Виртуальные окружения
+.venv/
 venv/
 env/
-ENV/
 
 # Кэш Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+*.pyc
+*.pyo
+*.pyd
 
-# Переменные окружения
-.env
+# Папки кэша приложения
+analysis_cache/
+user_photos/ # Если эта папка для временных файлов и не должна быть в репо
 
-# База данных SQLite
+# Базы данных SQLite (если вы не хотите ее коммитить)
 *.db
-*.sqlite
 *.sqlite3
 
-# Папка с загруженными фотографиями
-user_photos/
+# Файлы IDE
+.vscode/
+.idea/
 
-# Логи
-*.log
+# Файлы операционной системы
+.DS_Store
+Thumbs.db
 
-# VS Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# Файлы python-dotenv
+.env # Очень важно не коммитить .env с реальными ключами!
+     # .env.example можно и нужно коммитить

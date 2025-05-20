@@ -1,9 +1,9 @@
 python-telegram-bot==20.3
 python-dotenv==1.0.0
 requests==2.31.0
-Pillow>=10.0.0 # Явно добавляем Pillow, >=10.0.0 для гибкости версии
+Pillow # Или Pillow>=10.0.0, или Pillow==11.2.1 (если вы уверены в этой версии)
 fastapi==0.103.1
 uvicorn==0.23.2
-aiohttp # Для автоматического выбора совместимой версии (FastAPI/PTB могут его требовать)
+aiohttp # Позволит pip выбрать совместимую версию
 python-multipart
 google-generativeai==0.3.1

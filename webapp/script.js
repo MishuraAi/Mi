@@ -1,33 +1,22 @@
 /*
 ПРОЕКТ: МИШУРА - ИИ СТИЛИСТ
-<<<<<<< HEAD
 ВЕРСИЯ: 0.3.3
 ФАЙЛ: script.js
 НАЗНАЧЕНИЕ: Основной JS-файл для восстановления функциональности
-МЕТОДОЛОГИЯ ПРАВОК: Полная замена файла для избежания ошибок
-ДАТА ОБНОВЛЕНИЯ: 2025-05-19
+МЕТОДОЛОГИЯ ОБНОВЛЕНИЯ КОДА:
+При внесении любых изменений в этот файл необходимо предоставлять полный код файла целиком,
+а не только изменившиеся части. Это обеспечивает целостность кода и исключает ошибки интеграции.
+ДАТА ОБНОВЛЕНИЯ: 2025-05-19 (восстановлена версия 0.3.3)
 */
 
 document.addEventListener('DOMContentLoaded', function () {
     // Упрощенный логгер для отладки
-=======
-ВЕРСИЯ ДИЗАЙНА: SereneFlow 1.0.2-hotfix-single
-ФАЙЛ: script.js
-НАЗНАЧЕНИЕ: Исправление проблемы с повторным выбором файла в одиночном режиме.
-МЕТОДОЛОГИЯ ПРАВОК: Файл предоставляется целиком. Добавлен сброс input.value после обработки выбора файла.
-ДАТА ОБНОВЛЕНИЯ: 2025-05-18
-*/
-
-document.addEventListener('DOMContentLoaded', function () {
-    // Упрощенный логгер для клиента
->>>>>>> e92feb3 (ошибка загрузки фото с перовго раза)
     const logger = {
         info: (message, ...args) => console.log(`[INFO] МишураApp: ${message}`, ...args),
         warn: (message, ...args) => console.warn(`[WARN] МишураApp: ${message}`, ...args),
         error: (message, ...args) => console.error(`[ERROR] МишураApp: ${message}`, ...args),
         debug: (message, ...args) => console.debug(`[DEBUG] МишураApp: ${message}`, ...args)
     };
-<<<<<<< HEAD
 
     logger.info("DOM полностью загружен. Инициализация приложения...");
 
@@ -46,16 +35,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Оверлеи и диалоги
     const consultationOverlay = document.getElementById('consultation-overlay');
-    const resultsOverlay = document.getElementById('results-overlay');
-    const tryOnOverlay = document.getElementById('try-on-overlay');
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const tryOnResultOverlay = document.getElementById('try-on-result-overlay');
+    const resultsOverlay = document.getElementById('results-overlay'); // Предполагается, что такой ID будет в HTML для результатов
+    const tryOnOverlay = document.getElementById('try-on-overlay'); // Предполагается, что такой ID будет для примерки
+    const loadingOverlay = document.getElementById('loading-overlay'); // Предполагается, что такой ID будет для загрузки
+    const tryOnResultOverlay = document.getElementById('try-on-result-overlay'); // Для результатов примерки
 
     // Кнопки закрытия и отмены
     const consultationCancel = document.getElementById('consultation-cancel');
-    const resultsClose = document.getElementById('results-close');
-    const tryOnCancel = document.getElementById('try-on-cancel');
-    const tryOnResultClose = document.getElementById('try-on-result-close');
+    const resultsClose = document.getElementById('results-close'); // Для закрытия результатов
+    const tryOnCancel = document.getElementById('try-on-cancel'); // Для отмены в окне примерки
+    const tryOnResultClose = document.getElementById('try-on-result-close'); // Для закрытия результатов примерки
 
     // Переключатели режимов
     const modeButtons = document.querySelectorAll('.mode-button');
@@ -64,32 +53,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Элементы загрузки фото
     const singleUploadInput = document.getElementById('single-upload-input');
-    const compareUploadInputs = document.querySelectorAll('.compare-upload-input');
-    const yourPhotoInput = document.getElementById('your-photo-input');
-    const outfitPhotoInput = document.getElementById('outfit-photo-input');
+    const compareUploadInputs = document.querySelectorAll('.compare-upload-input'); // Их должно быть 4 по HTML
+    const yourPhotoInput = document.getElementById('your-photo-input'); // Для фото пользователя в примерке
+    const outfitPhotoInput = document.getElementById('outfit-photo-input'); // Для фото одежды в примерке
 
     // Контейнеры для превью
     const singlePreviewContainer = document.getElementById('single-preview-container');
     const singlePreviewImage = document.getElementById('single-preview-image');
-    const yourPhotoContainer = document.getElementById('your-photo-container');
-    const yourPhotoPreview = document.getElementById('your-photo-preview');
-    const outfitPhotoContainer = document.getElementById('outfit-photo-container');
-    const outfitPhotoPreview = document.getElementById('outfit-photo-preview');
+    const yourPhotoContainer = document.getElementById('your-photo-container'); // Для фото пользователя в примерке
+    const yourPhotoPreview = document.getElementById('your-photo-preview'); // Для фото пользователя в примерке
+    const outfitPhotoContainer = document.getElementById('outfit-photo-container'); // Для фото одежды в примерке
+    const outfitPhotoPreview = document.getElementById('outfit-photo-preview'); // Для фото одежды в примерке
+
 
     // Кнопки действий
     const analyzeButton = document.getElementById('analyze-button');
-    const tryOnButtonSubmit = document.getElementById('try-on-button-submit');
-    const tryOnResultDownload = document.getElementById('try-on-result-download');
+    const tryOnButtonSubmit = document.getElementById('try-on-button-submit'); // Для запуска примерки
+    const tryOnResultDownload = document.getElementById('try-on-result-download'); // Для скачивания результата примерки
 
     // Другие элементы
     const occasionSelector = document.getElementById('occasion-selector');
     const preferencesInput = document.getElementById('preferences-input');
-    const tryOnStyleSelector = document.getElementById('try-on-style-selector');
-    const resultsContainer = document.getElementById('results-container');
-    const tryOnResultContainer = document.getElementById('try-on-result-container');
-    const tryOnResultImage = document.getElementById('try-on-result-image');
-    const loadingText = document.getElementById('loading-text');
+    const tryOnStyleSelector = document.getElementById('try-on-style-selector'); // Для выбора стиля в примерке
+    const resultsContainer = document.getElementById('results-container'); // Для отображения результатов анализа
+    const tryOnResultContainer = document.getElementById('try-on-result-container'); // Для отображения результата примерки
+    const tryOnResultImage = document.getElementById('try-on-result-image'); // img для результата примерки
+    const loadingText = document.getElementById('loading-text'); // Текст в индикаторе загрузки
     const deleteImageButtons = document.querySelectorAll('.delete-image');
+
 
     // Проверка на мобильное устройство
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -99,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Данные для анализа одежды
         consultationMode: 'single', // 'single' или 'compare'
         singleImage: null,
-        compareImages: [null, null, null, null],
+        compareImages: [null, null, null, null], // Array for up to 4 images
 
         // Данные для примерки
         yourPhoto: null,
@@ -110,165 +101,9 @@ document.addEventListener('DOMContentLoaded', function () {
         isLoading: false,
         lastApiResponse: null
     };
-=======
-
-    logger.info("DOM полностью загружен. Инициализация приложения...");
-
-    // Элементы DOM
-    const singleModeBtn = document.getElementById('single-mode');
-    const compareModeBtn = document.getElementById('compare-mode');
-
-    const fileInputSingle = document.getElementById('file-input-single');
-    const fileDropArea = document.getElementById('file-drop-area');
-    const previewContainerSingle = document.getElementById('preview-container-single');
-
-    const singleUploadContainer = document.getElementById('single-upload-container');
-    const multiUploadContainer = document.getElementById('multi-upload-container');
-
-    const analysisForm = document.getElementById('analysis-form');
-    const uploadSection = document.getElementById('upload-section');
-    const resultSection = document.getElementById('result-section');
-    const backButton = document.getElementById('back-button');
-    const resultContent = document.getElementById('result-content');
-    const loadingIndicator = document.getElementById('loading-indicator');
-
-    const aboutLink = document.getElementById('about-link');
-    const aboutModal = document.getElementById('about-modal');
-    const closeAboutModal = document.getElementById('close-about-modal');
-
-    const singleModeText = document.querySelector('.single-mode-text');
-    const compareModeText = document.querySelector('.compare-mode-text');
-
-    const imageSlots = document.querySelectorAll('.image-slot');
-
-    let currentMode = 'single';
-    let selectedFileSingle = null;
-    let slotFiles = [null, null, null, null];
-
-    // --- Кастомный курсор (полный код из предыдущей рабочей версии SereneFlow 1.0) ---
-    const CURSOR_MAIN_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-primary').trim() || '#307A7A';
-    const CURSOR_INTERACTIVE_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-secondary').trim() || '#FF8C69';
-    let customCursor, trailContainer, trailPoints = [], lastPositions = [], mouseX, mouseY, lastUpdate = 0;
-    const MAX_TRAIL_LENGTH_CURSOR = 15;
-
-    function initCustomCursor() {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile || customCursor) { // Не инициализировать повторно, если уже есть
-            if (isMobile) document.body.style.cursor = 'auto'; // Вернуть обычный курсор на мобильных
-            return;
-        }
-        logger.debug("Инициализация кастомного курсора...");
-        document.body.style.cursor = 'none';
-        customCursor = createCursorElement();
-        trailContainer = createTrailContainerElement();
-        document.body.appendChild(customCursor);
-        document.body.appendChild(trailContainer);
-        trailPoints = []; // Очищаем перед заполнением
-        for (let i = 0; i < MAX_TRAIL_LENGTH_CURSOR; i++) {
-            const point = createTrailPointElement(i);
-            trailContainer.appendChild(point);
-            trailPoints.push(point);
-        }
-        mouseX = window.innerWidth / 2;
-        mouseY = window.innerHeight / 2;
-        updateCursorPositionVisual(mouseX, mouseY); // Установить начальную позицию
-
-        document.removeEventListener('mousemove', handleMouseMoveCursor); // Убрать старые, если были
-        document.addEventListener('mousemove', handleMouseMoveCursor);
-        document.removeEventListener('mousedown', handleMouseDownCursor);
-        document.addEventListener('mousedown', handleMouseDownCursor);
-        document.removeEventListener('mouseup', handleMouseUpCursor);
-        document.addEventListener('mouseup', handleMouseUpCursor);
-        document.removeEventListener('mouseover', handleMouseOverInteractive);
-        document.addEventListener('mouseover', handleMouseOverInteractive);
-        document.removeEventListener('mouseout', handleMouseOutInteractive);
-        document.addEventListener('mouseout', handleMouseOutInteractive);
-
-        if (animateTrailCursor._animationFrameId) { // Отменить предыдущую анимацию, если есть
-            cancelAnimationFrame(animateTrailCursor._animationFrameId);
-        }
-        animateTrailCursor();
-    }
-    function createCursorElement() {
-        const el = document.createElement('div');
-        el.id = 'serene-cursor';
-        Object.assign(el.style, {
-            position: 'fixed', width: '10px', height: '10px', borderRadius: '50%',
-            backgroundColor: CURSOR_MAIN_COLOR, pointerEvents: 'none', zIndex: '2147483647',
-            transform: 'translate(-50%, -50%)',
-            transition: 'transform 0.1s ease-out, background-color 0.2s ease, width 0.2s ease, height 0.2s ease',
-        });
-        return el;
-    }
-    function createTrailContainerElement() {
-        const el = document.createElement('div');
-        el.id = 'serene-trail';
-        Object.assign(el.style, {
-            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-            pointerEvents: 'none', zIndex: '2147483646', overflow: 'hidden',
-        });
-        return el;
-    }
-    function createTrailPointElement(index) {
-        const el = document.createElement('div');
-        el.className = 'serene-trail-point';
-        const trailColor = index % 2 === 0 ? 'rgba(255, 255, 255, 0.6)' : CURSOR_MAIN_COLOR;
-        Object.assign(el.style, {
-            position: 'absolute', width: '8px', height: '8px', borderRadius: '50%',
-            backgroundColor: trailColor, opacity: '0', transform: 'translate(-50%, -50%)',
-            transition: 'opacity 0.3s ease-out, width 0.3s ease-out, height 0.3s ease-out',
-        });
-        return el;
-    }
-    function updateCursorPositionVisual(x, y) {
-        mouseX = x; mouseY = y;
-        if (customCursor) { customCursor.style.left = x + 'px'; customCursor.style.top = y + 'px'; }
-    }
-    function animateTrailCursor() {
-        const now = Date.now();
-        if (now - lastUpdate < 20) {
-            animateTrailCursor._animationFrameId = requestAnimationFrame(animateTrailCursor); return;
-        }
-        lastUpdate = now;
-        lastPositions.unshift({ x: mouseX, y: mouseY });
-        if (lastPositions.length > MAX_TRAIL_LENGTH_CURSOR) lastPositions.pop();
-        trailPoints.forEach((point, i) => {
-            if (i < lastPositions.length) {
-                const pos = lastPositions[i]; const progress = i / MAX_TRAIL_LENGTH_CURSOR;
-                const size = 8 - (progress * 6); const opacity = 0.6 - progress * 0.5;
-                Object.assign(point.style, {
-                    left: `${pos.x}px`, top: `${pos.y}px`, width: `${size}px`,
-                    height: `${size}px`, opacity: opacity.toString()
-                });
-            } else { point.style.opacity = '0'; }
-        });
-        animateTrailCursor._animationFrameId = requestAnimationFrame(animateTrailCursor);
-    }
-    animateTrailCursor._animationFrameId = null; // Для хранения ID requestAnimationFrame
-    function handleMouseMoveCursor(e) { updateCursorPositionVisual(e.clientX, e.clientY); }
-    function handleMouseDownCursor() { if (customCursor) customCursor.style.transform = 'translate(-50%, -50%) scale(1.5)'; }
-    function handleMouseUpCursor() { if (customCursor) customCursor.style.transform = 'translate(-50%, -50%) scale(1)'; }
-    const interactiveSelector = 'a, button, select, textarea, input[type="file"], .upload-label, .upload-label-slot, .image-slot, .mode-button, .remove-image, .remove-preview-single, .close-modal';
-    function handleMouseOverInteractive(e) {
-        if (customCursor && e.target.closest(interactiveSelector)) {
-            Object.assign(customCursor.style, { backgroundColor: CURSOR_INTERACTIVE_COLOR, width: '14px', height: '14px' });
-        }
-    }
-    function handleMouseOutInteractive(e) {
-        if (customCursor && e.target.closest(interactiveSelector)) {
-            if (!e.relatedTarget || !e.relatedTarget.closest(interactiveSelector)) {
-                Object.assign(customCursor.style, { backgroundColor: CURSOR_MAIN_COLOR, width: '10px', height: '10px' });
-            }
-        }
-    }
-    // --- Конец кода кастомного курсора ---
-
-    initApp();
->>>>>>> e92feb3 (ошибка загрузки фото с перовго раза)
 
     // === ИНИЦИАЛИЗАЦИЯ ===
     function initApp() {
-<<<<<<< HEAD
         logger.info("Инициализация приложения");
 
         // Установка обработчиков событий
@@ -282,13 +117,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Показываем уведомление о готовности
         showToast("Приложение МИШУРА готово к работе");
-=======
-        logger.info("initApp: Старт инициализации.");
-        setupEventListeners();
-        switchMode(currentMode);
-        initCustomCursor();
-        logger.info("initApp: Инициализация завершена.");
->>>>>>> e92feb3 (ошибка загрузки фото с перовго раза)
     }
 
     // Проверка наличия всех нужных DOM элементов
@@ -300,6 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { name: 'singleAnalysisMode', element: singleAnalysisMode },
             { name: 'compareAnalysisMode', element: compareAnalysisMode },
             { name: 'singleUploadInput', element: singleUploadInput }
+            // Добавьте другие критические элементы сюда для проверки
         ];
 
         for (const item of criticalElements) {
@@ -311,7 +140,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // === УСТАНОВКА ОБРАБОТЧИКОВ СОБЫТИЙ ===
     function setupEventListeners() {
-<<<<<<< HEAD
         logger.debug("Настройка обработчиков событий");
 
         // Основные кнопки
@@ -319,7 +147,10 @@ document.addEventListener('DOMContentLoaded', function () {
             consultationButton.addEventListener('click', openConsultationModal);
         }
         if (tryOnButton) {
-            tryOnButton.addEventListener('click', openTryOnModal);
+            tryOnButton.addEventListener('click', () => {
+                 showToast("Функция 'Примерить' находится в разработке.");
+                 // openTryOnModal(); // Закомментировано, так как функционал не готов
+            });
         }
         if (fabButton) {
             fabButton.addEventListener('click', handleFabClick);
@@ -353,11 +184,11 @@ document.addEventListener('DOMContentLoaded', function () {
             input.addEventListener('change', handleCompareImageUpload);
         });
 
-        if (yourPhotoInput) {
+        if (yourPhotoInput) { // Предполагается, что эти ID будут в HTML для примерки
             yourPhotoInput.addEventListener('change', handleYourPhotoUpload);
         }
 
-        if (outfitPhotoInput) {
+        if (outfitPhotoInput) { // Предполагается, что эти ID будут в HTML для примерки
             outfitPhotoInput.addEventListener('change', handleOutfitPhotoUpload);
         }
 
@@ -366,11 +197,14 @@ document.addEventListener('DOMContentLoaded', function () {
             analyzeButton.addEventListener('click', handleAnalyzeClick);
         }
 
-        if (tryOnButtonSubmit) {
-            tryOnButtonSubmit.addEventListener('click', handleTryOnClick);
+        if (tryOnButtonSubmit) { // Для кнопки "Примерить" в модальном окне
+             tryOnButtonSubmit.addEventListener('click', () => {
+                 showToast("Функция 'Примерить' находится в разработке.");
+                 // handleTryOnClick(); // Закомментировано
+             });
         }
 
-        if (tryOnResultDownload) {
+        if (tryOnResultDownload) { // Для скачивания результата примерки
             tryOnResultDownload.addEventListener('click', handleResultDownload);
         }
 
@@ -379,23 +213,95 @@ document.addEventListener('DOMContentLoaded', function () {
             consultationCancel.addEventListener('click', () => closeOverlay(consultationOverlay));
         }
 
-        if (resultsClose) {
+        if (resultsClose) { // Для закрытия окна результатов
             resultsClose.addEventListener('click', () => closeOverlay(resultsOverlay));
         }
 
-        if (tryOnCancel) {
-            tryOnCancel.addEventListener('click', () => closeOverlay(tryOnOverlay));
+        if (tryOnCancel) { // Для отмены в окне примерки
+             tryOnCancel.addEventListener('click', () => closeOverlay(tryOnOverlay));
         }
 
-        if (tryOnResultClose) {
+        if (tryOnResultClose) { // Для закрытия результатов примерки
             tryOnResultClose.addEventListener('click', () => closeOverlay(tryOnResultOverlay));
         }
+
 
         // Кнопки удаления изображений
         deleteImageButtons.forEach(button => {
             button.addEventListener('click', handleDeleteImage);
         });
+         // Также обработчики для drag-n-drop если они есть в HTML
+        const singleUploadArea = document.getElementById('single-upload-area');
+        if (singleUploadArea) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                singleUploadArea.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false); // Для всего body, если перетаскивание вне зоны
+            });
+            ['dragenter', 'dragover'].forEach(eventName => {
+                singleUploadArea.addEventListener(eventName, () => singleUploadArea.classList.add('drag-over'), false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                singleUploadArea.addEventListener(eventName, () => singleUploadArea.classList.remove('drag-over'), false);
+            });
+            singleUploadArea.addEventListener('drop', handleSingleImageDrop, false);
+        }
+
+        document.querySelectorAll('.image-slot').forEach(slot => {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                slot.addEventListener(eventName, preventDefaults, false);
+            });
+            ['dragenter', 'dragover'].forEach(eventName => {
+                slot.addEventListener(eventName, () => slot.classList.add('drag-over'), false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                slot.addEventListener(eventName, () => slot.classList.remove('drag-over'), false);
+            });
+            slot.addEventListener('drop', handleCompareImageDrop, false);
+        });
     }
+     function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function handleSingleImageDrop(e) {
+        const dt = e.dataTransfer;
+        const file = dt.files[0];
+        if (file) {
+            logger.info("Одиночное изображение перетащено (drop):", file.name);
+            if (!validateImageFile(file)) return;
+            appState.singleImage = file;
+            if (singlePreviewImage && singlePreviewContainer) {
+                displayImagePreview(file, singlePreviewImage);
+                singlePreviewContainer.style.display = 'block';
+                if (document.getElementById('single-upload-area')) {
+                    document.getElementById('single-upload-area').style.display = 'none';
+                }
+            }
+            showToast("Изображение загружено");
+            if(singleUploadInput) singleUploadInput.files = dt.files; // Связываем с инпутом
+        }
+    }
+
+    function handleCompareImageDrop(e) {
+        const slotIndex = parseInt(e.currentTarget.getAttribute('data-slot'));
+        if (isNaN(slotIndex)) return;
+
+        const dt = e.dataTransfer;
+        const file = dt.files[0];
+        if (file) {
+            logger.info(`Изображение для сравнения перетащено (drop) в слот ${slotIndex}:`, file.name);
+            if (!validateImageFile(file)) return;
+
+            appState.compareImages[slotIndex] = file;
+            const slotElement = e.currentTarget; // Это и есть image-slot
+            updateCompareSlotPreview(slotElement, file, slotIndex);
+
+            const inputElement = slotElement.querySelector('.compare-upload-input');
+            if(inputElement) inputElement.files = dt.files; // Связываем с инпутом
+        }
+    }
+
 
     // === ОБРАБОТЧИКИ КЛИКОВ ПО ОСНОВНЫМ КНОПКАМ ===
 
@@ -403,14 +309,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function openConsultationModal() {
         logger.info("Открытие модального окна консультации");
         resetConsultationForm();
-        openOverlay(consultationOverlay);
+        if (consultationOverlay) openOverlay(consultationOverlay);
+        else logger.error("Элемент consultationOverlay не найден!");
     }
 
-    // Открыть модальное окно примерки
+    // Открыть модальное окно примерки (пока не используется)
     function openTryOnModal() {
         logger.info("Открытие модального окна примерки");
         resetTryOnForm();
-        openOverlay(tryOnOverlay);
+        if (tryOnOverlay) openOverlay(tryOnOverlay);
+        else logger.error("Элемент tryOnOverlay не найден!");
     }
 
     // Обработка клика по кнопке FAB
@@ -436,95 +344,13 @@ document.addEventListener('DOMContentLoaded', function () {
         logger.info("Клик по заголовку (возврат на главную)");
         navItems.forEach(item => {
             if (item.getAttribute('data-tab') === 'home') {
+                if (item.classList.contains('active')) return; // Уже на главной
                 handleNavClick({ currentTarget: item });
             }
         });
     }
 
     // === НАВИГАЦИЯ ===
-=======
-        logger.debug("setupEventListeners: Настройка слушателей...");
-        singleModeBtn.addEventListener('click', () => switchMode('single'));
-        compareModeBtn.addEventListener('click', () => switchMode('compare'));
-
-        fileInputSingle.addEventListener('change', handleFileSelectSingle);
-        // Клик по drop-зоне также должен триггерить fileInputSingle
-        fileDropArea.addEventListener('click', (e) => {
-            // Предотвращаем двойное открытие, если клик был по label внутри fileDropArea
-            if (e.target === fileDropArea || e.target.classList.contains('upload-icon') || e.target.classList.contains('upload-text')) {
-                logger.debug("Клик по fileDropArea, триггер fileInputSingle.click()");
-                fileInputSingle.click();
-            }
-        });
-
-        // Drag and Drop для одиночного режима (оставляем, но проблема не в нем, похоже)
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            fileDropArea.addEventListener(eventName, preventDefaults, false);
-        });
-        ['dragenter', 'dragover'].forEach(eventName => {
-            fileDropArea.addEventListener(eventName, () => fileDropArea.classList.add('drag-over'), false);
-        });
-        ['dragleave', 'drop'].forEach(eventName => {
-            fileDropArea.addEventListener(eventName, () => fileDropArea.classList.remove('drag-over'), false);
-        });
-        fileDropArea.addEventListener('drop', handleDropSingle, false);
-
-
-        imageSlots.forEach((slot) => {
-            const input = slot.querySelector('.slot-input');
-            const removeBtn = slot.querySelector('.remove-image');
-            const slotIndex = parseInt(slot.dataset.slotId, 10);
-
-            slot.addEventListener('click', (e) => {
-                if (!slot.classList.contains('has-image') && e.target !== removeBtn && !removeBtn.contains(e.target)) {
-                    input.click();
-                }
-            });
-            input.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleSlotFileSelect(slotIndex, e.target.files[0]);
-                    e.target.value = null; // *** ИСПРАВЛЕНИЕ для слотов, аналогично одиночному ***
-                }
-            });
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeSlotFile(slotIndex);
-            });
-            // Drag-n-drop для слотов
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                slot.addEventListener(eventName, preventDefaults, false);
-                slot.addEventListener(eventName, (ev) => ev.stopPropagation(), false);
-            });
-            ['dragenter', 'dragover'].forEach(eventName => { slot.addEventListener(eventName, () => slot.classList.add('drag-over'), false); });
-            ['dragleave', 'drop'].forEach(eventName => { slot.addEventListener(eventName, () => slot.classList.remove('drag-over'), false); });
-            slot.addEventListener('drop', (e) => {
-                if (e.dataTransfer.files.length > 0) {
-                    handleSlotFileSelect(slotIndex, e.dataTransfer.files[0]);
-                    e.target.value = null; // *** ИСПРАВЛЕНИЕ для слотов, аналогично одиночному ***
-                }
-            }, false);
-        });
-
-        analysisForm.addEventListener('submit', handleFormSubmit);
-        backButton.addEventListener('click', resetToUploadView);
-        aboutLink.addEventListener('click', (e) => { e.preventDefault(); aboutModal.classList.remove('hidden'); });
-        closeAboutModal.addEventListener('click', () => { aboutModal.classList.add('hidden'); });
-        aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) aboutModal.classList.add('hidden'); });
-        logger.debug("setupEventListeners: Слушатели настроены.");
-    }
-
-    function switchMode(mode) { /* ... код как в 1.0.1-debug-single ... */
-        logger.info(`switchMode: Переключение в режим "${mode}"`);
-        currentMode = mode;
-        selectedFileSingle = null;
-        if (fileInputSingle) fileInputSingle.value = null; // Сбрасываем инпут при смене режима
-        slotFiles = [null, null, null, null];
-        imageSlots.forEach(slot => { // Сбрасываем инпуты в слотах
-            const input = slot.querySelector('.slot-input');
-            if (input) input.value = null;
-        });
-
->>>>>>> e92feb3 (ошибка загрузки фото с перовго раза)
 
     // Обработка клика по пункту нижнего меню
     function handleNavClick(event) {
@@ -546,6 +372,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (tabName !== 'home') {
             const tabText = item.querySelector('.nav-text').textContent;
             showToast(`Раздел "${tabText}" в разработке`);
+            // Здесь можно будет скрывать/показывать соответствующий контент для вкладок, когда он появится
+            // Например, document.getElementById('home-content').style.display = (tabName === 'home') ? 'flex' : 'none';
         }
     }
 
@@ -569,7 +397,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Показываем соответствующий интерфейс
         if (mode === 'single') {
-<<<<<<< HEAD
             if (singleAnalysisMode) singleAnalysisMode.classList.remove('hidden');
             if (compareAnalysisMode) compareAnalysisMode.classList.add('hidden');
             appState.consultationMode = 'single';
@@ -599,9 +426,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (singlePreviewImage && singlePreviewContainer) {
             displayImagePreview(file, singlePreviewImage);
             singlePreviewContainer.style.display = 'block';
+            if (document.getElementById('single-upload-area')) {
+                 document.getElementById('single-upload-area').style.display = 'none';
+            }
+        } else {
+            logger.error("singlePreviewImage или singlePreviewContainer не найдены");
         }
-
         showToast("Изображение загружено");
+        event.target.value = ''; // Сброс для возможности повторной загрузки того же файла
     }
 
     // Обработка загрузки изображения для сравнения
@@ -609,62 +441,65 @@ document.addEventListener('DOMContentLoaded', function () {
         const file = event.target.files[0];
         if (!file) return;
 
-        const slotIndex = parseInt(event.currentTarget.getAttribute('data-slot'));
+        const slotInput = event.currentTarget;
+        const slotIndex = parseInt(slotInput.getAttribute('data-slot'));
+
         if (isNaN(slotIndex)) {
             logger.error("Не удалось определить индекс слота для сравнения изображений");
+            slotInput.value = '';
             return;
         }
 
         logger.info(`Загрузка изображения для сравнения в слот ${slotIndex}:`, file.name);
 
         if (!validateImageFile(file)) {
-            event.target.value = '';
+            slotInput.value = '';
             return;
         }
 
         appState.compareImages[slotIndex] = file;
 
-        // Находим слот и обновляем его внешний вид
-        const slot = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
-        if (!slot) {
-            logger.error(`Слот с индексом ${slotIndex} не найден`);
-            return;
+        const slotElement = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
+        if (slotElement) {
+            updateCompareSlotPreview(slotElement, file, slotIndex);
+        } else {
+            logger.error(`Слот .image-slot[data-slot="${slotIndex}"] не найден.`);
         }
-
-        // Если уже есть изображение в слоте, обновляем его
-        let slotImage = slot.querySelector('.slot-image');
-        if (!slotImage) {
-            // Создаем элемент изображения, если его еще нет
-            slotImage = document.createElement('img');
-            slotImage.className = 'slot-image';
-            slot.innerHTML = ''; // Очищаем слот
-            slot.appendChild(slotImage);
-
-            // Добавляем кнопку удаления
-            const removeButton = document.createElement('div');
-            removeButton.className = 'remove-image';
-            removeButton.textContent = '✕';
-            removeButton.setAttribute('data-slot', slotIndex);
-            removeButton.addEventListener('click', handleRemoveCompareImage);
-            slot.appendChild(removeButton);
-        }
-
-        // Отображаем изображение
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            slotImage.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-
-        // Обновляем класс слота
-        slot.classList.add('filled');
-
-        showToast("Изображение добавлено");
+        slotInput.value = ''; // Сброс для возможности повторной загрузки того же файла
     }
+
+    function updateCompareSlotPreview(slotElement, file, slotIndex) {
+        const existingImage = slotElement.querySelector('.slot-image');
+        if (existingImage) existingImage.remove(); // Удаляем старое превью если есть
+
+        const existingRemoveBtn = slotElement.querySelector('.remove-image');
+         if (existingRemoveBtn) existingRemoveBtn.remove();
+
+        const uploadIcon = slotElement.querySelector('.upload-icon');
+        if (uploadIcon) uploadIcon.style.display = 'none';
+
+
+        const slotImage = document.createElement('img');
+        slotImage.className = 'slot-image'; // Убедимся, что класс правильный для CSS
+        slotElement.appendChild(slotImage);
+        displayImagePreview(file, slotImage);
+
+
+        const removeButton = document.createElement('div');
+        removeButton.className = 'remove-image';
+        removeButton.textContent = '✕';
+        removeButton.setAttribute('data-slot', slotIndex);
+        removeButton.addEventListener('click', handleRemoveCompareImage);
+        slotElement.appendChild(removeButton);
+
+        slotElement.classList.add('filled');
+        showToast("Изображение добавлено в слот " + (slotIndex + 1));
+    }
+
 
     // Обработка удаления изображения для сравнения
     function handleRemoveCompareImage(event) {
-        event.stopPropagation();
+        event.stopPropagation(); // Предотвращаем срабатывание загрузки файла по клику на слот
 
         const slotIndex = parseInt(event.currentTarget.getAttribute('data-slot'));
         if (isNaN(slotIndex)) {
@@ -674,10 +509,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         logger.info(`Удаление изображения из слота ${slotIndex}`);
 
-        // Очищаем состояние
         appState.compareImages[slotIndex] = null;
 
-        // Находим слот и возвращаем ему первоначальный вид
         const slot = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
         if (!slot) {
             logger.error(`Слот с индексом ${slotIndex} не найден`);
@@ -685,7 +518,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         slot.classList.remove('filled');
-
         slot.innerHTML = `
             <div class="upload-icon">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none"
@@ -698,55 +530,51 @@ document.addEventListener('DOMContentLoaded', function () {
             <input type="file" class="compare-upload-input" accept="image/*" data-slot="${slotIndex}">
         `;
 
-        // Обновляем обработчик событий для нового input
         const newInput = slot.querySelector('.compare-upload-input');
-        newInput.addEventListener('change', handleCompareImageUpload);
+        if (newInput) {
+            newInput.addEventListener('change', handleCompareImageUpload);
+        } else {
+            logger.error("Не удалось найти новый input в слоте " + slotIndex);
+        }
 
-        showToast("Изображение удалено");
+        showToast("Изображение удалено из слота " + (slotIndex + 1));
     }
 
-    // Обработка загрузки фото пользователя для примерки
+
+    // Обработка загрузки фото пользователя для примерки (пока не используется)
     function handleYourPhotoUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         logger.info("Загрузка фото пользователя:", file.name);
-
-        if (!validateImageFile(file)) {
-            event.target.value = '';
-            return;
-        }
-
+        if (!validateImageFile(file)) { event.target.value = ''; return; }
         appState.yourPhoto = file;
-
         if (yourPhotoPreview && yourPhotoContainer) {
             displayImagePreview(file, yourPhotoPreview);
             yourPhotoContainer.style.display = 'block';
+             if (document.getElementById('your-photo-upload-area')) {
+                 document.getElementById('your-photo-upload-area').style.display = 'none';
+            }
         }
-
         showToast("Ваше фото загружено");
+        event.target.value = '';
     }
 
-    // Обработка загрузки фото образа для примерки
+    // Обработка загрузки фото образа для примерки (пока не используется)
     function handleOutfitPhotoUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         logger.info("Загрузка фото образа:", file.name);
-
-        if (!validateImageFile(file)) {
-            event.target.value = '';
-            return;
-        }
-
+        if (!validateImageFile(file)) { event.target.value = ''; return; }
         appState.outfitPhoto = file;
-
         if (outfitPhotoPreview && outfitPhotoContainer) {
             displayImagePreview(file, outfitPhotoPreview);
             outfitPhotoContainer.style.display = 'block';
+            if (document.getElementById('outfit-photo-upload-area')) {
+                 document.getElementById('outfit-photo-upload-area').style.display = 'none';
+            }
         }
-
         showToast("Фото образа загружено");
+        event.target.value = '';
     }
 
     // Обработка удаления изображения
@@ -764,25 +592,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 appState.singleImage = null;
                 if (singleUploadInput) singleUploadInput.value = '';
                 if (singlePreviewContainer) singlePreviewContainer.style.display = 'none';
+                if (document.getElementById('single-upload-area')) {
+                     document.getElementById('single-upload-area').style.display = 'flex'; // Показываем обратно зону загрузки
+                }
                 break;
 
-            case 'your-photo':
+            case 'your-photo': // Для примерки
                 appState.yourPhoto = null;
                 if (yourPhotoInput) yourPhotoInput.value = '';
                 if (yourPhotoContainer) yourPhotoContainer.style.display = 'none';
+                 if (document.getElementById('your-photo-upload-area')) {
+                     document.getElementById('your-photo-upload-area').style.display = 'flex';
+                }
                 break;
 
-            case 'outfit-photo':
+            case 'outfit-photo': // Для примерки
                 appState.outfitPhoto = null;
                 if (outfitPhotoInput) outfitPhotoInput.value = '';
                 if (outfitPhotoContainer) outfitPhotoContainer.style.display = 'none';
+                 if (document.getElementById('outfit-photo-upload-area')) {
+                     document.getElementById('outfit-photo-upload-area').style.display = 'flex';
+                }
                 break;
 
             default:
                 logger.warn(`Неизвестный тип цели удаления: ${target}`);
                 return;
         }
-
         showToast("Изображение удалено");
     }
 
@@ -793,518 +629,328 @@ document.addEventListener('DOMContentLoaded', function () {
         logger.info("Клик по кнопке Проанализировать");
 
         if (appState.consultationMode === 'single') {
-            // Проверка наличия одиночного изображения
             if (!appState.singleImage) {
                 showToast("Пожалуйста, загрузите изображение одежды");
                 return;
             }
-
-            // Отправка запроса на анализ одного изображения
             analyzeSingleOutfit();
-        } else {
-            // Проверка наличия изображений для сравнения
+        } else { // 'compare'
             const validImages = appState.compareImages.filter(img => img !== null);
-
             if (validImages.length < 2) {
                 showToast("Пожалуйста, загрузите минимум 2 изображения для сравнения");
                 return;
             }
-
-            if (validImages.length > 4) {
+            if (validImages.length > 4) { // В HTML 4 слота
                 showToast("Максимальное количество изображений для сравнения - 4");
                 return;
             }
-
-            // Отправка запроса на сравнение изображений
             compareOutfits(validImages);
         }
     }
 
-    // Обработка клика по кнопке "Примерить"
+    // Обработка клика по кнопке "Примерить" (пока не используется)
     function handleTryOnClick() {
         logger.info("Клик по кнопке Примерить");
-
-        // Проверка наличия обоих необходимых изображений
-        if (!appState.yourPhoto) {
-            showToast("Пожалуйста, загрузите ваше фото");
-            return;
-        }
-
-        if (!appState.outfitPhoto) {
-            showToast("Пожалуйста, загрузите фото образа");
-            return;
-        }
-
-        // Отправка запроса на виртуальную примерку
+        if (!appState.yourPhoto) { showToast("Пожалуйста, загрузите ваше фото"); return; }
+        if (!appState.outfitPhoto) { showToast("Пожалуйста, загрузите фото образа"); return; }
         tryOnOutfit();
     }
 
-    // Обработка клика по кнопке "Скачать результат"
+    // Обработка клика по кнопке "Скачать результат" (пока не используется)
     function handleResultDownload() {
         logger.info("Клик по кнопке Скачать результат");
-
-        // Проверка наличия результата
-        if (!tryOnResultImage || !tryOnResultImage.src) {
+        if (!tryOnResultImage || !tryOnResultImage.src || tryOnResultImage.src.startsWith('data:image/svg+xml')) { // Проверка, что это не placeholder
             showToast("Нет изображения для скачивания");
             return;
         }
-
-        // Создаем ссылку для скачивания
         const link = document.createElement('a');
         link.href = tryOnResultImage.src;
-        link.download = 'mishura-virtual-tryon.jpg';
+        link.download = 'mishura-virtual-tryon.jpg'; // Имя файла для скачивания
+        document.body.appendChild(link); // Необходимо для Firefox
         link.click();
-
+        document.body.removeChild(link);
         showToast("Изображение сохранено");
     }
 
     // === API ЗАПРОСЫ ===
+    const API_BASE_URL = ''; // Если запускается локально FastAPI на том же порту, или настроен прокси
 
-    // Анализ одного предмета одежды
     async function analyzeSingleOutfit() {
         logger.info("Отправка запроса на анализ одежды");
-
-        // Показываем индикатор загрузки
         showLoading("Анализируем вашу одежду...");
 
+        const formData = new FormData();
+        formData.append('image', appState.singleImage);
+        formData.append('occasion', occasionSelector ? occasionSelector.value : 'повседневный');
+        if (preferencesInput && preferencesInput.value.trim()) {
+            formData.append('preferences', preferencesInput.value.trim());
+        }
+
         try {
-            // Создаем FormData для отправки
-            const formData = new FormData();
-            formData.append('image', appState.singleImage);
-            formData.append('occasion', occasionSelector ? occasionSelector.value : 'повседневный');
+            const response = await fetch(`${API_BASE_URL}/analyze-outfit`, {
+                method: 'POST',
+                body: formData
+            });
+            hideLoading(); // Скрываем лоадер после получения ответа
 
-            if (preferencesInput && preferencesInput.value.trim()) {
-                formData.append('preferences', preferencesInput.value.trim());
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: `HTTP ошибка: ${response.status}` }));
+                throw new Error(errorData.message || `HTTP ошибка: ${response.status}`);
             }
 
-            // Отправляем запрос
-            let response;
-
-            try {
-                response = await fetch('/analyze-outfit', {
-                    method: 'POST',
-                    body: formData
-                });
-            } catch (fetchError) {
-                logger.error("Ошибка при отправке запроса на сервер:", fetchError);
-
-                // Имитация ответа для демонстрации (в реальном приложении будет использоваться ответ от сервера)
-                simulateAnalysisResponse();
-                return;
-            }
-
-            // Обрабатываем ответ
-            let data;
-
-            try {
-                data = await response.json();
-            } catch (jsonError) {
-                logger.error("Ошибка при разборе JSON ответа:", jsonError);
-
-                // Имитация ответа для демонстрации
-                simulateAnalysisResponse();
-                return;
-            }
-
-            // Скрываем индикатор загрузки
-            hideLoading();
+            const data = await response.json();
 
             if (data.status === 'success') {
                 logger.info("Анализ успешно получен");
-
-                // Сохраняем результат в состоянии
                 appState.lastApiResponse = data;
-
-                // Закрываем диалог консультации
-                closeOverlay(consultationOverlay);
-
-                // Отображаем результаты
+                if (consultationOverlay) closeOverlay(consultationOverlay);
                 displayResults(data.advice);
             } else {
-                logger.error("Ошибка при анализе:", data.message);
-                showToast(`Ошибка: ${data.message || 'Не удалось проанализировать изображение'}`);
-
-                // Имитация ответа для демонстрации
-                simulateAnalysisResponse();
+                throw new Error(data.message || 'Не удалось проанализировать изображение');
             }
         } catch (error) {
-            logger.error("Общая ошибка при отправке запроса:", error);
-            hideLoading();
-            showToast("Ошибка соединения с сервером. Попробуйте позже.");
-
-            // Имитация ответа для демонстрации
-            simulateAnalysisResponse();
+            logger.error("Ошибка при анализе (single):", error);
+            hideLoading(); // Убедимся, что лоадер скрыт при ошибке
+            showToast(`Ошибка: ${error.message}. Попробуйте позже.`);
+            // Можно добавить имитацию ответа для тестирования UI, если нужно
+            // simulateAnalysisResponse();
         }
     }
 
-    // Имитация ответа для анализа одежды (демонстрационный режим)
-    function simulateAnalysisResponse() {
-        setTimeout(() => {
-            hideLoading();
-
-            // Закрываем диалог консультации
-            closeOverlay(consultationOverlay);
-
-            // Демонстрационный ответ
-            const demoAdvice = `### 1. Описание Вещи (Мишура)
-* **Тип:** Casual джинсовая рубашка
-* **Фасон и крой:** Прямой классический крой с карманами на груди
-* **Цвет/Принт:** Светло-голубой деним, однотонный
-* **Материал (предположительно):** Хлопковый деним средней плотности
-* **Ключевые детали:** Металлические кнопки, отложной воротник, накладные карманы
-
-### 2. Оценка для повода "повседневный" от Мишуры
-* **Соответствие:** Отличный выбор!
-* **Комментарий:** Джинсовая рубашка идеально подходит для повседневных образов. Её универсальность позволяет создавать различные комбинации — от расслабленных до более структурированных.
-
-### 3. Рекомендации по Сочетаниям от Мишуры
-* **Образ 1:** Сочетайте эту рубашку с темно-синими или черными джинсами slim-fit и белыми кроссовками для современного повседневного образа. В прохладную погоду добавьте бежевый или серый кардиган.
-* **Образ 2:** Для более нарядного образа комбинируйте с бежевыми чиносами, коричневыми дерби и тонким кожаным ремнем в тон обуви.
-* **Аксессуары:** Минималистичные часы с кожаным ремешком и солнцезащитные очки в темной оправе отлично дополнят образ.
-
-### 4. Общее Впечатление и Сезонность от Мишуры
-* Стильная и актуальная вещь, которая подходит для любого сезона. Летом носите с подвернутыми рукавами как самостоятельный верх, весной и осенью — как слой под куртку или пиджак.
-
-💡 Совет для будущих консультаций: В следующий раз, если вы хотите более точные рекомендации по поводу аксессуаров, укажите в своих предпочтениях, какие цвета и стили вам нравятся. Это поможет мне дать ещё более персонализированные советы.`;
-
-            // Отображаем результаты
-            displayResults(demoAdvice);
-        }, 1500);
-    }
-
-    // Сравнение нескольких предметов одежды
     async function compareOutfits(images) {
         logger.info(`Отправка запроса на сравнение ${images.length} предметов одежды`);
-
-        // Показываем индикатор загрузки
         showLoading("Сравниваем предметы одежды...");
 
+        const formData = new FormData();
+        images.forEach((image) => {
+            formData.append('images', image);
+        });
+        formData.append('occasion', occasionSelector ? occasionSelector.value : 'повседневный');
+        if (preferencesInput && preferencesInput.value.trim()) {
+            formData.append('preferences', preferencesInput.value.trim());
+        }
+
         try {
-            // Создаем FormData для отправки
-            const formData = new FormData();
-
-            // Добавляем все изображения
-            images.forEach((image, index) => {
-                formData.append('images', image);
+            const response = await fetch(`${API_BASE_URL}/compare-outfits`, {
+                method: 'POST',
+                body: formData
             });
-
-            // Добавляем дополнительные параметры
-            formData.append('occasion', occasionSelector ? occasionSelector.value : 'повседневный');
-
-            if (preferencesInput && preferencesInput.value.trim()) {
-                formData.append('preferences', preferencesInput.value.trim());
-            }
-
-            // Отправляем запрос
-            let response;
-
-            try {
-                response = await fetch('/compare-outfits', {
-                    method: 'POST',
-                    body: formData
-                });
-            } catch (fetchError) {
-                logger.error("Ошибка при отправке запроса на сервер:", fetchError);
-
-                // Имитация ответа для демонстрации
-                simulateComparisonResponse(images.length);
-                return;
-            }
-
-            // Обрабатываем ответ
-            let data;
-
-            try {
-                data = await response.json();
-            } catch (jsonError) {
-                logger.error("Ошибка при разборе JSON ответа:", jsonError);
-
-                // Имитация ответа для демонстрации
-                simulateComparisonResponse(images.length);
-                return;
-            }
-
-            // Скрываем индикатор загрузки
             hideLoading();
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: `HTTP ошибка: ${response.status}` }));
+                throw new Error(errorData.message || `HTTP ошибка: ${response.status}`);
+            }
+            const data = await response.json();
 
             if (data.status === 'success') {
                 logger.info("Сравнение успешно получено");
-
-                // Сохраняем результат в состоянии
                 appState.lastApiResponse = data;
-
-                // Закрываем диалог консультации
-                closeOverlay(consultationOverlay);
-
-                // Отображаем результаты
+                if (consultationOverlay) closeOverlay(consultationOverlay);
                 displayResults(data.advice);
             } else {
-                logger.error("Ошибка при сравнении:", data.message);
-                showToast(`Ошибка: ${data.message || 'Не удалось сравнить изображения'}`);
-
-                // Имитация ответа для демонстрации
-                simulateComparisonResponse(images.length);
+                throw new Error(data.message || 'Не удалось сравнить изображения');
             }
         } catch (error) {
-            logger.error("Общая ошибка при отправке запроса:", error);
+            logger.error("Ошибка при сравнении (compare):", error);
             hideLoading();
-            showToast("Ошибка соединения с сервером. Попробуйте позже.");
-
-            // Имитация ответа для демонстрации
-            simulateComparisonResponse(images.length);
+            showToast(`Ошибка: ${error.message}. Попробуйте позже.`);
+            // simulateComparisonResponse(images.length);
         }
     }
-
-    // Имитация ответа для сравнения одежды (демонстрационный режим)
-    function simulateComparisonResponse(imageCount) {
-        setTimeout(() => {
-            hideLoading();
-
-            // Закрываем диалог консультации
-            closeOverlay(consultationOverlay);
-
-            // Демонстрационный ответ
-            const demoAdvice = `### Краткий Обзор Предметов от Мишуры
-* **Предмет 1:** Черный облегающий джемпер из тонкой шерсти с круглым вырезом
-* **Предмет 2:** Темно-синий свитер из мериносовой шерсти с V-образным вырезом
-${imageCount > 2 ? '* **Предмет 3:** Серый кашемировый свитер с высоким горлом и ребристой вязкой' : ''}
-${imageCount > 3 ? '* **Предмет 4:** Бежевый кардиган из хлопка с пуговицами и накладными карманами' : ''}
-
-### Сравнение для повода "повседневный" от Мишуры
-* **Предмет 1:** Универсальный базовый элемент, хорошо сочетается с множеством вещей, но может выглядеть слишком строго для некоторых повседневных ситуаций.
-* **Предмет 2:** Сочетает элегантность и комфорт, V-образный вырез делает его более интересным визуально.
-${imageCount > 2 ? '* **Предмет 3:** Наиболее теплый и комфортный вариант, создает стильный и современный образ благодаря текстуре и фасону.' : ''}
-${imageCount > 3 ? '* **Предмет 4:** Наиболее универсальный и функциональный вариант, можно использовать как верхний слой или самостоятельно.' : ''}
-
-### Итоговая Рекомендация от Мишуры
-* **Лучший выбор:** Предмет ${imageCount > 2 ? '3' : '2'} - идеально подходит для повседневного использования благодаря сочетанию комфорта, стиля и универсальности. Цвет и фактура делают его более интересным визуально, при этом он остается достаточно сдержанным для разных ситуаций.
-* **Стилизация лучшего выбора:** Сочетайте с джинсами прямого кроя или чиносами, добавьте кожаные кроссовки или ботинки chelsea для завершенного образа.
-
-💡 Совет для будущих сравнений: Для более точных рекомендаций было бы полезно знать, какой у вас тип фигуры и какие цветовые сочетания вы предпочитаете. Это поможет мне дать более персонализированные советы.`;
-
-            // Отображаем результаты
-            displayResults(demoAdvice);
-        }, 1500);
-    }
-
-    // Виртуальная примерка
+    // Виртуальная примерка (пока заглушка)
     async function tryOnOutfit() {
-        logger.info("Отправка запроса на виртуальную примерку");
-
-        // Показываем индикатор загрузки
+        logger.info("Отправка запроса на виртуальную примерку (заглушка)");
         showLoading("Создаем виртуальную примерку...");
 
-        // Временная имитация запроса (будет заменено реальным API)
-        setTimeout(() => {
+        setTimeout(() => { // Имитация задержки API
             hideLoading();
-
-            // Для демонстрации используем загруженные изображения
-            // В реальном приложении здесь будет ответ от API
-
             const reader = new FileReader();
             reader.onload = function (e) {
-                // Используем фото образа в качестве результата для демонстрации
                 if (tryOnResultImage) {
-                    tryOnResultImage.src = e.target.result;
+                    tryOnResultImage.src = e.target.result; // Показываем фото одежды как "результат"
                 }
-
-                // Закрываем диалог примерки
-                closeOverlay(tryOnOverlay);
-
-                // Открываем диалог с результатом
-                openOverlay(tryOnResultOverlay);
+                if (tryOnOverlay) closeOverlay(tryOnOverlay);
+                if (tryOnResultOverlay) openOverlay(tryOnResultOverlay);
             };
-            reader.readAsDataURL(appState.outfitPhoto);
-
+            if(appState.outfitPhoto) { // Убедимся, что фото есть
+                 reader.readAsDataURL(appState.outfitPhoto);
+            } else {
+                 showToast("Ошибка: Фото образа не загружено для примерки.");
+                 if (tryOnOverlay) closeOverlay(tryOnOverlay); // Закрываем, если нет фото
+            }
             logger.info("Виртуальная примерка создана (демо)");
         }, 2000);
     }
 
+
     // === УТИЛИТЫ ИНТЕРФЕЙСА ===
 
-    // Показать всплывающее сообщение
-    function showToast(message, duration = 2000) {
+    function showToast(message, duration = 3000) { // Увеличил длительность по умолчанию
         logger.debug(`Показ сообщения: ${message}`);
-
-        // Находим или создаем элемент toast
         const toastElement = document.getElementById('toast') || createToastElement();
-
-        // Устанавливаем текст и показываем
         toastElement.textContent = message;
         toastElement.classList.add('show');
-
-        // Скрываем через указанное время
         setTimeout(() => {
             toastElement.classList.remove('show');
         }, duration);
     }
 
-    // Создать элемент toast, если его нет
     function createToastElement() {
         const toast = document.createElement('div');
         toast.id = 'toast';
-        toast.className = 'toast';
+        toast.className = 'toast'; // Убедитесь, что класс соответствует CSS
         document.body.appendChild(toast);
         return toast;
     }
 
-    // Показать индикатор загрузки
     function showLoading(message = 'Загрузка...') {
         logger.debug(`Показ индикатора загрузки: ${message}`);
-
-        if (loadingText) {
-            loadingText.textContent = message;
-        }
-
-        openOverlay(loadingOverlay);
+        if (loadingText) loadingText.textContent = message;
+        // Предполагается, что loadingOverlay - это ID оверлея для загрузки
+        const loOverlay = document.getElementById('loading-overlay') || createLoadingOverlay();
+        if (loOverlay) openOverlay(loOverlay);
         appState.isLoading = true;
     }
+    function createLoadingOverlay() {
+        // Эта функция нужна, если loadingOverlay не всегда есть в DOM заранее
+        const overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.className = 'overlay'; // Используем тот же класс, что и другие оверлеи
+        overlay.innerHTML = `
+            <div class="dialog"> <div class="loading-indicator">
+                    <div class="loading-spinner"></div>
+                    <p id="loading-text-dynamic">Загрузка...</p>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        // Переназначаем loadingText на динамически созданный элемент
+        // loadingText = document.getElementById('loading-text-dynamic'); // Не нужно, если loadingText уже есть
+        return overlay;
+    }
 
-    // Скрыть индикатор загрузки
+
     function hideLoading() {
         logger.debug('Скрытие индикатора загрузки');
-
-        closeOverlay(loadingOverlay);
+        const loOverlay = document.getElementById('loading-overlay');
+        if (loOverlay) closeOverlay(loOverlay);
         appState.isLoading = false;
     }
 
-    // Открыть оверлей
-    function openOverlay(overlay) {
-        if (!overlay) {
-            logger.error('Попытка открыть несуществующий оверлей');
-            return;
-        }
-
-        logger.debug(`Открытие оверлея: ${overlay.id}`);
-
-        overlay.classList.add('active');
+    function openOverlay(overlayElement) {
+        if (!overlayElement) { logger.error('Попытка открыть несуществующий оверлей'); return; }
+        logger.debug(`Открытие оверлея: ${overlayElement.id}`);
+        overlayElement.classList.add('active');
     }
 
-    // Закрыть оверлей
-    function closeOverlay(overlay) {
-        if (!overlay) {
-            logger.error('Попытка закрыть несуществующий оверлей');
-            return;
-        }
-
-        logger.debug(`Закрытие оверлея: ${overlay.id}`);
-
-        overlay.classList.remove('active');
+    function closeOverlay(overlayElement) {
+        if (!overlayElement) { logger.error('Попытка закрыть несуществующий оверлей'); return; }
+        logger.debug(`Закрытие оверлея: ${overlayElement.id}`);
+        overlayElement.classList.remove('active');
     }
 
-    // Отобразить превью изображения
     function displayImagePreview(file, imgElement) {
-        if (!file || !imgElement) {
-            logger.error('Невозможно отобразить превью - отсутствует файл или элемент изображения');
-            return;
-        }
-
+        if (!file || !imgElement) { logger.error('Невозможно отобразить превью - отсутствует файл или элемент img'); return; }
         const reader = new FileReader();
-        reader.onload = function (e) {
-            imgElement.src = e.target.result;
-        };
+        reader.onload = function (e) { imgElement.src = e.target.result; };
         reader.readAsDataURL(file);
     }
 
-    // Отобразить результаты анализа
-    function displayResults(advice) {
+    function displayResults(adviceMarkdown) {
         logger.info("Отображение результатов анализа");
+        const resultsContainerEl = document.getElementById('results-container'); // Убедимся, что ID правильный
+        const resultsOverlayEl = document.getElementById('results-overlay'); // ID для оверлея результатов
 
-        if (!resultsContainer) {
-            logger.error('Контейнер для результатов не найден');
-            return;
-        }
+        if (!resultsContainerEl) { logger.error('Контейнер #results-container не найден'); return; }
+        if (!resultsOverlayEl) { logger.error('Оверлей #results-overlay не найден'); return; }
 
-        // Очищаем контейнер результатов
-        resultsContainer.innerHTML = '';
-
-        // Преобразуем текстовые результаты в HTML
-        // Предполагается, что совет в формате Markdown с заголовками
-        const sections = advice.split('###').filter(section => section.trim() !== '');
-
-        sections.forEach(section => {
-            const sectionDiv = document.createElement('div');
-            sectionDiv.className = 'result-section';
-
-            const lines = section.trim().split('\n');
-            const title = lines[0].trim();
-            const content = lines.slice(1).join('\n').trim();
-
-            const titleEl = document.createElement('div');
-            titleEl.className = 'result-section-title';
-            titleEl.textContent = title;
-
-            const contentEl = document.createElement('div');
-            contentEl.className = 'result-section-content';
-            contentEl.innerHTML = parseMarkdown(content);
-
-            sectionDiv.appendChild(titleEl);
-            sectionDiv.appendChild(contentEl);
-            resultsContainer.appendChild(sectionDiv);
-        });
-
-        // Открываем оверлей с результатами
-        openOverlay(resultsOverlay);
+        resultsContainerEl.innerHTML = parseMarkdownToHtml(adviceMarkdown); // Используем новую функцию
+        openOverlay(resultsOverlayEl);
     }
 
-    // Преобразование Markdown в HTML
-    function parseMarkdown(markdown) {
-        // Заменяем маркеры списка
-        let html = markdown.replace(/\*\s(.*)/g, '<li>$1</li>');
+    function parseMarkdownToHtml(markdown) {
+        if (!markdown) return '<p>Нет данных для отображения.</p>';
+        let html = markdown;
 
-        // Добавляем теги списка
-        if (html.includes('<li>')) {
-            html = '<ul>' + html + '</ul>';
+        // Заголовки (###, ##, #)
+        html = html.replace(/^### (.*$)/gm, '<div class="result-section-title">$1</div>');
+        html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>'); // Если нужны H2
+        html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');   // Если нужны H1
+
+        // Списки (* или -)
+        html = html.replace(/^\*\s(.*)$/gm, '<li>$1</li>');
+        html = html.replace(/^- \s(.*)$/gm, '<li>$1</li>'); // Также для дефисов
+
+        // Обертывание списков в <ul>
+        // Простой способ: если есть <li>, но нет <ul>, обернуть все блоки <li>
+        if (html.includes('<li>') && !html.includes('<ul>')) {
+            html = html.replace(/^(<li>.*<\/li>\s*)+/gm, (match) => `<ul>${match}</ul>`);
         }
+         // Более надежный способ для нескольких списков:
+        let inList = false;
+        html = html.split('\n').map(line => {
+            if (line.startsWith('<li>')) {
+                if (!inList) {
+                    inList = true;
+                    return '<ul>' + line;
+                }
+                return line;
+            } else {
+                if (inList) {
+                    inList = false;
+                    return '</ul>' + line;
+                }
+                return line;
+            }
+        }).join('\n');
+        if (inList) html += '</ul>'; // Закрыть список, если он последний
 
-        // Заменяем двойные переносы строк на параграфы
-        html = html.replace(/\n\n/g, '</p><p>');
+        // Замена символов новой строки на <br> внутри абзацев, но не для списков и заголовков
+        // Сначала обернем в <p> то, что не является заголовком или списком
+        html = html.split('\n').map(line => {
+            if (line.match(/^<(div|ul|li|h[1-3])/)) return line; // Не трогаем существующие теги
+            if (line.trim() === "") return ""; // Пустые строки пропускаем
+            return `<p>${line}</p>`;
+        }).join(''); // Соединяем без \n, т.к. <p> уже блочные
 
-        // Оборачиваем весь текст в параграф если он не начинается с <ul>
-        if (!html.startsWith('<ul>')) {
-            html = '<p>' + html + '</p>';
-        }
-
-        // Удаляем пустые параграфы
-        html = html.replace(/<p><\/p>/g, '');
+        // Удаляем <p> вокруг <ul> и <div>
+        html = html.replace(/<p><(ul|div class="result-section-title")>/g, '<$1>');
+        html = html.replace(/<\/(ul|div)><\/p>/g, '</$1>');
+        html = html.replace(/<\/li><\/ul><p>💡/g, '</li></ul><p class="ai-tip">💡'); // Для подсказок
 
         return html;
     }
 
+
     // Сброс формы консультации
     function resetConsultationForm() {
-        // Сбрасываем режим
+        logger.debug("Сброс формы консультации");
         appState.consultationMode = 'single';
-
-        // Активируем первую кнопку режима
-        modeButtons.forEach((button, index) => {
-            button.classList.toggle('active', index === 0);
-        });
-
-        // Показываем режим одиночного анализа
-        if (singleAnalysisMode && compareAnalysisMode) {
-            singleAnalysisMode.classList.remove('hidden');
-            compareAnalysisMode.classList.add('hidden');
+        if(modeButtons.length > 0) {
+            modeButtons.forEach(b => b.classList.remove('active'));
+            modeButtons[0].classList.add('active'); // Первый режим (single) по умолчанию
         }
 
-        // Очищаем поля
+        if (singleAnalysisMode) singleAnalysisMode.classList.remove('hidden');
+        if (compareAnalysisMode) compareAnalysisMode.classList.add('hidden');
+
         if (singleUploadInput) singleUploadInput.value = '';
         if (preferencesInput) preferencesInput.value = '';
         if (occasionSelector) occasionSelector.selectedIndex = 0;
 
-        // Скрываем превью
-        if (singlePreviewContainer) singlePreviewContainer.style.display = 'none';
+        if (singlePreviewContainer) {
+            singlePreviewContainer.style.display = 'none';
+            if(singlePreviewImage) singlePreviewImage.src = '#'; // Сброс src
+        }
+         if (document.getElementById('single-upload-area')) {
+             document.getElementById('single-upload-area').style.display = 'flex';
+        }
 
-        // Очищаем состояние
+
         appState.singleImage = null;
         appState.compareImages = [null, null, null, null];
 
-        // Очищаем слоты сравнения
-        const slots = document.querySelectorAll('.image-slot');
-        slots.forEach(slot => {
-            const slotIndex = slot.getAttribute('data-slot');
-
-            // Возвращаем исходный вид
+        document.querySelectorAll('.image-slot').forEach((slot, index) => {
             slot.classList.remove('filled');
             slot.innerHTML = `
                 <div class="upload-icon">
@@ -1315,295 +961,43 @@ ${imageCount > 3 ? '* **Предмет 4:** Наиболее универсал�
                         <polyline points="21 15 16 10 5 21"></polyline>
                     </svg>
                 </div>
-                <input type="file" class="compare-upload-input" accept="image/*" data-slot="${slotIndex}">
+                <input type="file" class="compare-upload-input" accept="image/*" data-slot="${index}">
             `;
-
-            // Обновляем обработчик событий
-            const input = slot.querySelector('.compare-upload-input');
-            if (input) {
-                input.addEventListener('change', handleCompareImageUpload);
-            }
+            const newInput = slot.querySelector('.compare-upload-input');
+            if (newInput) newInput.addEventListener('change', handleCompareImageUpload);
         });
-=======
-            singleModeBtn.classList.add('active');
-            compareModeBtn.classList.remove('active');
-            singleModeText.style.display = 'block';
-            compareModeText.style.display = 'none';
-            singleUploadContainer.classList.remove('hidden');
-            multiUploadContainer.classList.add('hidden');
-        } else {
-            singleModeBtn.classList.remove('active');
-            compareModeBtn.classList.add('active');
-            singleModeText.style.display = 'none';
-            compareModeText.style.display = 'block';
-            singleUploadContainer.classList.add('hidden');
-            multiUploadContainer.classList.remove('hidden');
-        }
-        updateFilePreviewSingle();
-        updateAllSlotPreviews();
     }
 
-    function handleFileSelectSingle(e) {
-        logger.debug("handleFileSelectSingle: Сработало событие 'change'. e.target.files:", e.target.files);
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            logger.info(`handleFileSelectSingle: Файл выбран: "${file.name}"`);
-            selectedFileSingle = file;
-            updateFilePreviewSingle();
-            // *** КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ***
-            // Сбрасываем значение инпута ПОСЛЕ того, как файл был успешно обработан и сохранен в selectedFileSingle.
-            // Это позволит событию 'change' сработать снова, если пользователь выберет тот же самый файл.
-            e.target.value = null;
-        } else {
-            logger.warn("handleFileSelectSingle: Файлы не выбраны.");
-            // selectedFileSingle = null; // Не нужно, т.к. не было нового выбора
-            // updateFilePreviewSingle(); // Не нужно, т.к. файл не изменился
-        }
-    }
-
-    function handleDropSingle(e) {
-        logger.debug("handleDropSingle: Сработало событие 'drop'.");
-        preventDefaults(e); // Убедимся, что preventDefaults вызван и здесь
-        fileDropArea.classList.remove('drag-over'); // Убираем подсветку
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            const file = e.dataTransfer.files[0];
-            logger.info(`handleDropSingle: Файл перетащен: "${file.name}"`);
-            selectedFileSingle = file;
-            updateFilePreviewSingle();
-            // Для drag-n-drop нет прямого file input, который нужно сбрасывать таким же образом,
-            // но selectedFileSingle теперь содержит файл.
-            // Если после drag-n-drop мы хотим снова использовать <input type="file">,
-            // его состояние уже должно быть независимым.
-        } else {
-            logger.warn("handleDropSingle: Файлы не были перетащены.");
-        }
-    }
-
-
-    function updateFilePreviewSingle() { /* ... код как в 1.0.1-debug-single, но убедитесь, что fileInputSingle.value = ''; есть при удалении ... */
-        logger.debug(`updateFilePreviewSingle: Вызвана. selectedFileSingle: ${selectedFileSingle ? selectedFileSingle.name : 'null'}`);
-        previewContainerSingle.innerHTML = '';
-        if (selectedFileSingle) {
-            fileDropArea.classList.add('hidden');
-            previewContainerSingle.classList.remove('hidden');
-            const reader = new FileReader();
-            reader.onload = function (e_reader) {
-                const previewItem = document.createElement('div');
-                previewItem.className = 'preview-item-single';
-                const img = document.createElement('img');
-                img.src = e_reader.target.result;
-                img.className = 'preview-image-single';
-                img.alt = selectedFileSingle.name;
-                const removeBtn = document.createElement('div');
-                removeBtn.className = 'remove-preview-single';
-                removeBtn.innerHTML = '✕';
-                removeBtn.title = 'Удалить изображение';
-                removeBtn.addEventListener('click', () => {
-                    logger.info("Удаление одиночного файла из предпросмотра.");
-                    selectedFileSingle = null;
-                    if (fileInputSingle) fileInputSingle.value = ''; // ВАЖНО!
-                    updateFilePreviewSingle();
-                });
-                previewItem.appendChild(img);
-                previewItem.appendChild(removeBtn);
-                previewContainerSingle.appendChild(previewItem);
-            };
-            reader.onerror = function (e_reader_error) { logger.error("Ошибка FileReader (single):", e_reader_error); };
-            reader.readAsDataURL(selectedFileSingle);
-        } else {
-            fileDropArea.classList.remove('hidden');
-            previewContainerSingle.classList.add('hidden');
-        }
-    }
-
-    // --- Множественный режим (слоты) ---
-    function handleSlotFileSelect(slotIndex, file) {
-        logger.info(`Слот ${slotIndex}: файл выбран "${file.name}"`);
-        slotFiles[slotIndex] = file;
-        updateSlotPreview(slotIndex);
-        // Сброс значения инпута для слота также здесь, после обработки
-        const inputElement = imageSlots[slotIndex].querySelector('.slot-input');
-        if (inputElement) {
-            inputElement.value = null;
-            logger.debug(`Слот ${slotIndex}: значение инпута сброшено.`);
-        }
-    }
-
-    function updateSlotPreview(slotIndex) {
-        // ... (код из SereneFlow 1.0 или 1.0.1-debug-single)
-        // Убедитесь, что при удалении файла из слота (removeSlotFile), соответствующий input.value также сбрасывается.
-        const slot = imageSlots[slotIndex];
-        const file = slotFiles[slotIndex];
-        const previewImgEl = slot.querySelector('.preview-image-slot');
-        const removeBtnEl = slot.querySelector('.remove-image');
-        const uploadLabelEl = slot.querySelector('.upload-label-slot');
-
-
-        if (file) {
-            slot.classList.add('has-image');
-            if (uploadLabelEl) uploadLabelEl.classList.add('hidden'); // Скрываем лейбл
-            if (previewImgEl) previewImgEl.classList.remove('hidden');
-            if (removeBtnEl) removeBtnEl.classList.remove('hidden');
-
-            const reader = new FileReader();
-            reader.onload = (e_reader) => { if (previewImgEl) previewImgEl.src = e_reader.target.result; };
-            reader.onerror = (e_reader_error) => { logger.error(`Ошибка FileReader (слот ${slotIndex}):`, e_reader_error); };
-            reader.readAsDataURL(file);
-        } else {
-            slot.classList.remove('has-image');
-            if (uploadLabelEl) uploadLabelEl.classList.remove('hidden');
-            if (previewImgEl) {
-                previewImgEl.classList.add('hidden');
-                previewImgEl.src = '#'; // Сброс src для чистоты
-            }
-            if (removeBtnEl) removeBtnEl.classList.add('hidden');
-        }
-    }
-    function updateAllSlotPreviews() { slotFiles.forEach((f, i) => updateSlotPreview(i)); }
-    function removeSlotFile(slotIndex) {
-        logger.info(`Удаление файла из слота ${slotIndex}.`);
-        slotFiles[slotIndex] = null;
-        const inputElement = imageSlots[slotIndex].querySelector('.slot-input');
-        if (inputElement) inputElement.value = ''; // ВАЖНО!
-        updateSlotPreview(slotIndex);
-    }
-
-
-    function handleFormSubmit(e) { /* ... код как в 1.0.1-debug-single ... */
-        e.preventDefault();
-        logger.info(`handleFormSubmit: Форма отправлена. Текущий режим: ${currentMode}`);
-        let filesToUpload = [];
-        let endpoint = '';
-        const formData = new FormData();
-
-        const occasion = document.getElementById('occasion').value;
-        const preferences = document.getElementById('preferences').value;
-
-        if (!occasion) { alert('Пожалуйста, выберите повод.'); return; }
-        formData.append('occasion', occasion);
-        if (preferences) formData.append('preferences', preferences);
-
-        if (currentMode === 'single') {
-            if (!selectedFileSingle) { alert('Пожалуйста, загрузите изображение.'); return; }
-            logger.info(`Форма (single): файл "${selectedFileSingle.name}"`);
-            formData.append('image', selectedFileSingle, selectedFileSingle.name);
-            endpoint = '/analyze-outfit';
-        } else {
-            filesToUpload = slotFiles.filter(file => file !== null);
-            if (filesToUpload.length < 2) { alert('Загрузите минимум 2 изображения для сравнения.'); return; }
-            filesToUpload.forEach((file) => {
-                logger.info(`Форма (compare): файл "${file.name}"`);
-                formData.append('images', file, file.name);
-            });
-            endpoint = '/compare-outfits';
-        }
-        logger.debug("Содержимое FormData перед отправкой:");
-        for (let [key, value] of formData.entries()) {
-            if (value instanceof File) { logger.debug(`  ${key}: File { name: "${value.name}" ... }`); }
-            else { logger.debug(`  ${key}: ${value}`); }
-        }
-
-        uploadSection.classList.add('hidden');
-        resultSection.classList.remove('hidden');
-        loadingIndicator.classList.remove('hidden');
-        resultContent.innerHTML = '';
-
-        fetch(endpoint, { method: 'POST', body: formData })
-            .then(response => {
-                logger.info(`Ответ от сервера: статус ${response.status}`);
-                if (!response.ok) {
-                    return response.json().then(errData => { throw new Error(errData.message || `Ошибка сервера: ${response.status}`); })
-                        .catch(() => { throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`); });
-                }
-                return response.json();
-            })
-            .then(data => {
-                logger.info("Данные JSON успешно разобраны:", data.status);
-                loadingIndicator.classList.add('hidden');
-                if (data.status === 'success' && data.advice) {
-                    resultContent.innerHTML = markdownToHtml(data.advice);
-                } else {
-                    resultContent.innerHTML = `<div class="error-message"><h3>Произошла ошибка</h3><p>${data.message || 'Не удалось получить анализ.'}</p></div>`;
-                }
-            })
-            .catch(error => {
-                logger.error("Ошибка fetch или JSON:", error);
-                loadingIndicator.classList.add('hidden');
-                resultContent.innerHTML = `<div class="error-message"><h3>Ошибка</h3><p>${error.message || 'Не удалось отправить запрос.'}</p></div>`;
-            });
-    }
-
-    function resetToUploadView() {
-        logger.debug("resetToUploadView: Возврат к секции загрузки.");
-        uploadSection.classList.remove('hidden');
-        resultSection.classList.add('hidden');
-        // Очистка выбранных файлов не здесь, а при смене режима или после успешной отправки,
-        // чтобы пользователь мог видеть, что он отправлял, если нажмет "Назад".
-        // Если нужен полный сброс, можно раскомментировать:
-        // selectedFileSingle = null;
-        // if (fileInputSingle) fileInputSingle.value = null;
-        // slotFiles = [null, null, null, null];
-        // imageSlots.forEach(slot => {
-        //     const input = slot.querySelector('.slot-input');
-        //     if (input) input.value = null;
-        // });
-        // updateFilePreviewSingle();
-        // updateAllSlotPreviews();
-    }
-    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-    function markdownToHtml(markdown) {
-        if (!markdown) return '';
-        let html = markdown;
-        html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
-        html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
-        html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
-        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/__(.*?)__/g, '<strong>$1</strong>');
-        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/_(.*?)_/g, '<em>$1</em>');
-        html = html.replace(/^\s*[-*+]\s+(.*)$/gm, '<li>$1</li>');
-        let inList = false;
-        const lines = html.split('\n');
-        html = lines.map(line => {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('<li>')) {
-                if (!inList) { inList = true; return '<ul>' + line; } return line;
-            } else if (inList) {
-                inList = false;
-                const closingUl = '</ul>';
-                return trimmedLine === '' ? closingUl : closingUl + line; // Если строка пустая после списка, просто закрываем. Иначе закрываем и добавляем строку.
-            }
-            return line;
-        }).join('\n');
-        if (inList) html += '</ul>';
-
-        html = html.split('\n').map(line => {
-            const trimmedLine = line.trim();
-            if (trimmedLine === '' || trimmedLine.match(/^<\/?(ul|li|h[1-6]|strong|em|p|br)/i)) return line;
-            return '<p>' + line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>'; // Экранирование для безопасности
-        }).join('\n').replace(/<\/p>\s*<p>/g, '</p><p>');
-        html = html.replace(/<p><ul>/g, '<ul>').replace(/<\/ul><\/p>/g, '</ul>');
-        return html.replace(/\n/g, '<br>');
->>>>>>> e92feb3 (ошибка загрузки фото с перовго раза)
-    }
-
-    // Сброс формы примерки
+    // Сброс формы примерки (пока не используется)
     function resetTryOnForm() {
-        // Очищаем поля
+        logger.debug("Сброс формы примерки");
         if (yourPhotoInput) yourPhotoInput.value = '';
         if (outfitPhotoInput) outfitPhotoInput.value = '';
-        if (tryOnStyleSelector) tryOnStyleSelector.selectedIndex = 0;
+        if (tryOnStyleSelector) tryOnStyleSelector.selectedIndex = 0; // Если есть селектор стиля
 
-        // Скрываем превью
-        if (yourPhotoContainer) yourPhotoContainer.style.display = 'none';
-        if (outfitPhotoContainer) outfitPhotoContainer.style.display = 'none';
+        if (yourPhotoContainer) {
+            yourPhotoContainer.style.display = 'none';
+            if(yourPhotoPreview) yourPhotoPreview.src = '#';
+        }
+        if (document.getElementById('your-photo-upload-area')) {
+             document.getElementById('your-photo-upload-area').style.display = 'flex';
+        }
 
-        // Очищаем состояние
+        if (outfitPhotoContainer) {
+            outfitPhotoContainer.style.display = 'none';
+            if(outfitPhotoPreview) outfitPhotoPreview.src = '#';
+        }
+         if (document.getElementById('outfit-photo-upload-area')) {
+             document.getElementById('outfit-photo-upload-area').style.display = 'flex';
+        }
+
+
         appState.yourPhoto = null;
         appState.outfitPhoto = null;
     }
 
-    // Обновление интерфейса
+    // Обновление интерфейса (пока только активный таб)
     function refreshUI() {
-        // Обновляем активный таб
         navItems.forEach(item => {
             const tabName = item.getAttribute('data-tab');
             item.classList.toggle('active', tabName === appState.selectedTab);
@@ -1612,18 +1006,15 @@ ${imageCount > 3 ? '* **Предмет 4:** Наиболее универсал�
 
     // Валидация файла изображения
     function validateImageFile(file) {
-        // Проверка типа файла
         if (!file.type.startsWith('image/')) {
-            showToast("Пожалуйста, выберите файл изображения");
+            showToast("Пожалуйста, выберите файл изображения (JPEG, PNG, GIF и т.д.)");
             return false;
         }
-
-        // Проверка размера файла (не более 5 МБ)
-        if (file.size > 5 * 1024 * 1024) {
-            showToast("Размер файла превышает 5 МБ");
+        const maxSizeMB = 5;
+        if (file.size > maxSizeMB * 1024 * 1024) {
+            showToast(`Размер файла превышает ${maxSizeMB} МБ`);
             return false;
         }
-
         return true;
     }
 

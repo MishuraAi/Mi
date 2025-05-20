@@ -3,550 +3,114 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="mobile-web-app-capable" content="yes">
     <title>МИШУРА - Ваш персональный стилист</title>
-    <!-- Убедимся, что путь к CSS правильный -->
+    <link rel="stylesheet" href="styles.css">
     <style>
-        /* Базовые стили для проверки отображения */
-        :root {
-            --primary-color: #00C2FF;
-            --secondary-color: #FF3E9A;
-            --extra-color: #39D976;
-            --background-color: #F7F9FC;
-            --card-color: #FFFFFF;
-            --text-primary: #212B36;
-            --text-secondary: #637381;
-            --shadow-sm: 0 2px 8px rgba(33, 43, 54, 0.08);
-            --shadow-md: 0 4px 16px rgba(33, 43, 54, 0.12);
-            --radius-md: 12px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-        }
-
-        body {
-            background-color: var(--background-color);
-            color: var(--text-primary);
-        }
-
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        .header {
-            height: 80px;
-            background-color: var(--card-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .header-left {
-            position: absolute;
-            left: 16px;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .header-right {
-            position: absolute;
-            right: 16px;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .header-title-container {
-            text-align: center;
-        }
-
-        .header-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-
-        .header-subtitle {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 24px 16px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .main-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            width: 100%;
-            max-width: 320px;
-        }
-
-        .main-button {
-            min-height: 200px;
-            background-color: var(--card-color);
-            border-radius: var(--radius-md);
-            padding: 20px;
-            box-shadow: var(--shadow-md);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .main-button:active {
-            transform: scale(0.98);
-        }
-
-        #consultation-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 6px;
-            background-color: var(--primary-color);
-        }
-
-        #try-on-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 6px;
-            background-color: var(--extra-color);
-        }
-
-        .main-button-icon {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
-        }
-
-        #consultation-button .main-button-icon {
-            background-color: rgba(0, 194, 255, 0.1);
-            color: var(--primary-color);
-        }
-
-        #try-on-button .main-button-icon {
-            background-color: rgba(57, 217, 118, 0.1);
-            color: var(--extra-color);
-        }
-
-        .main-button-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .main-button-description {
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-
-        .bottom-nav {
-            height: 64px;
-            background-color: var(--card-color);
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-        }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 8px;
-            cursor: pointer;
-        }
-
-        .nav-icon {
-            margin-bottom: 4px;
-        }
-
-        .nav-text {
-            font-size: 10px;
-            color: var(--text-secondary);
-        }
-
-        .nav-item.active .nav-text {
-            color: var(--primary-color);
-        }
-
-        .nav-item.active .nav-icon {
-            color: var(--primary-color);
-        }
-
-        .fab {
-            position: fixed;
-            right: 16px;
-            bottom: 80px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background-color: var(--primary-color);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: var(--shadow-md);
-            cursor: pointer;
-        }
-
-        /* Стили для оверлеев */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.75);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .dialog {
-            max-width: 90%;
-            width: 320px;
-            background-color: var(--card-color);
-            border-radius: var(--radius-md);
-            padding: 24px;
-            box-shadow: var(--shadow-lg);
-            transform: translateY(20px);
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-
-        .overlay.active .dialog {
-            transform: translateY(0);
-            opacity: 1;
-        }
-
-        .dialog-header {
-            margin-bottom: 16px;
-            text-align: center;
-        }
-
-        .dialog-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-        }
-
-        .dialog-subtitle {
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-
-        .dialog-content {
-            margin-bottom: 24px;
-        }
-
-        .dialog-footer {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .btn {
-            padding: 12px 16px;
-            border-radius: var(--radius-md);
-            border: none;
-            font-weight: 500;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: white;
-        }
-
-        .btn-secondary {
-            background-color: var(--background-color);
-            color: var(--text-primary);
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        /* Стили для загрузки фото */
-        .upload-area {
-            border: 2px dashed var(--primary-color);
-            border-radius: var(--radius-md);
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 24px;
-            background-color: rgba(0, 194, 255, 0.05);
-            position: relative;
-        }
-
-        .upload-icon {
-            font-size: 36px;
-            color: var(--primary-color);
-            margin-bottom: 16px;
-        }
-
-        .upload-text {
-            text-align: center;
-            color: var(--text-secondary);
-            margin-bottom: 16px;
-        }
-
-        .upload-input {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-        }
-
-        /* Стили для консультации */
-        .consultation-mode-switch {
-            display: flex;
-            margin-bottom: 16px;
-            border-radius: var(--radius-md);
-            overflow: hidden;
-            background-color: var(--background-color);
-        }
-
-        .mode-button {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .mode-button.active {
-            background-color: var(--primary-color);
-            color: white;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .image-slots {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
-        .image-slot {
-            aspect-ratio: 1/1;
-            border: 2px dashed var(--primary-color);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: rgba(0, 194, 255, 0.05);
-            position: relative;
-            cursor: pointer;
-        }
-
-        /* Анимации загрузки */
-        .loading-indicator {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            padding: 16px;
-        }
-
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 4px solid rgba(0, 194, 255, 0.2);
-            border-top-color: var(--primary-color);
-            animation: spin 1s linear infinite;
-            margin-bottom: 16px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Стили для тостов */
-        .toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 30px;
-            z-index: 2000;
-            font-size: 14px;
-            font-weight: 500;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .toast.show {
-            opacity: 1;
-        }
+        /* Минимальные стили для предотвращения "прыжка" контента до загрузки CSS */
+        body { display: none; } /* Скрываем тело до полной загрузки CSS и JS */
     </style>
 </head>
 
 <body>
-    <div class="app-container">
-        <header class="header">
-            <div class="header-left" id="menu-button">
-                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </div>
-            <div class="header-title-container">
-                <div class="header-title">МИШУРА</div>
-                <div class="header-subtitle">Ваш персональный стилист</div>
-            </div>
-            <div class="header-right" id="search-button">
-                <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </div>
-        </header>
+    <div class="phone-container"> <!- Добавлен контейнер для десктопного вида -->
+        <div class="app-container">
+            <header class="header">
+                <div class="header-left" id="menu-button" aria-label="Меню">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </div>
+                <div class="header-title-container" id="home-button" aria-label="На главную">
+                    <div class="header-title">МИШУРА</div>
+                    <div class="header-subtitle">Ваш персональный стилист</div>
+                </div>
+                <div class="header-right" id="search-button" aria-label="Поиск">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </div>
+            </header>
 
-        <main class="main-content">
-            <div class="main-buttons">
-                <div class="main-button" id="consultation-button">
-                    <div class="main-button-icon">
-                        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
-                            </path>
+            <main class="main-content">
+                <div class="main-buttons">
+                    <div class="main-button" id="consultation-button" role="button" tabindex="0">
+                        <div class="main-button-icon">
+                            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </div>
+                        <div class="main-button-title">Получить консультацию</div>
+                        <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
+                    </div>
+
+                    <div class="main-button" id="try-on-button" role="button" tabindex="0">
+                        <div class="main-button-icon">
+                            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <path d="M16 10a4 4 0 0 1-8 0"></path>
+                            </svg>
+                        </div>
+                        <div class="main-button-title">Примерить</div>
+                        <div class="main-button-description">Виртуальная примерка образов (в разработке)</div>
+                    </div>
+                </div>
+            </main>
+
+            <nav class="bottom-nav">
+                <div class="nav-item active" data-tab="home" role="button" tabindex="0" aria-label="Главная">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
                         </svg>
                     </div>
-                    <div class="main-button-title">Получить консультацию</div>
-                    <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
+                    <div class="nav-text">Главная</div>
                 </div>
-
-                <div class="main-button" id="try-on-button">
-                    <div class="main-button-icon">
-                        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                            <line x1="3" y1="6" x2="21" y2="6"></line>
-                            <path d="M16 10a4 4 0 0 1-8 0"></path>
+                <div class="nav-item" data-tab="wardrobe" role="button" tabindex="0" aria-label="Гардероб">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                         </svg>
                     </div>
-                    <div class="main-button-title">Примерить</div>
-                    <div class="main-button-description">Виртуальная примерка образов на вашей фотографии</div>
+                    <div class="nav-text">Гардероб</div>
                 </div>
-            </div>
-        </main>
-
-        <nav class="bottom-nav">
-            <div class="nav-item active" data-tab="home">
-                <div class="nav-icon">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
+                <div class="nav-item" data-tab="tips" role="button" tabindex="0" aria-label="Советы">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div class="nav-text">Советы</div>
                 </div>
-                <div class="nav-text">Главная</div>
-            </div>
-
-            <div class="nav-item" data-tab="wardrobe">
-                <div class="nav-icon">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                    </svg>
+                <div class="nav-item" data-tab="consultations" role="button" tabindex="0" aria-label="Консультации">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    </div>
+                    <div class="nav-text">Консультации</div>
                 </div>
-                <div class="nav-text">Гардероб</div>
-            </div>
+            </nav>
 
-            <div class="nav-item" data-tab="tips">
-                <div class="nav-icon">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </div>
-                <div class="nav-text">Советы</div>
+            <div class="fab" id="fab-button" role="button" tabindex="0" aria-label="Создать новую консультацию">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                    <circle cx="12" cy="13" r="4"></circle>
+                </svg>
             </div>
-
-            <div class="nav-item" data-tab="consultations">
-                <div class="nav-icon">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                        <line x1="8" y1="21" x2="16" y2="21"></line>
-                        <line x1="12" y1="17" x2="12" y2="21"></line>
-                    </svg>
-                </div>
-                <div class="nav-text">Консультации</div>
-            </div>
-        </nav>
-
-        <div class="fab" id="fab-button">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-            </svg>
         </div>
     </div>
 
-    <!-- Диалог для консультации стилиста -->
     <div class="overlay" id="consultation-overlay">
         <div class="dialog">
             <div class="dialog-header">
@@ -555,77 +119,43 @@
             </div>
             <div class="dialog-content">
                 <div class="consultation-mode-switch">
-                    <div class="mode-button active" data-mode="single">Один предмет</div>
-                    <div class="mode-button" data-mode="compare">Сравнение</div>
+                    <div class="mode-button active" data-mode="single" role="button" tabindex="0">Один предмет</div>
+                    <div class="mode-button" data-mode="compare" role="button" tabindex="0">Сравнение</div>
                 </div>
 
-                <!-- Режим одиночного анализа -->
                 <div id="single-analysis-mode" class="analysis-mode">
-                    <div class="upload-area" id="single-upload-area">
+                    <div class="upload-area" id="single-upload-area" role="button" tabindex="0" aria-label="Загрузить одно фото">
                         <div class="upload-icon">
-                            <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" fill="none"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                <polyline points="21 15 16 10 5 21"></polyline>
+                            <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect> <circle cx="8.5" cy="8.5" r="1.5"></circle> <polyline points="21 15 16 10 5 21"></polyline>
                             </svg>
                         </div>
                         <div class="upload-text">Нажмите, чтобы выбрать фото<br>или перетащите файл сюда</div>
                         <input type="file" id="single-upload-input" class="upload-input" accept="image/*">
                     </div>
-
-                    <div class="image-preview-container" id="single-preview-container" style="display: none;">
-                        <img id="single-preview-image" class="image-preview">
-                        <div class="delete-image" data-target="single">✕</div>
+                    <div class="image-preview-container" id="single-preview-container">
+                        <img id="single-preview-image" class="image-preview" alt="Предпросмотр загруженного изображения">
+                        <div class="delete-image" data-target="single" role="button" tabindex="0" aria-label="Удалить изображение">✕</div>
                     </div>
                 </div>
 
-                <!-- Режим сравнения нескольких предметов -->
                 <div id="compare-analysis-mode" class="analysis-mode hidden">
                     <div class="compare-container">
                         <div class="image-slots">
-                            <div class="image-slot" data-slot="0">
-                                <div class="upload-icon">
-                                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                        <polyline points="21 15 16 10 5 21"></polyline>
-                                    </svg>
-                                </div>
+                            <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения">
+                                <div class="upload-icon"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div>
                                 <input type="file" class="compare-upload-input" accept="image/*" data-slot="0">
                             </div>
-                            <div class="image-slot" data-slot="1">
-                                <div class="upload-icon">
-                                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                        <polyline points="21 15 16 10 5 21"></polyline>
-                                    </svg>
-                                </div>
+                            <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
+                                <div class="upload-icon"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div>
                                 <input type="file" class="compare-upload-input" accept="image/*" data-slot="1">
                             </div>
-                            <div class="image-slot" data-slot="2">
-                                <div class="upload-icon">
-                                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                        <polyline points="21 15 16 10 5 21"></polyline>
-                                    </svg>
-                                </div>
+                            <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
+                                <div class="upload-icon"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div>
                                 <input type="file" class="compare-upload-input" accept="image/*" data-slot="2">
                             </div>
-                            <div class="image-slot" data-slot="3">
-                                <div class="upload-icon">
-                                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                        <polyline points="21 15 16 10 5 21"></polyline>
-                                    </svg>
-                                </div>
+                            <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
+                                <div class="upload-icon"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div>
                                 <input type="file" class="compare-upload-input" accept="image/*" data-slot="3">
                             </div>
                         </div>
@@ -633,91 +163,78 @@
                     </div>
                 </div>
 
-                <select class="occasion-selector" id="occasion-selector">
+                <select class="occasion-selector" id="occasion-selector" aria-label="Выберите повод">
                     <option value="повседневный">Повседневный</option>
                     <option value="деловой">Деловой</option>
                     <option value="вечеринка">Вечеринка</option>
                     <option value="свидание">Свидание</option>
                     <option value="спорт">Спорт/Активный отдых</option>
+                    <option value="особый случай">Особый случай</option>
                 </select>
 
-                <textarea class="preferences-input" id="preferences-input"
-                    placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ' и т.д.)"></textarea>
+                <textarea class="preferences-input" id="preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
             </div>
             <div class="dialog-footer">
-                <button class="btn btn-primary" id="analyze-button">Проанализировать</button>
-                <button class="btn btn-secondary" id="consultation-cancel">Отмена</button>
+                <button class="btn btn-primary" id="analyze-button" role="button">Проанализировать</button>
+                <button class="btn btn-secondary" id="consultation-cancel" role="button">Отмена</button>
             </div>
         </div>
     </div>
 
-    <!-- Тост для сообщений -->
-    <div class="toast" id="toast"></div>
+    <div class="overlay" id="results-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <div class="dialog-title">Результаты анализа</div>
+            </div>
+            <div class="dialog-content" id="results-container">
+                </div>
+            <div class="dialog-footer">
+                <button class="btn btn-primary" id="results-close" role="button">Закрыть</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="overlay" id="loading-overlay">
+        <div class="dialog"> <div class="loading-indicator">
+                <div class="loading-spinner"></div>
+                <p id="loading-text">Загрузка...</p>
+            </div>
+        </div>
+    </div>
 
-    <!-- Скрипты -->
+    <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+        <symbol id="upload-svg-icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+        </symbol>
+    </svg>
+
+    <script src="script.js" defer></script>
+    <script src="cursor-effect.js" defer></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // Базовая инициализация для проверки работы интерфейса
-
-            // Кнопки основного экрана
-            const consultationButton = document.getElementById('consultation-button');
-            const tryOnButton = document.getElementById('try-on-button');
-
-            // Модальное окно
-            const consultationOverlay = document.getElementById('consultation-overlay');
-            const consultationCancel = document.getElementById('consultation-cancel');
-
-            // Добавляем обработчики событий
-            if (consultationButton) {
-                consultationButton.addEventListener('click', function () {
-                    showToast("Открытие консультации");
-                    if (consultationOverlay) {
-                        consultationOverlay.classList.add('active');
+        // Показываем тело документа после загрузки CSS (предотвращение FOUC)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Проверяем, загружены ли стили (основной файл)
+            const mainStyles = document.querySelector('link[href="styles.css"]');
+            if (mainStyles) {
+                mainStyles.onload = function() {
+                    document.body.style.display = 'flex'; // Или 'block', в зависимости от вашего body
+                };
+                 // Fallback на случай, если onload не сработает (например, стили уже в кэше)
+                setTimeout(function() {
+                    if(document.body.style.display !== 'flex' && document.body.style.display !== 'block') {
+                        console.warn("Fallback: Показ body по таймауту, onload для CSS не сработал.");
+                        document.body.style.display = 'flex';
                     }
-                });
+                }, 200); // Небольшой таймаут
+            } else {
+                 console.error("Основной файл стилей styles.css не найден в head!");
+                 document.body.style.display = 'flex'; // Показать в любом случае, если ссылка на CSS не найдена
             }
-
-            if (tryOnButton) {
-                tryOnButton.addEventListener('click', function () {
-                    showToast("Функция примерки в разработке");
-                });
-            }
-
-            if (consultationCancel) {
-                consultationCancel.addEventListener('click', function () {
-                    if (consultationOverlay) {
-                        consultationOverlay.classList.remove('active');
-                    }
-                });
-            }
-
-            // Нижнее меню
-            const navItems = document.querySelectorAll('.nav-item');
-            navItems.forEach(item => {
-                item.addEventListener('click', function () {
-                    navItems.forEach(navItem => navItem.classList.remove('active'));
-                    this.classList.add('active');
-                    const tabName = this.getAttribute('data-tab');
-                    showToast(`Выбран раздел: ${tabName}`);
-                });
-            });
-
-            // Функция для показа тоста
-            function showToast(message, duration = 2000) {
-                const toast = document.getElementById('toast');
-                if (toast) {
-                    toast.textContent = message;
-                    toast.classList.add('show');
-                    setTimeout(() => {
-                        toast.classList.remove('show');
-                    }, duration);
-                }
-            }
-
-            // Показываем сообщение о готовности
-            showToast("Приложение МИШУРА готово к работе");
         });
     </script>
 </body>
-
 </html>

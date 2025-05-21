@@ -1,84 +1,103 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Основной загрузчик (app.js)
+КОМПОНЕНТ: Загрузчик приложения (app.js)
 ВЕРСИЯ: 0.4.0 (Модульная структура)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-20
-
-МЕТОДОЛОГИЯ РАБОТЫ И ОБНОВЛЕНИЯ КОДА:
-1.  Целостность Обновлений: Любые изменения файлов предоставляются целиком.
-    Частичные изменения кода не допускаются для обеспечения стабильности интеграции.
-2.  Язык Коммуникации: Комментарии и документация ведутся на русском языке.
-3.  Стандарт Качества: Данный код является частью проекта "МИШУРА", разработанного
-    с применением высочайших стандартов программирования и дизайна, соответствуя
-    уровню лучших мировых практик.
+ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Основной загрузчик JavaScript-модулей для веб-приложения МИШУРА.
-Управляет загрузкой всех модулей и инициализацией приложения.
+Основной файл-загрузчик, который импортирует и инициализирует все модули приложения.
+Организует правильный порядок инициализации и обрабатывает ошибки загрузки.
 ==========================================================================================
 */
 
-// Начальное сообщение о загрузке
-console.log('МИШУРА app.js загружен - инициализация модульной структуры...');
+// Главный объект приложения должен быть создан раньше в config.js
+// Но на всякий случай проверяем его наличие
+if (typeof MishuraApp === 'undefined') {
+    console.error('КРИТИЧЕСКАЯ ОШИБКА: Основной объект MishuraApp не определен. Проверьте загрузку config.js.');
+    MishuraApp = {
+        utils: {},
+        api: {},
+        components: {},
+        features: {}
+    };
+}
 
-// Основная функция инициализации приложения
+// Обеспечиваем наличие всех необходимых подобъектов
+MishuraApp.utils = MishuraApp.utils || {};
+MishuraApp.api = MishuraApp.api || {};
+MishuraApp.components = MishuraApp.components || {};
+MishuraApp.features = MishuraApp.features || {};
+
+// Когда DOM полностью загружен, начинаем инициализацию
 document.addEventListener('DOMContentLoaded', function() {
-    // Проверяем, правильно ли загружены модули
-    if (!window.MishuraApp) {
-        console.error('ОШИБКА: Основные модули МИШУРА не загружены. Проверьте порядок загрузки скриптов.');
-        showFallbackError();
-        return;
-    }
+    console.log('МИШУРА app.js загружен - инициализация модульной структуры...');
     
-    // Инициализация модулей в правильном порядке с учетом зависимостей
     try {
-        // 1. Сначала инициализируем конфигурацию (не требует инициализации)
-        console.log('Инициализация конфигурации завершена');
+        // Инициализация конфигурации
+        if (MishuraApp.config && typeof MishuraApp.config.init === 'function') {
+            MishuraApp.config.init();
+            console.log('Инициализация конфигурации завершена');
+        } else {
+            console.warn('Модуль конфигурации не найден или не имеет метода init');
+        }
         
-        // 2. Базовые утилиты
-        window.MishuraApp.utils.logger.debug('Инициализация логгера завершена');
-        window.MishuraApp.utils.deviceDetect.init();
-        window.MishuraApp.utils.uiHelpers.init();
+        // Инициализация утилит
+        initModuleIfExists(MishuraApp.utils.logger, 'Логгер');
+        initModuleIfExists(MishuraApp.utils.deviceDetect, 'Определение устройства');
+        initModuleIfExists(MishuraApp.utils.uiHelpers, 'UI-хелперы');
         console.log('Базовые утилиты инициализированы');
         
-        // 3. Коммуникация с API
-        window.MishuraApp.api.service.init();
+        // Инициализация API
+        initModuleIfExists(MishuraApp.api.service, 'API-сервис');
         console.log('API-сервис инициализирован');
         
-        // 4. Компоненты интерфейса
-        window.MishuraApp.components.modals.init();
-        window.MishuraApp.components.navigation.init();
-        window.MishuraApp.components.imageUpload.init();
+        // Инициализация компонентов
+        initModuleIfExists(MishuraApp.components.navigation, 'Навигация');
+        initModuleIfExists(MishuraApp.components.modals, 'Модальные окна');
+        initModuleIfExists(MishuraApp.components.imageUpload, 'Загрузка изображений');
         console.log('Компоненты интерфейса инициализированы');
         
-        // 5. Функциональные модули
-        window.MishuraApp.features.consultation.init();
-        window.MishuraApp.features.comparison.init();
-        window.MishuraApp.features.tryOn.init();
+        // Инициализация функциональных модулей
+        initModuleIfExists(MishuraApp.features.consultation, 'Консультация');
+        initModuleIfExists(MishuraApp.features.comparison, 'Сравнение');
+        initModuleIfExists(MishuraApp.features.tryOn, 'Виртуальная примерка');
         console.log('Функциональные модули инициализированы');
         
-        // 6. Главный модуль приложения
-        window.MishuraApp.init();
-        console.log('МИШУРА успешно инициализирована');
+        // Инициализация главного модуля
+        initModuleIfExists(MishuraApp.main, 'Основной модуль');
+        
+        console.log('МИШУРА успешно инициализирована и готова к работе!');
+        document.body.classList.add('app-initialized');
+        
     } catch (error) {
         console.error('КРИТИЧЕСКАЯ ОШИБКА при инициализации МИШУРА:', error);
-        showFallbackError();
+    }
+    
+    // Вспомогательная функция для безопасной инициализации модулей
+    function initModuleIfExists(module, moduleName) {
+        if (module && typeof module.init === 'function') {
+            try {
+                module.init();
+                if (MishuraApp.utils.logger && MishuraApp.utils.logger.info) {
+                    MishuraApp.utils.logger.info(`Модуль ${moduleName} инициализирован`);
+                }
+            } catch (e) {
+                console.error(`Ошибка при инициализации модуля ${moduleName}:`, e);
+                throw e; // Пробрасываем ошибку дальше для обработки в основном блоке
+            }
+        } else {
+            console.warn(`Модуль ${moduleName} не найден или не имеет метода init`);
+        }
     }
 });
 
-// Запасной вариант для отображения ошибки, если основной код не загрузился
-function showFallbackError() {
-    const errorMessage = 'Не удалось загрузить приложение. Пожалуйста, обновите страницу или попробуйте позже.';
-    
-    // Проверяем, существует ли элемент toast
-    const toastElement = document.getElementById('toast');
-    if (toastElement) {
-        toastElement.textContent = errorMessage;
-        toastElement.classList.add('show');
-        // Не убираем сообщение об ошибке автоматически
-    } else {
-        // Создаем простой алерт, если нет элемента toast
-        alert(errorMessage);
-    }
-}
+// Страхуемся от потенциальных ошибок загрузки стилей
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        if (!document.body.classList.contains('loaded')) {
+            document.body.classList.add('loaded');
+            console.warn('Принудительное отображение страницы после таймаута загрузки');
+        }
+    }, 1000);
+});

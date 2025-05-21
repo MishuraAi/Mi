@@ -1,312 +1,217 @@
-/*
-==========================================================================================
-ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Виртуальная примерка (try-on.js)
-ВЕРСИЯ: 0.4.1 (Модульная структура)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-21
+// Исправление в webapp/js/features/try-on.js
 
-НАЗНАЧЕНИЕ ФАЙЛА:
-Реализует функциональность виртуальной примерки одежды.
-Обрабатывает загрузку фотографий и наложение выбранных предметов одежды.
-==========================================================================================
-*/
+function initDOMElements() {
+    // Используем правильные ID элементов в соответствии с HTML
+    const yourPhotoUpload = document.getElementById('your-photo-input');
+    const outfitPhotoUpload = document.getElementById('outfit-photo-input');
+    const yourPhotoPreview = document.getElementById('your-photo-preview');
+    const outfitPhotoPreview = document.getElementById('outfit-photo-preview');
+    const yourPhotoContainer = document.getElementById('your-photo-container');
+    const outfitPhotoContainer = document.getElementById('outfit-photo-container');
+    const tryOnButton = document.getElementById('try-on-button-submit');
+    
+    // Обновляем ссылки на элементы
+    fittingImageUpload = {
+        yourPhoto: yourPhotoUpload,
+        outfitPhoto: outfitPhotoUpload
+    };
+    
+    fittingResults = document.getElementById('try-on-result-container');
+    fittingResultImage = document.getElementById('try-on-result-image');
+    fittingSubmitButton = tryOnButton;
+    
+    // Прикрепляем контейнеры и превью для удобства
+    fittingPreviews = {
+        yourPhoto: yourPhotoPreview,
+        outfitPhoto: outfitPhotoPreview,
+        yourPhotoContainer: yourPhotoContainer,
+        outfitPhotoContainer: outfitPhotoContainer
+    };
+}
 
-// Добавляем модуль в пространство имен приложения
-window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.features = window.MishuraApp.features || {};
-window.MishuraApp.features.tryOn = (function() {
-    'use strict';
-    
-    // Локальные ссылки на другие модули
-    let config, logger, uiHelpers, apiService;
-    
-    // Элементы DOM
-    let fittingForm, fittingImageUpload, clothesSelection, fittingSubmitButton;
-    let fittingResults, fittingResultImage;
-    
-    // Текущие данные
-    let uploadedImage = null;
-    let selectedClothes = [];
-    
-    /**
-     * Инициализация модуля
-     */
-    function init() {
-        // Получаем ссылки на другие модули
-        if (window.MishuraApp.config) {
-            config = window.MishuraApp.config;
-        }
-        
-        if (window.MishuraApp.utils) {
-            logger = window.MishuraApp.utils.logger;
-            uiHelpers = window.MishuraApp.utils.uiHelpers;
-        }
-        
-        if (window.MishuraApp.api) {
-            apiService = window.MishuraApp.api.service;
-        }
-        
-        // Инициализация элементов DOM
-        initDOMElements();
-        
-        // Настройка обработчиков событий
-        initEventListeners();
-        
-        if (logger) {
-            logger.info('Модуль Виртуальная примерка инициализирован');
-        } else {
-            console.log('Модуль Виртуальная примерка инициализирован');
-        }
+function initEventListeners() {
+    // Обработчик загрузки фото пользователя
+    if (fittingImageUpload.yourPhoto) {
+        fittingImageUpload.yourPhoto.addEventListener('change', function(e) {
+            handlePhotoUpload(e, 'yourPhoto');
+        });
     }
     
-    /**
-     * Инициализация элементов DOM
-     * @private
-     */
-    function initDOMElements() {
-        fittingForm = document.getElementById('fitting-form');
-        fittingImageUpload = document.getElementById('fitting-image-upload');
-        clothesSelection = document.getElementById('clothes-selection');
-        fittingSubmitButton = document.getElementById('submit-fitting');
-        fittingResults = document.getElementById('fitting-results');
-        fittingResultImage = document.getElementById('fitting-result-image');
+    // Обработчик загрузки фото одежды
+    if (fittingImageUpload.outfitPhoto) {
+        fittingImageUpload.outfitPhoto.addEventListener('change', function(e) {
+            handlePhotoUpload(e, 'outfitPhoto');
+        });
     }
     
-    /**
-     * Инициализация обработчиков событий
-     * @private
-     */
-    function initEventListeners() {
-        // Обработчик загрузки изображения
-        if (fittingImageUpload) {
-            fittingImageUpload.addEventListener('change', function(e) {
-                if (e.target.files && e.target.files[0]) {
-                    uploadedImage = e.target.files[0];
-                    
-                    // Отображаем превью загруженного изображения
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const preview = document.getElementById('fitting-image-preview');
-                        if (preview) {
-                            preview.src = e.target.result;
-                            preview.classList.remove('hidden');
-                        }
-                    };
-                    reader.readAsDataURL(uploadedImage);
-                    
-                    // Обновляем состояние кнопки отправки
-                    updateSubmitButtonState();
-                }
-            });
-        }
-        
-        // Обработчики выбора предметов одежды
-        if (clothesSelection) {
-            const clothesItems = clothesSelection.querySelectorAll('.clothes-item');
-            
-            clothesItems.forEach(item => {
-                item.addEventListener('click', function() {
-                    const clothesId = this.getAttribute('data-id');
-                    const isSelected = this.classList.toggle('selected');
-                    
-                    // Обновляем список выбранных предметов
-                    if (isSelected) {
-                        selectedClothes.push(clothesId);
-                    } else {
-                        const index = selectedClothes.indexOf(clothesId);
-                        if (index !== -1) {
-                            selectedClothes.splice(index, 1);
-                        }
-                    }
-                    
-                    // Обновляем состояние кнопки отправки
-                    updateSubmitButtonState();
-                });
-            });
-        }
-        
-        // Обработчик отправки формы
-        if (fittingForm) {
-            fittingForm.addEventListener('submit', handleFittingSubmit);
-        }
-    }
-    
-    /**
-     * Обновление состояния кнопки отправки
-     * @private
-     */
-    function updateSubmitButtonState() {
-        if (!fittingSubmitButton) return;
-        
-        // Проверяем, загружено ли изображение и выбран ли хотя бы один предмет одежды
-        fittingSubmitButton.disabled = !uploadedImage || selectedClothes.length === 0;
-    }
-    
-    /**
-     * Обработка отправки формы примерки
-     * @private
-     * @param {Event} e - событие отправки формы
-     */
-    function handleFittingSubmit(e) {
-        e.preventDefault();
-        
-        if (!uploadedImage || selectedClothes.length === 0) {
-            if (uiHelpers) {
-                uiHelpers.showToast('Пожалуйста, загрузите фото и выберите предметы одежды');
+    // Обработка кликов на области загрузки
+    const uploadAreas = document.querySelectorAll('.tryon-upload-area');
+    uploadAreas.forEach(area => {
+        area.addEventListener('click', function(e) {
+            const id = this.id;
+            if (id === 'your-photo-upload-area' && fittingImageUpload.yourPhoto) {
+                fittingImageUpload.yourPhoto.click();
+            } else if (id === 'outfit-photo-upload-area' && fittingImageUpload.outfitPhoto) {
+                fittingImageUpload.outfitPhoto.click();
             }
-            return;
+        });
+    });
+    
+    // Обработчики удаления фото
+    const deleteButtons = document.querySelectorAll('.delete-image[data-target]');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const target = this.getAttribute('data-target');
+            if (target === 'your-photo') {
+                resetPhoto('yourPhoto');
+            } else if (target === 'outfit-photo') {
+                resetPhoto('outfitPhoto');
+            }
+        });
+    });
+    
+    // Обработчик кнопки примерки
+    if (fittingSubmitButton) {
+        fittingSubmitButton.addEventListener('click', handleTryOnSubmit);
+    }
+}
+
+// Функция обработки загрузки фото
+function handlePhotoUpload(e, type) {
+    if (!e.target.files || !e.target.files[0]) return;
+    
+    const file = e.target.files[0];
+    if (!isValidImageFile(file)) {
+        if (uiHelpers) {
+            uiHelpers.showToast('Пожалуйста, выберите изображение');
         }
-        
-        // Формируем данные для отправки
-        const formData = new FormData();
-        formData.append('image', uploadedImage);
-        formData.append('clothes', JSON.stringify(selectedClothes));
-        
-        if (config) {
-            formData.append('userId', config.userId || '');
-        }
-        
-        // Показываем загрузку
-        showLoading(true);
-        
-        // Отправляем запрос на сервер
-        if (apiService) {
-            apiService.sendVirtualFittingRequest(formData)
-                .then(handleFittingResponse)
-                .catch(handleFittingError)
-                .finally(() => showLoading(false));
-        } else {
-            // Эмуляция задержки для демонстрации
-            setTimeout(() => {
-                showLoading(false);
-                
-                if (uiHelpers) {
-                    uiHelpers.showToast('Демо-режим: Функция виртуальной примерки временно недоступна');
-                }
-            }, 2000);
-        }
+        return;
     }
     
-    /**
-     * Обработка ответа сервера на запрос примерки
-     * @private
-     * @param {Object} response - ответ от сервера
-     */
-    function handleFittingResponse(response) {
-        if (!response || !response.success) {
-            handleFittingError(new Error('Неизвестная ошибка при виртуальной примерке'));
-            return;
-        }
-        
-        // Отображаем результаты
-        renderFittingResults(response.data);
-        
-        if (logger) {
-            logger.info('Виртуальная примерка успешно выполнена');
-        }
+    // Сохраняем файл
+    if (type === 'yourPhoto') {
+        uploadedImages.yourPhoto = file;
+    } else if (type === 'outfitPhoto') {
+        uploadedImages.outfitPhoto = file;
     }
     
-    /**
-     * Обработка ошибки при запросе примерки
-     * @private
-     * @param {Error} error - объект ошибки
-     */
-    function handleFittingError(error) {
-        if (logger) {
-            logger.error('Ошибка при запросе виртуальной примерки:', error);
+    // Отображаем превью
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        if (fittingPreviews[type]) {
+            fittingPreviews[type].src = e.target.result;
+            fittingPreviews[type + 'Container'].classList.remove('hidden');
+        }
+        
+        // Скрываем область загрузки
+        const areaId = type === 'yourPhoto' ? 'your-photo-upload-area' : 'outfit-photo-upload-area';
+        const area = document.getElementById(areaId);
+        if (area) {
+            area.classList.add('hidden');
+        }
+        
+        // Обновляем состояние кнопки
+        updateButtonState();
+    };
+    reader.readAsDataURL(file);
+}
+
+// Функция сброса фото
+function resetPhoto(type) {
+    // Сбрасываем файл
+    if (type === 'yourPhoto') {
+        if (fittingImageUpload.yourPhoto) {
+            fittingImageUpload.yourPhoto.value = '';
+        }
+        uploadedImages.yourPhoto = null;
+    } else if (type === 'outfitPhoto') {
+        if (fittingImageUpload.outfitPhoto) {
+            fittingImageUpload.outfitPhoto.value = '';
+        }
+        uploadedImages.outfitPhoto = null;
+    }
+    
+    // Скрываем превью
+    if (fittingPreviews[type + 'Container']) {
+        fittingPreviews[type + 'Container'].classList.add('hidden');
+    }
+    
+    // Показываем область загрузки
+    const areaId = type === 'yourPhoto' ? 'your-photo-upload-area' : 'outfit-photo-upload-area';
+    const area = document.getElementById(areaId);
+    if (area) {
+        area.classList.remove('hidden');
+    }
+    
+    // Обновляем состояние кнопки
+    updateButtonState();
+}
+
+// Обновление состояния кнопки примерки
+function updateButtonState() {
+    if (fittingSubmitButton) {
+        fittingSubmitButton.disabled = !(uploadedImages.yourPhoto && uploadedImages.outfitPhoto);
+    }
+}
+
+// Функция обработки нажатия на кнопку примерки
+function handleTryOnSubmit() {
+    if (!uploadedImages.yourPhoto || !uploadedImages.outfitPhoto) {
+        if (uiHelpers) {
+            uiHelpers.showToast('Пожалуйста, загрузите оба изображения для примерки');
+        }
+        return;
+    }
+    
+    // Демо-режим пока функция в разработке
+    showLoading(true);
+    setTimeout(() => {
+        showLoading(false);
+        
+        // Показываем результат (в демо-режиме просто открываем модалку с результатом)
+        const resultModal = document.getElementById('try-on-result-overlay');
+        if (resultModal) {
+            if (window.MishuraApp.utils.modals) {
+                window.MishuraApp.utils.modals.openModal('try-on-result-overlay');
+            } else {
+                resultModal.classList.add('active');
+            }
         }
         
         if (uiHelpers) {
-            uiHelpers.showToast('Произошла ошибка при виртуальной примерке. Пожалуйста, попробуйте позже.');
+            uiHelpers.showToast('Функция виртуальной примерки в разработке');
         }
-        
-        // Скрываем загрузку
-        showLoading(false);
-    }
+    }, 1500);
+}
+
+// Проверка на валидный формат изображения
+function isValidImageFile(file) {
+    return file && file.type && file.type.match('image.*');
+}
+
+// Вызывается при инициализации
+function init() {
+    // Получаем ссылки на модули
+    config = window.MishuraApp.config;
+    logger = window.MishuraApp.utils.logger;
+    uiHelpers = window.MishuraApp.utils.uiHelpers;
+    apiService = window.MishuraApp.api.service;
     
-    /**
-     * Управление отображением индикатора загрузки
-     * @private
-     * @param {boolean} isLoading - флаг отображения загрузки
-     */
-    function showLoading(isLoading) {
-        const loadingIndicator = document.getElementById('fitting-loading');
-        
-        if (loadingIndicator) {
-            loadingIndicator.classList.toggle('active', isLoading);
-        }
-        
-        if (fittingSubmitButton) {
-            fittingSubmitButton.disabled = isLoading;
-        }
-        
-        if (fittingResults) {
-            fittingResults.classList.toggle('hidden', isLoading);
-        }
-    }
-    
-    /**
-     * Отображение результатов примерки
-     * @private
-     * @param {Object} data - данные примерки
-     */
-    function renderFittingResults(data) {
-        if (!fittingResults || !fittingResultImage) return;
-        
-        // Временная заглушка для демонстрации
-        const message = document.createElement('div');
-        message.className = 'fitting-message';
-        message.textContent = 'Функция виртуальной примерки находится в разработке. Скоро вы сможете примерять одежду на ваши фотографии!';
-        
-        fittingResults.innerHTML = '';
-        fittingResults.appendChild(message);
-        fittingResults.classList.remove('hidden');
-    }
-    
-    /**
-     * Сброс формы примерки
-     * @public
-     */
-    function resetFittingForm() {
-        // Сбрасываем поля формы
-        if (fittingForm) {
-            fittingForm.reset();
-        }
-        
-        // Сбрасываем изображение
-        uploadedImage = null;
-        
-        // Скрываем превью
-        const preview = document.getElementById('fitting-image-preview');
-        if (preview) {
-            preview.classList.add('hidden');
-        }
-        
-        // Сбрасываем выбранные предметы одежды
-        selectedClothes = [];
-        
-        // Удаляем выделение с предметов одежды
-        if (clothesSelection) {
-            const clothesItems = clothesSelection.querySelectorAll('.clothes-item');
-            clothesItems.forEach(item => {
-                item.classList.remove('selected');
-            });
-        }
-        
-        // Отключаем кнопку отправки
-        if (fittingSubmitButton) {
-            fittingSubmitButton.disabled = true;
-        }
-        
-        // Скрываем результаты
-        if (fittingResults) {
-            fittingResults.classList.add('hidden');
-        }
-    }
-    
-    // Публичный API
-    return {
-        init,
-        resetFittingForm
+    // Инициализируем данные
+    uploadedImages = {
+        yourPhoto: null,
+        outfitPhoto: null
     };
-})();
+    
+    // Инициализируем DOM элементы
+    initDOMElements();
+    
+    // Настраиваем обработчики событий
+    initEventListeners();
+    
+    if (logger) {
+        logger.info('Модуль Виртуальная примерка инициализирован');
+    } else {
+        console.log('Модуль Виртуальная примерка инициализирован');
+    }
+}

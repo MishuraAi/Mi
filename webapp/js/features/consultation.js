@@ -13,8 +13,8 @@
 
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.components = window.MishuraApp.components || {};
-window.MishuraApp.components.consultation = (function() {
+window.MishuraApp.features = window.MishuraApp.features || {};
+window.MishuraApp.features.consultation = (function() {
     'use strict';
     
     // Локальные ссылки на другие модули
@@ -39,7 +39,7 @@ window.MishuraApp.components.consultation = (function() {
         uiHelpers = window.MishuraApp.utils.uiHelpers;
         modals = window.MishuraApp.utils.modals;
         imageUpload = window.MishuraApp.components.imageUpload;
-        api = window.MishuraApp.services.api;
+        api = window.MishuraApp.api.service;
         
         // Инициализация элементов DOM
         initDOMElements();

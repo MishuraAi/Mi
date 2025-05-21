@@ -105,3 +105,11 @@ window.MishuraApp = window.MishuraApp || {};
     app.version = '0.4.0';
     
 })(window.MishuraApp);
+
+// Экспортируем модуль в глобальное пространство имен для доступа из других модулей
+window.MishuraApp.main = (function() {
+    return {
+        init: window.MishuraApp.init,
+        version: window.MishuraApp.version
+    };
+})();

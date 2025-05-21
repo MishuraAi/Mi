@@ -1,36 +1,33 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Консультация (consultation.js)
-ВЕРСИЯ: 0.4.0 (Модульная структура)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-20
+КОМПОНЕНТ: Консультации (consultation.js)
+ВЕРСИЯ: 0.4.1 (Модульная структура)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Управляет функциональностью получения консультации для одного предмета одежды.
-Включает форму консультации, отправку запросов к API и отображение результатов.
+Реализует функциональность консультаций с ИИ-стилистом.
+Обрабатывает запросы пользователя, управляет формой и взаимодействует с API.
 ==========================================================================================
 */
 
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.features = window.MishuraApp.features || {};
-window.MishuraApp.features.consultation = (function() {
+window.MishuraApp.components = window.MishuraApp.components || {};
+window.MishuraApp.components.consultation = (function() {
     'use strict';
     
     // Локальные ссылки на другие модули
-    let config, logger, uiHelpers, apiService, modals, imageUpload;
-    
-    // Текущее состояние модуля
-    const state = {
-        singleImage: null,
-        lastApiResponse: null
-    };
+    let config, logger, uiHelpers, modals, imageUpload, api;
     
     // Элементы DOM
-    let consultationButton, consultationOverlay;
-    let fabButton, analyzeButton;
-    let occasionSelector, preferencesInput;
-    let singleAnalysisMode, resultsContainer;
+    let consultationForm, occasionSelector, preferencesInput, submitButton;
+    let loadingIndicator, consultationResults, consultationResultsContainer;
+    let consultationTriggers;
+    
+    // Текущие данные
+    let currentConsultationData = null;
+    let uploadedImage = null;
     
     /**
      * Инициализация модуля
@@ -40,17 +37,17 @@ window.MishuraApp.features.consultation = (function() {
         config = window.MishuraApp.config;
         logger = window.MishuraApp.utils.logger;
         uiHelpers = window.MishuraApp.utils.uiHelpers;
-        apiService = window.MishuraApp.api.service;
-        modals = window.MishuraApp.components.modals;
+        modals = window.MishuraApp.utils.modals;
         imageUpload = window.MishuraApp.components.imageUpload;
+        api = window.MishuraApp.services.api;
         
         // Инициализация элементов DOM
         initDOMElements();
         
         // Настройка обработчиков событий
-        setupEventListeners();
+        initEventListeners();
         
-        logger.debug("Модуль консультации инициализирован");
+        logger.debug("Модуль консультаций инициализирован");
     }
     
     /**
@@ -58,185 +55,323 @@ window.MishuraApp.features.consultation = (function() {
      * @private
      */
     function initDOMElements() {
-        consultationButton = document.getElementById('consultation-button');
-        consultationOverlay = document.getElementById('consultation-overlay');
-        fabButton = document.getElementById('fab-button');
-        analyzeButton = document.getElementById('analyze-button');
+        // Элементы формы
+        consultationForm = document.getElementById('consultation-form');
         occasionSelector = document.getElementById('occasion-selector');
         preferencesInput = document.getElementById('preferences-input');
-        singleAnalysisMode = document.getElementById('single-analysis-mode');
-        resultsContainer = document.getElementById('results-container');
+        submitButton = document.getElementById('submit-consultation');
         
-        if (!consultationButton) logger.warn("Элемент consultationButton не найден");
-        if (!consultationOverlay) logger.warn("Элемент consultationOverlay не найден");
-        if (!fabButton) logger.warn("Элемент fabButton не найден");
-        if (!analyzeButton) logger.warn("Элемент analyzeButton не найден");
+        // Элементы результатов
+        loadingIndicator = document.getElementById('consultation-loading');
+        consultationResults = document.getElementById('consultation-results');
+        consultationResultsContainer = document.getElementById('consultation-results-container');
+        
+        // Триггеры для открытия модального окна
+        consultationTriggers = document.querySelectorAll('.consultation-trigger');
+        
+        // Логирование ошибок, если элементы не найдены
+        if (!consultationForm) logger.warn("Элемент consultationForm не найден");
         if (!occasionSelector) logger.warn("Элемент occasionSelector не найден");
         if (!preferencesInput) logger.warn("Элемент preferencesInput не найден");
-        if (!singleAnalysisMode) logger.warn("Элемент singleAnalysisMode не найден");
-        if (!resultsContainer) logger.warn("Элемент resultsContainer не найден");
+        if (!submitButton) logger.warn("Элемент submitButton не найден");
     }
     
     /**
-     * Настройка обработчиков событий
+     * Инициализация обработчиков событий
      * @private
      */
-    function setupEventListeners() {
-        // Обработчики кнопок для открытия модального окна консультации
-        if (consultationButton) {
-            consultationButton.addEventListener('click', openConsultationModal);
+    function initEventListeners() {
+        // Обработчики для триггеров открытия консультации
+        if (consultationTriggers) {
+            consultationTriggers.forEach(trigger => {
+                trigger.addEventListener('click', openConsultationModal);
+            });
         }
         
-        if (fabButton) {
-            fabButton.addEventListener('click', openConsultationModal);
+        // Обработчик отправки формы
+        if (consultationForm) {
+            consultationForm.addEventListener('submit', handleConsultationSubmit);
         }
         
-        // Обработчик кнопки анализа
-        if (analyzeButton) {
-            analyzeButton.addEventListener('click', handleAnalyzeClick);
-        }
+        // Обработчик загрузки изображения
+        document.addEventListener('singleImageUploaded', function(e) {
+            uploadedImage = e.detail.file;
+            logger.debug('Изображение загружено для консультации');
+            
+            // Включаем кнопку отправки
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+        });
         
-        // Обработчики событий загрузки и удаления изображений
-        document.addEventListener('singleImageUploaded', handleSingleImageUploaded);
-        document.addEventListener('singleImageRemoved', handleSingleImageRemoved);
+        // Обработчик удаления изображения
+        document.addEventListener('singleImageRemoved', function() {
+            uploadedImage = null;
+            logger.debug('Изображение удалено из консультации');
+            
+            // Отключаем кнопку отправки
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+        });
         
-        // Обработчик закрытия оверлея для сброса формы
-        document.addEventListener('overlayClose', function(event) {
-            if (event.detail && event.detail.id === 'consultation-overlay') {
-                // Можно сбросить форму, если нужно при закрытии
-                // resetConsultationForm();
+        // Обработчик закрытия модального окна для сброса формы
+        document.addEventListener('modalClosed', function(e) {
+            if (e.detail.modalId === 'consultation-modal') {
+                resetConsultationForm();
             }
         });
     }
     
     /**
-     * Открывает модальное окно консультации
+     * Открытие модального окна консультации
+     * @public
      */
     function openConsultationModal() {
-        logger.info("Открытие модального окна консультации");
+        logger.info('Открытие модального окна консультации');
+        
+        // Используем полный путь к модулю модальных окон
+        window.MishuraApp.utils.modals.openConsultationModal();
+        
+        // Сбросим форму перед открытием
         resetConsultationForm();
-        modals.openConsultationModal();
     }
     
     /**
-     * Сбрасывает форму консультации в начальное состояние
-     */
-    function resetConsultationForm() {
-        logger.debug("Сброс формы консультации");
-        
-        // Сбрасываем состояние
-        state.singleImage = null;
-        
-        // Сбрасываем поля формы
-        if (preferencesInput) preferencesInput.value = '';
-        if (occasionSelector) occasionSelector.selectedIndex = 0;
-        
-        // Сбрасываем загруженное изображение
-        imageUpload.resetSingleImageUpload();
-    }
-    
-    /**
-     * Обработчик события загрузки одиночного изображения
+     * Обработка отправки формы консультации
      * @private
-     * @param {CustomEvent} event - Событие singleImageUploaded
+     * @param {Event} e - событие отправки формы
      */
-    function handleSingleImageUploaded(event) {
-        if (event.detail && event.detail.file) {
-            state.singleImage = event.detail.file;
-            logger.debug("Одиночное изображение сохранено в state:", 
-                {name: state.singleImage.name, size: state.singleImage.size});
-        }
-    }
-    
-    /**
-     * Обработчик события удаления одиночного изображения
-     * @private
-     */
-    function handleSingleImageRemoved() {
-        state.singleImage = null;
-        logger.debug("Одиночное изображение удалено из state");
-    }
-    
-    /**
-     * Обработчик нажатия на кнопку "Проанализировать"
-     * @private
-     */
-    function handleAnalyzeClick() {
-        logger.info("Клик по 'Проанализировать'");
+    function handleConsultationSubmit(e) {
+        e.preventDefault();
         
-        // Получаем активный режим от родительского компонента через состояние модального окна
-        const consultationModeElement = document.querySelector('.mode-button.active');
-        const consultationMode = consultationModeElement ? consultationModeElement.dataset.mode : 'single';
-        
-        // Проверка на активную загрузку
-        if (imageUpload.isUploading()) {
-            uiHelpers.showToast("Пожалуйста, дождитесь завершения загрузки изображения");
+        if (!uploadedImage) {
+            uiHelpers.showToast('Пожалуйста, загрузите изображение');
             return;
         }
         
-        if (consultationMode === 'single') {
-            if (!state.singleImage) { 
-                uiHelpers.showToast("Пожалуйста, загрузите изображение одежды"); 
-                return; 
-            }
-            
-            analyzeSingleOutfit();
-            
-        } else {
-            // Для режима сравнения используем модуль comparison
-            // Отправляем событие, что нужно выполнить сравнение
-            document.dispatchEvent(new CustomEvent('startCompareAnalysis'));
+        // Получаем данные формы
+        const occasion = occasionSelector ? occasionSelector.value : '';
+        const preferences = preferencesInput ? preferencesInput.value : '';
+        
+        // Валидация
+        if (occasion === '') {
+            uiHelpers.showToast('Пожалуйста, выберите повод');
+            return;
+        }
+        
+        // Формируем данные для отправки
+        const formData = new FormData();
+        formData.append('image', uploadedImage);
+        formData.append('occasion', occasion);
+        formData.append('preferences', preferences);
+        formData.append('userId', config.userId || '');
+        
+        // Показываем загрузку
+        showLoading(true);
+        
+        // Отправляем запрос на сервер
+        api.sendConsultationRequest(formData)
+            .then(handleConsultationResponse)
+            .catch(handleConsultationError)
+            .finally(() => showLoading(false));
+    }
+    
+    /**
+     * Обработка ответа сервера на запрос консультации
+     * @private
+     * @param {Object} response - ответ от сервера
+     */
+    function handleConsultationResponse(response) {
+        if (!response || !response.success) {
+            handleConsultationError(new Error('Неизвестная ошибка при получении консультации'));
+            return;
+        }
+        
+        // Сохраняем результаты
+        currentConsultationData = response.data;
+        
+        // Отображаем результаты
+        renderConsultationResults(currentConsultationData);
+        
+        // Логируем успешную консультацию
+        logger.info('Консультация успешно получена');
+    }
+    
+    /**
+     * Обработка ошибки при запросе консультации
+     * @private
+     * @param {Error} error - объект ошибки
+     */
+    function handleConsultationError(error) {
+        logger.error('Ошибка при запросе консультации:', error);
+        uiHelpers.showToast('Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже.');
+        
+        // Скрываем загрузку
+        showLoading(false);
+    }
+    
+    /**
+     * Управление отображением индикатора загрузки
+     * @private
+     * @param {boolean} isLoading - флаг отображения загрузки
+     */
+    function showLoading(isLoading) {
+        if (loadingIndicator) {
+            loadingIndicator.classList.toggle('active', isLoading);
+        }
+        
+        if (submitButton) {
+            submitButton.disabled = isLoading;
+        }
+        
+        if (consultationResultsContainer) {
+            consultationResultsContainer.classList.toggle('hidden', isLoading);
         }
     }
     
     /**
-     * Отправляет запрос на анализ одиночного предмета одежды и отображает результат
+     * Отображение результатов консультации
+     * @private
+     * @param {Object} data - данные консультации
+     */
+    function renderConsultationResults(data) {
+        if (!consultationResults || !data) return;
+        
+        // Очищаем контейнер результатов
+        consultationResults.innerHTML = '';
+        
+        // Создаем элементы для отображения результатов
+        const resultTitle = document.createElement('h3');
+        resultTitle.className = 'result-title';
+        resultTitle.textContent = 'Рекомендации стилиста';
+        
+        const resultDescription = document.createElement('div');
+        resultDescription.className = 'result-description';
+        resultDescription.innerHTML = data.advice || '';
+        
+        const resultRecommendations = document.createElement('div');
+        resultRecommendations.className = 'result-recommendations';
+        
+        // Добавляем рекомендации по предметам одежды
+        if (data.recommendations && Array.isArray(data.recommendations)) {
+            const recommendationsList = document.createElement('ul');
+            recommendationsList.className = 'recommendations-list';
+            
+            data.recommendations.forEach(item => {
+                const listItem = document.createElement('li');
+                listItem.className = 'recommendation-item';
+                
+                // Создаем карточку рекомендации
+                const card = document.createElement('div');
+                card.className = 'recommendation-card';
+                
+                // Изображение
+                if (item.imageUrl) {
+                    const image = document.createElement('img');
+                    image.src = item.imageUrl;
+                    image.alt = item.name || 'Рекомендуемый предмет одежды';
+                    image.className = 'recommendation-image';
+                    card.appendChild(image);
+                }
+                
+                // Информация
+                const info = document.createElement('div');
+                info.className = 'recommendation-info';
+                
+                const name = document.createElement('h4');
+                name.textContent = item.name || '';
+                info.appendChild(name);
+                
+                if (item.description) {
+                    const description = document.createElement('p');
+                    description.textContent = item.description;
+                    info.appendChild(description);
+                }
+                
+                if (item.price) {
+                    const price = document.createElement('div');
+                    price.className = 'recommendation-price';
+                    price.textContent = `${item.price} ₽`;
+                    info.appendChild(price);
+                }
+                
+                // Кнопка просмотра
+                if (item.url) {
+                    const viewButton = document.createElement('a');
+                    viewButton.href = item.url;
+                    viewButton.className = 'btn btn-outline view-recommendation';
+                    viewButton.textContent = 'Посмотреть';
+                    viewButton.target = '_blank';
+                    viewButton.rel = 'noopener noreferrer';
+                    info.appendChild(viewButton);
+                }
+                
+                card.appendChild(info);
+                listItem.appendChild(card);
+                recommendationsList.appendChild(listItem);
+            });
+            
+            resultRecommendations.appendChild(recommendationsList);
+        }
+        
+        // Добавляем все элементы в контейнер результатов
+        consultationResults.appendChild(resultTitle);
+        consultationResults.appendChild(resultDescription);
+        consultationResults.appendChild(resultRecommendations);
+        
+        // Показываем контейнер результатов
+        if (consultationResultsContainer) {
+            consultationResultsContainer.classList.remove('hidden');
+        }
+    }
+    
+    /**
+     * Сброс формы консультации
      * @private
      */
-    async function analyzeSingleOutfit() {
-        logger.info("Начинаем анализ одиночного предмета одежды");
+    function resetConsultationForm() {
+        logger.debug('Сброс формы консультации');
         
-        // Получаем данные формы
-        const occasion = occasionSelector ? occasionSelector.value : 'повседневный';
-        const preferences = preferencesInput ? preferencesInput.value.trim() : null;
+        // Сбрасываем поля формы
+        if (consultationForm) {
+            consultationForm.reset();
+        }
         
-        try {
-            const response = await apiService.analyzeSingleOutfit(
-                state.singleImage,
-                occasion,
-                preferences
-            );
-            
-            logger.info("Анализ одиночного предмета успешно получен");
-            state.lastApiResponse = response;
-            
-            // Закрываем модальное окно консультации
-            modals.closeOverlay(consultationOverlay);
-            
-            // Отображаем результаты
-            displayResults(response.advice);
-            
-        } catch (error) {
-            logger.error("Ошибка при analyzeSingleOutfit:", error);
-            uiHelpers.showToast(`Ошибка анализа: ${error.message}. Попробуйте еще раз.`);
+        // Скрываем результаты
+        if (consultationResultsContainer) {
+            consultationResultsContainer.classList.add('hidden');
+        }
+        
+        // Сбрасываем изображение
+        if (imageUpload && typeof imageUpload.resetSingleImageUpload === 'function') {
+            imageUpload.resetSingleImageUpload();
+        }
+        
+        // Сбрасываем текущие данные
+        currentConsultationData = null;
+        uploadedImage = null;
+        
+        // Отключаем кнопку отправки
+        if (submitButton) {
+            submitButton.disabled = true;
         }
     }
     
     /**
-     * Отображает результаты анализа в модальном окне
-     * @param {string} adviceMarkdown - Текст советов в формате Markdown
+     * Получение текущих данных консультации
+     * @public
+     * @returns {Object|null} - данные последней консультации
      */
-    function displayResults(adviceMarkdown) {
-        logger.info("Отображение результатов анализа");
-        
-        const parsedHtml = uiHelpers.parseMarkdownToHtml(adviceMarkdown);
-        modals.openResultsModal(parsedHtml);
+    function getCurrentConsultationData() {
+        return currentConsultationData;
     }
     
-    // Публичный API модуля
+    // Публичный API
     return {
         init,
         openConsultationModal,
+        getCurrentConsultationData,
         resetConsultationForm
     };
 })();

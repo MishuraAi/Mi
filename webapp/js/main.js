@@ -19,26 +19,21 @@ window.MishuraApp = window.MishuraApp || {};
     'use strict';
     
     // Инициализация модулей
-    const Logger = app.utils.logger;
-    const DeviceDetect = app.utils.deviceDetect;
-    const UIHelpers = app.utils.uiHelpers;
-    const Modals = app.components.modals;
-    const Navigation = app.components.navigation;
-    const ImageUpload = app.components.imageUpload;
-    const APIService = app.api.service;
-    const ConsultationFeature = app.features.consultation;
-    const ComparisonFeature = app.features.comparison;
-    const TryOnFeature = app.features.tryOn;
+    let Logger, DeviceDetect, UIHelpers, Modals, Navigation, ImageUpload, APIService;
+    let ConsultationFeature, ComparisonFeature, TryOnFeature;
         
     /**
      * Инициализация Telegram WebApp API
      */
     function initTelegramWebApp() {
         if (window.Telegram && window.Telegram.WebApp) {
-            Logger.info("Telegram WebApp API доступен. Вызов ready()...");
+            if (Logger) Logger.info("Telegram WebApp API доступен. Вызов ready()...");
+            else console.info("Telegram WebApp API доступен. Вызов ready()...");
+            
             try {
                 Telegram.WebApp.ready(); // Сообщаем Telegram, что приложение готово
-                Logger.info("Telegram.WebApp.ready() успешно вызван");
+                if (Logger) Logger.info("Telegram.WebApp.ready() успешно вызван");
+                else console.info("Telegram.WebApp.ready() успешно вызван");
                 
                 // Пример: Попробуем расширить приложение на весь экран, если это возможно
                 if (Telegram.WebApp.isExpanded) {
@@ -48,11 +43,13 @@ window.MishuraApp = window.MishuraApp || {};
                 }
                 return true;
             } catch (e) {
-                Logger.error("Ошибка при работе с Telegram.WebApp:", e);
+                if (Logger) Logger.error("Ошибка при работе с Telegram.WebApp:", e);
+                else console.error("Ошибка при работе с Telegram.WebApp:", e);
                 return false;
             }
         } else {
-            Logger.warn("window.Telegram.WebApp не найден! Приложение запущено вне Telegram или API не инициализирован");
+            if (Logger) Logger.warn("window.Telegram.WebApp не найден! Приложение запущено вне Telegram или API не инициализирован");
+            else console.warn("window.Telegram.WebApp не найден! Приложение запущено вне Telegram или API не инициализирован");
             return false;
         }
     }
@@ -62,8 +59,12 @@ window.MishuraApp = window.MishuraApp || {};
      */
     function setupErrorHandling() {
         window.onerror = function(message, source, lineno, colno, error) {
-            Logger.error("Глобальная ошибка JavaScript:", {message, source, lineno, colno, error: error?.stack});
-            UIHelpers.showToast("Произошла ошибка. Проверьте консоль.");
+            if (Logger) Logger.error("Глобальная ошибка JavaScript:", {message, source, lineno, colno, error: error?.stack});
+            else console.error("Глобальная ошибка JavaScript:", {message, source, lineno, colno, error: error?.stack});
+            
+            if (UIHelpers) UIHelpers.showToast("Произошла ошибка. Проверьте консоль.");
+            else alert("Произошла ошибка. Проверьте консоль.");
+            
             return false;
         };
     }
@@ -72,33 +73,61 @@ window.MishuraApp = window.MishuraApp || {};
      * Инициализация всего приложения
      */
     app.init = function() {
-        Logger.info("Инициализация приложения МИШУРА");
+        // Инициализируем ссылки на модули
+        if (app.utils) {
+            Logger = app.utils.logger;
+            DeviceDetect = app.utils.deviceDetect;
+            UIHelpers = app.utils.uiHelpers;
+            Modals = app.utils.modals;
+            Navigation = app.components.navigation;
+        }
         
-        // Определение устройства пользователя
-        DeviceDetect.init();
-        Logger.info(`Определен тип устройства - iOS: ${DeviceDetect.isIOS}, Android: ${DeviceDetect.isAndroid}`);
+        if (app.components) {
+            ImageUpload = app.components.imageUpload;
+        }
+        
+        if (app.api) {
+            APIService = app.api.service;
+        }
+        
+        if (app.features) {
+            ConsultationFeature = app.features.consultation;
+            ComparisonFeature = app.features.comparison;
+            TryOnFeature = app.features.tryOn;
+        }
+        
+        if (Logger) Logger.info("Инициализация приложения МИШУРА");
+        else console.info("Инициализация приложения МИШУРА");
         
         // Настройка обработчика ошибок
         setupErrorHandling();
+        
+        // Определение устройства пользователя
+        if (DeviceDetect && typeof DeviceDetect.init === 'function') {
+            DeviceDetect.init();
+            if (Logger) Logger.info(`Определен тип устройства - iOS: ${DeviceDetect.isIOS}, Android: ${DeviceDetect.isAndroid}`);
+        }
         
         // Инициализация Telegram WebApp API
         const telegramInitialized = initTelegramWebApp();
         
         // Инициализация компонентов UI
-        UIHelpers.init();
-        Modals.init();
-        Navigation.init();
-        ImageUpload.init();
+        if (UIHelpers && typeof UIHelpers.init === 'function') UIHelpers.init();
+        if (Modals && typeof Modals.init === 'function') Modals.init();
+        if (Navigation && typeof Navigation.init === 'function') Navigation.init();
+        if (ImageUpload && typeof ImageUpload.init === 'function') ImageUpload.init();
         
         // Инициализация API сервиса
-        APIService.init();
+        if (APIService && typeof APIService.init === 'function') APIService.init();
         
         // Инициализация функциональных модулей
-        ConsultationFeature.init();
-        ComparisonFeature.init();
-        TryOnFeature.init();
+        if (ConsultationFeature && typeof ConsultationFeature.init === 'function') ConsultationFeature.init();
+        if (ComparisonFeature && typeof ComparisonFeature.init === 'function') ComparisonFeature.init();
+        if (TryOnFeature && typeof TryOnFeature.init === 'function') TryOnFeature.init();
         
-        UIHelpers.showToast("Приложение МИШУРА готово к работе!");
+        if (UIHelpers && typeof UIHelpers.showToast === 'function') {
+            UIHelpers.showToast("Приложение МИШУРА готово к работе!");
+        }
     };
     
     // Экспортируем интерфейс и версию
@@ -107,9 +136,13 @@ window.MishuraApp = window.MishuraApp || {};
 })(window.MishuraApp);
 
 // Экспортируем модуль в глобальное пространство имен для доступа из других модулей
-window.MishuraApp.main = (function() {
-    return {
-        init: window.MishuraApp.init,
-        version: window.MishuraApp.version
-    };
-})();
+window.MishuraApp.main = {
+    init: function() {
+        if (window.MishuraApp && typeof window.MishuraApp.init === 'function') {
+            window.MishuraApp.init();
+        } else {
+            console.error("Ошибка: window.MishuraApp.init не является функцией");
+        }
+    },
+    version: window.MishuraApp.version || '0.4.0'
+};

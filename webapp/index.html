@@ -101,42 +101,46 @@
                 <div class="dialog-subtitle">Загрузите фото одежды для анализа</div>
             </div>
             <div class="dialog-content">
-                <div class="consultation-mode-switch" role="tablist" aria-label="Режим консультации">
-                    <div class="mode-button active" data-mode="single" role="tab" aria-selected="true" tabindex="0">Один предмет</div>
-                    <div class="mode-button" data-mode="compare" role="tab" aria-selected="false" tabindex="0">Сравнение</div>
-                </div>
-                <div id="single-analysis-mode" class="analysis-mode" role="tabpanel">
-                    <div class="upload-area" id="single-upload-area" role="button" tabindex="0" aria-label="Загрузить одно фото">
-                        <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
-                        <div class="upload-text">Нажмите, чтобы выбрать фото<br>или перетащите файл сюда</div>
-                        <input type="file" id="single-upload-input" class="upload-input" accept="image/*">
+                <!-- Добавляем форму консультации с id -->
+                <form id="consultation-form">
+                    <div class="consultation-mode-switch" role="tablist" aria-label="Режим консультации">
+                        <div class="mode-button active" data-mode="single" role="tab" aria-selected="true" tabindex="0">Один предмет</div>
+                        <div class="mode-button" data-mode="compare" role="tab" aria-selected="false" tabindex="0">Сравнение</div>
                     </div>
-                    <div class="image-preview-container" id="single-preview-container">
-                        <img id="single-preview-image" class="image-preview" alt="Предпросмотр загруженного изображения">
-                        <div class="delete-image" data-target="single" role="button" tabindex="0" aria-label="Удалить изображение">✕</div>
-                    </div>
-                </div>
-                <div id="compare-analysis-mode" class="analysis-mode hidden" role="tabpanel">
-                    <div class="compare-container">
-                        <div class="image-slots" aria-label="Слоты для сравнения изображений">
-                            <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="0"></div>
-                            <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="1"></div>
-                            <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="2"></div>
-                            <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="3"></div>
+                    <div id="single-analysis-mode" class="analysis-mode" role="tabpanel">
+                        <div class="upload-area" id="single-upload-area" role="button" tabindex="0" aria-label="Загрузить одно фото">
+                            <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
+                            <div class="upload-text">Нажмите, чтобы выбрать фото<br>или перетащите файл сюда</div>
+                            <input type="file" id="single-upload-input" class="upload-input" accept="image/*">
                         </div>
-                        <div class="upload-text">Загрузите от 2 до 4 фотографий для сравнения</div>
+                        <div class="image-preview-container" id="single-preview-container">
+                            <img id="single-preview-image" class="image-preview" alt="Предпросмотр загруженного изображения">
+                            <div class="delete-image" data-target="single" role="button" tabindex="0" aria-label="Удалить изображение">✕</div>
+                        </div>
                     </div>
-                </div>
-                <label for="occasion-selector" class="input-label hidden">Выберите повод:</label>
-                <select class="occasion-selector" id="occasion-selector" aria-label="Выберите повод">
-                    <option value="повседневный">Повседневный</option> <option value="деловой">Деловой</option> <option value="вечеринка">Вечеринка</option> <option value="свидание">Свидание</option> <option value="спорт">Спорт/Активный отдых</option> <option value="особый случай">Особый случай</option>
-                </select>
-                <label for="preferences-input" class="input-label hidden">Ваши предпочтения:</label>
-                <textarea class="preferences-input" id="preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
-            </div>
-            <div class="dialog-footer">
-                <button class="btn btn-primary" id="analyze-button" role="button">Проанализировать</button>
-                <button class="btn btn-secondary" id="consultation-cancel" role="button">Отмена</button>
+                    <div id="compare-analysis-mode" class="analysis-mode hidden" role="tabpanel">
+                        <div class="compare-container">
+                            <div class="image-slots" aria-label="Слоты для сравнения изображений">
+                                <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="0"></div>
+                                <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="1"></div>
+                                <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="2"></div>
+                                <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="3"></div>
+                            </div>
+                            <div class="upload-text">Загрузите от 2 до 4 фотографий для сравнения</div>
+                        </div>
+                    </div>
+                    <label for="occasion-selector" class="input-label hidden">Выберите повод:</label>
+                    <select class="occasion-selector" id="occasion-selector" aria-label="Выберите повод">
+                        <option value="повседневный">Повседневный</option> <option value="деловой">Деловой</option> <option value="вечеринка">Вечеринка</option> <option value="свидание">Свидание</option> <option value="спорт">Спорт/Активный отдых</option> <option value="особый случай">Особый случай</option>
+                    </select>
+                    <label for="preferences-input" class="input-label hidden">Ваши предпочтения:</label>
+                    <textarea class="preferences-input" id="preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
+                    <!-- Добавляем кнопку отправки формы с id submit-consultation -->
+                    <div class="dialog-footer">
+                        <button class="btn btn-primary" id="submit-consultation" type="submit">Проанализировать</button>
+                        <button class="btn btn-secondary" id="consultation-cancel" type="button">Отмена</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

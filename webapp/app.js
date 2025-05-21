@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Загрузчик приложения (app.js)
-ВЕРСИЯ: 0.4.1
+ВЕРСИЯ: 0.4.2 (Исправлен путь к модулю modals)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -109,17 +109,16 @@ function initializeComponents() {
     // Инициализация навигации
     if (window.MishuraApp.components.navigation && typeof window.MishuraApp.components.navigation.init === 'function') {
         window.MishuraApp.components.navigation.init();
-    } else if (window.MishuraApp.utils.navigation && typeof window.MishuraApp.utils.navigation.init === 'function') {
-        window.MishuraApp.utils.navigation.init();
     } else {
-        console.warn("Модуль навигации не найден");
+        // Удален старый fallback, если он был window.MishuraApp.utils.navigation
+        console.warn("Модуль навигации (components.navigation) не найден");
     }
     
     // Инициализация модальных окон
-    if (window.MishuraApp.utils.modals && typeof window.MishuraApp.utils.modals.init === 'function') {
-        window.MishuraApp.utils.modals.init();
+    if (window.MishuraApp.components.modals && typeof window.MishuraApp.components.modals.init === 'function') {
+        window.MishuraApp.components.modals.init();
     } else {
-        console.warn("Модуль модальных окон не найден");
+        console.warn("Модуль модальных окон (components.modals) не найден");
     }
     
     // Инициализация компонента загрузки изображений
@@ -163,7 +162,8 @@ function setupButtonHandlers() {
     console.log("Настройка обработчиков кнопок...");
     
     // Получаем ссылки на модули для обработки событий
-    const modals = window.MishuraApp.utils.modals;
+    // ИСПРАВЛЕНО: Путь к modals теперь components.modals
+    const modals = window.MishuraApp.components.modals; 
     const uiHelpers = window.MishuraApp.utils.uiHelpers;
     
     // Кнопка "Получить консультацию"
@@ -174,7 +174,7 @@ function setupButtonHandlers() {
             if (modals && typeof modals.openConsultationModal === 'function') {
                 modals.openConsultationModal();
             } else {
-                console.error("Невозможно открыть модальное окно консультации: модуль не найден или метод недоступен");
+                console.error("Невозможно открыть модальное окно консультации: модуль modals или метод openConsultationModal недоступен");
                 if (uiHelpers && typeof uiHelpers.showToast === 'function') {
                     uiHelpers.showToast('Функция временно недоступна');
                 }
@@ -191,10 +191,10 @@ function setupButtonHandlers() {
             console.log("Нажата кнопка 'Примерить'");
             if (modals && typeof modals.openTryOnModal === 'function') {
                 modals.openTryOnModal();
-            } else if (modals && typeof modals.openModal === 'function') {
-                modals.openModal('try-on-overlay');
             } else {
-                console.error("Невозможно открыть модальное окно примерки: модуль не найден или метод недоступен");
+                // Старый fallback, если openTryOnModal специфически отсутствует, но openModal есть
+                // Однако, лучше убедиться, что openTryOnModal реализован в components.modals
+                console.error("Невозможно открыть модальное окно примерки: модуль modals или метод openTryOnModal недоступен");
                 if (uiHelpers && typeof uiHelpers.showToast === 'function') {
                     uiHelpers.showToast('Функция временно недоступна');
                 }
@@ -211,10 +211,8 @@ function setupButtonHandlers() {
             console.log("Нажата плавающая кнопка (FAB)");
             if (modals && typeof modals.openConsultationModal === 'function') {
                 modals.openConsultationModal();
-            } else if (modals && typeof modals.openModal === 'function') {
-                modals.openModal('consultation-overlay');
             } else {
-                console.error("Невозможно открыть модальное окно консультации: модуль не найден или метод недоступен");
+                console.error("Невозможно открыть модальное окно консультации через FAB: модуль modals или метод openConsultationModal недоступен");
                 if (uiHelpers && typeof uiHelpers.showToast === 'function') {
                     uiHelpers.showToast('Функция временно недоступна');
                 }

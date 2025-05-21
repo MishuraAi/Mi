@@ -1,13 +1,13 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: API-сервис (api-service.js)
-ВЕРСИЯ: 0.4.1 (Модульная структура)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-21
+КОМПОНЕНТ: API сервис (service.js)
+ВЕРСИЯ: 0.5.0 (Реализация API для примерки)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-22
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Обеспечивает взаимодействие с серверным API приложения.
-Реализует методы для отправки запросов и обработки ответов.
+Предоставляет интерфейс для взаимодействия с серверным API.
+Обрабатывает запросы к стилисту и виртуальной примерке.
 ==========================================================================================
 */
 
@@ -20,43 +20,30 @@ window.MishuraApp.api.service = (function() {
     // Локальные ссылки на другие модули
     let config, logger;
     
-    // Счетчик попыток повторного запроса
-    let retryCounters = {};
+    // Базовый URL API
+    let apiBaseUrl = '/api/v1';
     
     /**
      * Инициализация модуля
      */
     function init() {
+        console.log("Инициализация API сервиса");
+        
         // Получаем ссылки на другие модули
-        if (window.MishuraApp.config) {
+        if (window.MishuraApp && window.MishuraApp.config) {
             config = window.MishuraApp.config;
-        } else {
-            config = {
-                appSettings: {
-                    apiUrl: 'https://api.mishura-stylist.ru/v1'
-                },
-                apiSettings: {
-                    timeout: 30000,
-                    retryAttempts: 3,
-                    endpoints: {
-                        consultation: '/consultation',
-                        compare: '/compare',
-                        virtualFitting: '/virtual-fitting',
-                        feedback: '/feedback',
-                        user: '/user'
-                    },
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept-Language': 'ru'
-                    }
-                },
-                userId: localStorage.getItem('mishura_user_id') || 'anonymous'
-            };
+            
+            // Получаем базовый URL из конфигурации, если есть
+            if (config.apiBaseUrl) {
+                apiBaseUrl = config.apiBaseUrl;
+                console.log(`Базовый URL API установлен: ${apiBaseUrl}`);
+            }
         }
         
-        if (window.MishuraApp.utils && window.MishuraApp.utils.logger) {
+        if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) {
             logger = window.MishuraApp.utils.logger;
         } else {
+            // Используем временный логгер, если основной недоступен
             logger = {
                 debug: function(msg) { console.log('[DEBUG] ' + msg); },
                 info: function(msg) { console.log('[INFO] ' + msg); },
@@ -65,60 +52,58 @@ window.MishuraApp.api.service = (function() {
             };
         }
         
-        logger.info('Модуль API-сервис инициализирован');
+        logger.info('API сервис инициализирован');
     }
     
     /**
-     * Базовый метод для выполнения API-запроса
-     * @private
-     * @param {string} endpoint - конечная точка API
-     * @param {string} method - HTTP-метод
-     * @param {Object|FormData|null} data - данные для отправки
-     * @param {boolean} isFormData - флаг для FormData
-     * @returns {Promise} - промис с результатом запроса
+     * Отправка запроса на анализ стиля
+     * @param {FormData} formData - данные формы
+     * @returns {Promise<Object>} - Promise с результатом запроса
      */
-    function apiRequest(endpoint, method = 'GET', data = null, isFormData = false) {
-        const url = config.appSettings.apiUrl + endpoint;
-        const requestId = `${method}-${endpoint}-${Date.now()}`;
+    function processStylistConsultation(formData) {
+        logger.debug('Отправка запроса на консультацию стилиста');
         
-        // Инициализация счетчика попыток для этого запроса
-        if (!retryCounters[requestId]) {
-            retryCounters[requestId] = 0;
-        }
+        return fetchWithTimeout(`${apiBaseUrl}/stylist/analyze`, {
+            method: 'POST',
+            body: formData,
+            // Без 'Content-Type' для FormData
+        });
+    }
+    
+    /**
+     * Отправка запроса на примерку
+     * @param {FormData} formData - данные формы
+     * @returns {Promise<Object>} - Promise с результатом запроса
+     */
+    function processTryOn(formData) {
+        logger.debug('Отправка запроса на примерку');
         
-        const options = {
-            method: method,
-            mode: 'cors',
-            cache: 'no-cache',
-            credentials: 'same-origin',
-            redirect: 'follow',
-            referrerPolicy: 'no-referrer'
-        };
-        
-        // Добавляем заголовки и тело запроса в зависимости от типа данных
-        if (isFormData) {
-            // Для FormData не устанавливаем Content-Type, браузер сделает это сам
-            if (data) {
-                options.body = data;
-            }
-        } else {
-            options.headers = { ...config.apiSettings.headers };
-            
-            if (data) {
-                options.body = JSON.stringify(data);
-            }
-        }
-        
-        logger.debug(`API запрос: ${method} ${url}`);
-        
+        return fetchWithTimeout(`${apiBaseUrl}/try-on/process`, {
+            method: 'POST',
+            body: formData,
+            // Без 'Content-Type' для FormData
+        });
+    }
+    
+    /**
+     * Запрос с таймаутом
+     * @private
+     * @param {string} url - URL запроса
+     * @param {Object} options - опции fetch
+     * @param {number} timeout - таймаут в миллисекундах
+     * @returns {Promise<Object>} - Promise с результатом запроса
+     */
+    function fetchWithTimeout(url, options, timeout = 30000) {
         return new Promise((resolve, reject) => {
-            // Создаем таймаут для запроса
-            const timeoutId = setTimeout(() => {
-                logger.warn(`API запрос истек по таймауту: ${method} ${url}`);
-                handleRetry(requestId, endpoint, method, data, isFormData, resolve, reject);
-            }, config.apiSettings.timeout);
+            const controller = new AbortController();
+            const signal = controller.signal;
             
-            fetch(url, options)
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                reject(new Error('Превышено время ожидания ответа от сервера'));
+            }, timeout);
+            
+            fetch(url, { ...options, signal })
                 .then(response => {
                     clearTimeout(timeoutId);
                     
@@ -128,154 +113,27 @@ window.MishuraApp.api.service = (function() {
                     
                     return response.json();
                 })
-                .then(data => {
-                    logger.debug(`API ответ получен: ${method} ${url}`);
-                    resolve(data);
-                    // Очищаем счетчик попыток после успешного запроса
-                    delete retryCounters[requestId];
-                })
+                .then(data => resolve(data))
                 .catch(error => {
                     clearTimeout(timeoutId);
-                    logger.error(`API ошибка: ${error.message}`);
-                    handleRetry(requestId, endpoint, method, data, isFormData, resolve, reject);
+                    reject(error);
                 });
         });
     }
     
     /**
-     * Обработка повторных попыток запроса при ошибке
-     * @private
+     * Получение URL для эмуляции API (для тестирования)
+     * @param {string} endpoint - конечная точка API
+     * @returns {string} - URL для эмуляции
      */
-    function handleRetry(requestId, endpoint, method, data, isFormData, resolve, reject) {
-        retryCounters[requestId]++;
-        
-        if (retryCounters[requestId] <= config.apiSettings.retryAttempts) {
-            logger.warn(`Повторная попытка запроса (${retryCounters[requestId]}/${config.apiSettings.retryAttempts}): ${method} ${endpoint}`);
-            
-            // Экспоненциальная задержка перед повторной попыткой
-            const delay = Math.pow(2, retryCounters[requestId] - 1) * 1000;
-            
-            setTimeout(() => {
-                apiRequest(endpoint, method, data, isFormData)
-                    .then(resolve)
-                    .catch(reject);
-            }, delay);
-        } else {
-            logger.error(`Исчерпаны все попытки запроса: ${method} ${endpoint}`);
-            delete retryCounters[requestId];
-            reject(new Error('Превышено количество попыток запроса'));
-        }
-    }
-    
-    /**
-     * Отправка запроса на консультацию
-     * @public
-     * @param {FormData} formData - данные формы
-     * @returns {Promise} - промис с результатом запроса
-     */
-    function sendConsultationRequest(formData) {
-        return apiRequest(config.apiSettings.endpoints.consultation, 'POST', formData, true);
-    }
-    
-    /**
-     * Отправка запроса на сравнение
-     * @public
-     * @param {FormData} formData - данные формы
-     * @returns {Promise} - промис с результатом запроса
-     */
-    function sendCompareRequest(formData) {
-        return apiRequest(config.apiSettings.endpoints.compare, 'POST', formData, true);
-    }
-    
-    /**
-     * Отправка запроса на виртуальную примерку
-     * @public
-     * @param {FormData} formData - данные формы
-     * @returns {Promise} - промис с результатом запроса
-     */
-    function sendVirtualFittingRequest(formData) {
-        return apiRequest(config.apiSettings.endpoints.virtualFitting, 'POST', formData, true);
-    }
-    
-    /**
-     * Отправка отзыва
-     * @public
-     * @param {Object} feedbackData - данные отзыва
-     * @returns {Promise} - промис с результатом запроса
-     */
-    function sendFeedback(feedbackData) {
-        return apiRequest(config.apiSettings.endpoints.feedback, 'POST', feedbackData);
-    }
-    
-    /**
-     * Получение информации о пользователе
-     * @public
-     * @returns {Promise} - промис с результатом запроса
-     */
-    function getUserInfo() {
-        return apiRequest(config.apiSettings.endpoints.user, 'GET');
-    }
-    
-    /**
-     * Обновление информации о пользователе
-     * @public
-     * @param {Object} userData - данные пользователя
-     * @returns {Promise} - промис с результатом запроса
-     */
-    function updateUserInfo(userData) {
-        return apiRequest(config.apiSettings.endpoints.user, 'PUT', userData);
-    }
-    
-    // Временный метод для эмуляции работы API в демо-режиме
-    function getDemoResponse(type) {
-        // Эмуляция задержки для реалистичности
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                switch (type) {
-                    case 'consultation':
-                        resolve({
-                            success: true,
-                            data: {
-                                advice: "Ваш образ отлично смотрится для повседневного стиля! Для дополнительной выразительности рекомендую добавить аксессуары в виде минималистичных украшений и подобрать сумку под обувь для гармоничного сочетания.",
-                                recommendations: [
-                                    {
-                                        name: "Кожаная сумка",
-                                        description: "Классическая кожаная сумка подойдет для вашего образа",
-                                        price: "5990",
-                                        imageUrl: "https://via.placeholder.com/150",
-                                        url: "#"
-                                    },
-                                    {
-                                        name: "Серьги-кольца",
-                                        description: "Минималистичные серьги дополнят повседневный образ",
-                                        price: "1990",
-                                        imageUrl: "https://via.placeholder.com/150",
-                                        url: "#"
-                                    }
-                                ]
-                            }
-                        });
-                        break;
-                    default:
-                        resolve({
-                            success: true,
-                            data: {
-                                message: "Демо-ответ сгенерирован успешно"
-                            }
-                        });
-                }
-            }, 1500);
-        });
+    function getMockApiUrl(endpoint) {
+        return `/mock-api/${endpoint}.json`;
     }
     
     // Публичный API
     return {
         init,
-        sendConsultationRequest: getDemoResponse.bind(null, 'consultation'), // Используем демо-ответ для тестирования
-        sendCompareRequest,
-        sendVirtualFittingRequest,
-        sendFeedback,
-        getUserInfo,
-        updateUserInfo
+        processStylistConsultation,
+        processTryOn
     };
 })();

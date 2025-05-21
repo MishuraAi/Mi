@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Управление модальными окнами (modals.js)
-ВЕРСИЯ: 0.4.2 (Исправления в обработке модальных окон)
+ВЕРСИЯ: 0.4.3 (Полное исправление модальных окон)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-22
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -27,6 +27,8 @@ window.MishuraApp.utils.modals = (function() {
      * Инициализация модуля
      */
     function init() {
+        console.log("Инициализация модуля модальных окон");
+        
         // Получаем ссылки на другие модули
         if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) {
             logger = window.MishuraApp.utils.logger;
@@ -39,6 +41,9 @@ window.MishuraApp.utils.modals = (function() {
                 error: function(msg) { console.error('[ERROR] ' + msg); }
             };
         }
+        
+        // Настройка обработчиков событий для кнопок открытия модальных окон
+        setupOpenButtons();
         
         // Настройка обработчиков событий для кнопок закрытия модальных окон
         setupCloseButtons();
@@ -57,13 +62,39 @@ window.MishuraApp.utils.modals = (function() {
     }
     
     /**
+     * Настройка обработчиков открытия модальных окон
+     */
+    function setupOpenButtons() {
+        // Получить консультацию
+        const consultationButton = document.getElementById('consultation-button');
+        if (consultationButton) {
+            consultationButton.addEventListener('click', function() {
+                console.log("Кнопка открытия консультации нажата");
+                openConsultationModal();
+            });
+        }
+        
+        // Примерить
+        const tryOnButton = document.getElementById('try-on-button');
+        if (tryOnButton) {
+            tryOnButton.addEventListener('click', function() {
+                console.log("Кнопка открытия примерки нажата");
+                openTryOnModal();
+            });
+        }
+    }
+    
+    /**
      * Настройка обработчиков закрытия для кнопок отмены в модальных окнах
      */
     function setupCloseButtons() {
+        console.log("Настройка кнопок закрытия модальных окон");
+        
         // Настройка кнопок закрытия консультации
         const consultationCancel = document.getElementById('consultation-cancel');
         if (consultationCancel) {
             consultationCancel.addEventListener('click', function() {
+                console.log("Кнопка закрытия консультации нажата");
                 closeModal('consultation-overlay');
             });
         } else {
@@ -74,6 +105,7 @@ window.MishuraApp.utils.modals = (function() {
         const resultsClose = document.getElementById('results-close');
         if (resultsClose) {
             resultsClose.addEventListener('click', function() {
+                console.log("Кнопка закрытия результатов нажата");
                 closeModal('results-overlay');
             });
         } else {
@@ -84,6 +116,7 @@ window.MishuraApp.utils.modals = (function() {
         const tryOnCancel = document.getElementById('try-on-cancel');
         if (tryOnCancel) {
             tryOnCancel.addEventListener('click', function() {
+                console.log("Кнопка закрытия примерки нажата");
                 closeModal('try-on-overlay');
             });
         } else {
@@ -94,6 +127,7 @@ window.MishuraApp.utils.modals = (function() {
         const tryOnResultClose = document.getElementById('try-on-result-close');
         if (tryOnResultClose) {
             tryOnResultClose.addEventListener('click', function() {
+                console.log("Кнопка закрытия результатов примерки нажата");
                 closeModal('try-on-result-overlay');
             });
         } else {
@@ -107,15 +141,19 @@ window.MishuraApp.utils.modals = (function() {
     function setupOverlayClicks() {
         const overlays = document.querySelectorAll('.overlay');
         overlays.forEach(overlay => {
-            overlay.addEventListener('click', function(e) {
+            // Удаляем существующие обработчики, чтобы избежать дублирования
+            const newOverlay = overlay.cloneNode(true);
+            overlay.parentNode.replaceChild(newOverlay, overlay);
+            
+            newOverlay.addEventListener('click', function(e) {
                 // Закрываем только если клик был именно на фоне (overlay), а не на его содержимом
-                if (e.target === overlay) {
-                    closeModal(overlay.id);
+                if (e.target === newOverlay) {
+                    closeModal(newOverlay.id);
                 }
             });
         });
         
-        logger.debug(`Настроены обработчики кликов на фон для ${overlays.length} модальных окон`);
+        console.log(`Настроены обработчики кликов на фон для ${overlays.length} модальных окон`);
     }
     
     /**
@@ -123,12 +161,12 @@ window.MishuraApp.utils.modals = (function() {
      * @param {string} modalId - идентификатор модального окна
      */
     function openModal(modalId) {
+        console.log(`Открытие модального окна: ${modalId}`);
+        
         const modal = document.getElementById(modalId);
         
         if (!modal) {
-            if (logger) {
-                logger.error(`Модальное окно с ID ${modalId} не найдено`);
-            }
+            console.error(`Модальное окно с ID ${modalId} не найдено`);
             return;
         }
         
@@ -155,9 +193,7 @@ window.MishuraApp.utils.modals = (function() {
             detail: { modalId: modalId }
         }));
         
-        if (logger) {
-            logger.debug(`Открыто модальное окно: ${modalId}`);
-        }
+        console.log(`Модальное окно ${modalId} открыто`);
     }
     
     /**
@@ -165,12 +201,12 @@ window.MishuraApp.utils.modals = (function() {
      * @param {string} modalId - идентификатор модального окна
      */
     function closeModal(modalId) {
+        console.log(`Закрытие модального окна: ${modalId}`);
+        
         const modal = document.getElementById(modalId);
         
         if (!modal) {
-            if (logger) {
-                logger.error(`Модальное окно с ID ${modalId} не найдено`);
-            }
+            console.error(`Модальное окно с ID ${modalId} не найдено`);
             return;
         }
         
@@ -187,15 +223,15 @@ window.MishuraApp.utils.modals = (function() {
             detail: { modalId: modalId }
         }));
         
-        if (logger) {
-            logger.debug(`Закрыто модальное окно: ${modalId}`);
-        }
+        console.log(`Модальное окно ${modalId} закрыто`);
     }
     
     /**
      * Открытие модального окна консультации
      */
     function openConsultationModal() {
+        console.log('Открытие модального окна консультации');
+        
         // Сбрасываем в начальное состояние перед открытием
         resetConsultationModal();
         
@@ -207,6 +243,8 @@ window.MishuraApp.utils.modals = (function() {
      * Сброс модального окна консультации в начальное состояние
      */
     function resetConsultationModal() {
+        console.log('Сброс модального окна консультации');
+        
         // Сбрасываем активный режим на "одиночный"
         const singleModeButton = document.querySelector('.mode-button[data-mode="single"]');
         const compareModeButton = document.querySelector('.mode-button[data-mode="compare"]');
@@ -257,6 +295,8 @@ window.MishuraApp.utils.modals = (function() {
      * Открытие модального окна для примерки
      */
     function openTryOnModal() {
+        console.log('Открытие модального окна примерки');
+        
         resetTryOnModal();
         openModal('try-on-overlay');
     }
@@ -265,6 +305,8 @@ window.MishuraApp.utils.modals = (function() {
      * Сброс модального окна примерки в начальное состояние
      */
     function resetTryOnModal() {
+        console.log('Сброс модального окна примерки');
+        
         // Сбрасываем форму
         const tryOnForm = document.querySelector('#try-on-overlay form');
         if (tryOnForm) {
@@ -288,13 +330,33 @@ window.MishuraApp.utils.modals = (function() {
         
         if (yourPhotoInput) yourPhotoInput.value = '';
         if (outfitPhotoInput) outfitPhotoInput.value = '';
+        
+        // Сбрасываем TryOn модуль, если он существует
+        if (window.MishuraApp && window.MishuraApp.features && window.MishuraApp.features.tryOn) {
+            const tryOn = window.MishuraApp.features.tryOn;
+            
+            if (typeof tryOn.resetFittingForm === 'function') {
+                tryOn.resetFittingForm();
+            }
+        }
     }
     
     /**
      * Открытие модального окна результатов
      */
     function openResultsModal() {
+        console.log('Открытие модального окна результатов');
+        
         openModal('results-overlay');
+    }
+    
+    /**
+     * Открытие модального окна результатов примерки
+     */
+    function openTryOnResultModal() {
+        console.log('Открытие модального окна результатов примерки');
+        
+        openModal('try-on-result-overlay');
     }
     
     /**
@@ -322,6 +384,7 @@ window.MishuraApp.utils.modals = (function() {
         openConsultationModal,
         openTryOnModal,
         openResultsModal,
+        openTryOnResultModal,
         isModalOpen,
         getActiveModal
     };

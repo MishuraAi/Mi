@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Конфигурация (config.js)
-ВЕРСИЯ: 0.4.1
+ВЕРСИЯ: 0.4.3 (Уточнена структура apiUrl, добавлено логгирование)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 ==========================================================================================
 */
@@ -12,149 +12,115 @@ window.MishuraApp = window.MishuraApp || {};
 window.MishuraApp.config = (function() {
     'use strict';
     
-    // Общие настройки приложения
     const appSettings = {
         appName: 'МИШУРА',
-        appVersion: '0.4.1',
-        apiUrl: 'https://api.mishura-stylist.ru/v1',
+        appVersion: '0.4.3', 
+        // ВАЖНО: Для локальной разработки этот URL должен указывать на ваш локальный FastAPI сервер.
+        // Например: '/api/v1' (если фронтенд и бэкенд на одном порту)
+        // или 'http://localhost:ВАШ_ПОРТ_БЭКЕНДА/api/v1'.
+        // Убедитесь, что этот URL ПРАВИЛЬНЫЙ для вашей текущей среды.
+        // Ошибка ERR_NAME_NOT_RESOLVED означает, что домен НЕ МОЖЕТ БЫТЬ НАЙДЕН.
+        apiUrl: 'https://api.mishura-stylist.ru/v1', // ЗАМЕНИТЕ ЭТО, ЕСЛИ ТЕСТИРУЕТЕ ЛОКАЛЬНО!
         defaultLanguage: 'ru',
-        debugMode: true, // Включить/отключить режим отладки
-        maxUploadSize: 5242880, // 5MB в байтах
+        debugMode: true, 
+        maxUploadSize: 5 * 1024 * 1024, 
         supportedImageFormats: ['jpg', 'jpeg', 'png', 'webp'],
-        maxCompareImages: 4 // Максимальное количество изображений для сравнения
+        maxCompareImages: 4 
     };
     
-    // Настройки темы
     const themeSettings = {
-        defaultTheme: 'light', // 'light' или 'dark'
+        defaultTheme: 'light', 
         colorSchemes: {
-            light: {
-                primary: '#7E57C2',
-                secondary: '#FF4081',
-                background: '#F5F5F5',
-                surface: '#FFFFFF',
-                text: '#212121',
-                error: '#F44336'
-            },
-            dark: {
-                primary: '#B39DDB',
-                secondary: '#FF80AB',
-                background: '#121212',
-                surface: '#1E1E1E',
-                text: '#FFFFFF',
-                error: '#CF6679'
-            }
+            light: { primary: '#7E57C2', secondary: '#FF4081', background: '#F5F5F5', surface: '#FFFFFF', text: '#212121', error: '#F44336' },
+            dark: { primary: '#B39DDB', secondary: '#FF80AB', background: '#121212', surface: '#1E1E1E', text: '#FFFFFF', error: '#CF6679' }
         }
     };
     
-    // Настройки API
     const apiSettings = {
-        timeout: 30000, // 30 секунд
-        retryAttempts: 3,
+        baseUrl: appSettings.apiUrl, 
+        timeout: 30000, 
+        retryAttempts: 2, // Уменьшено для более быстрой диагностики ошибок сети
         endpoints: {
-            consultation: '/consultation',
-            compare: '/compare',
-            virtualFitting: '/virtual-fitting',
-            feedback: '/feedback',
-            user: '/user'
+            consultation: '/analyze-outfit',      
+            compare: '/compare-outfits',          
+            virtualFitting: '/virtual-fitting', 
+            // Эндпоинты ниже пока не используются активно в коде FastAPI:
+            // feedback: '/feedback',                
+            // user: '/user'                         
         },
-        headers: {
-            'Content-Type': 'application/json',
+        headers: { 
             'Accept-Language': 'ru'
         }
     };
     
-    // Добавляем лимиты и ограничения
     const LIMITS = {
-        TOAST_DURATION: 3000, // 3 секунды для показа тоста
-        MAX_FILE_SIZE: 5 * 1024 * 1024, // 5 МБ
-        MAX_COMPARE_ITEMS: 4,
-        MAX_TEXT_LENGTH: 500, // Максимальная длина текстовых полей
+        TOAST_DURATION: 3500, 
+        MAX_FILE_SIZE: appSettings.maxUploadSize, 
+        MAX_COMPARE_ITEMS: appSettings.maxCompareImages,
+        MAX_TEXT_LENGTH: 500, 
         MIN_PASSWORD_LENGTH: 6
     };
     
-    // Идентификатор пользователя (может быть загружен из localStorage)
-    let userId = localStorage.getItem('mishura_user_id') || null;
+    let userId = null; 
+    let isInitialized = false;
     
-    /**
-     * Инициализация модуля конфигурации
-     */
     function init() {
-        // Определение и сохранение идентификатора пользователя
-        if (!userId) {
-            userId = generateUserId();
-            localStorage.setItem('mishura_user_id', userId);
+        if (isInitialized) {
+            console.warn("Config: Повторная инициализация пропущена.");
+            return;
         }
+        const tempLogger = (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) 
+                       ? window.MishuraApp.utils.logger 
+                       : { info: console.info, debug: console.debug, warn: console.warn, error: console.error };
+
+        tempLogger.info("Инициализация конфигурации (v0.4.3)...");
+
+        userId = localStorage.getItem('mishura_user_id') || generateUserId();
+        localStorage.setItem('mishura_user_id', userId);
         
-        // Инициализация темы
         initTheme();
         
-        // Другие инициализации...
+        tempLogger.info(`Config: AppName: ${appSettings.appName}, Version: ${appSettings.appVersion}`);
+        tempLogger.info(`Config: API URL используется: ${appSettings.apiUrl}`);
+        tempLogger.info(`Config: UserID: ${userId}`);
+        tempLogger.debug("Config: LIMITS:", LIMITS);
+        tempLogger.debug("Config: API Settings (endpoints):", apiSettings.endpoints);
+        isInitialized = true;
     }
     
-    /**
-     * Генерация идентификатора пользователя
-     * @private
-     * @returns {string} - уникальный идентификатор
-     */
     function generateUserId() {
-        return 'user_' + Math.random().toString(36).substring(2, 15) + 
-               Math.random().toString(36).substring(2, 15);
+        return 'user_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
     }
     
-    /**
-     * Инициализация темы
-     * @private
-     */
     function initTheme() {
-        // Получение сохраненной темы или использование дефолтной
         const savedTheme = localStorage.getItem('mishura_theme') || themeSettings.defaultTheme;
-        
-        // Установка темы
         setTheme(savedTheme);
     }
     
-    /**
-     * Установка темы
-     * @public
-     * @param {string} theme - 'light' или 'dark'
-     */
     function setTheme(theme) {
-        // Проверка валидности темы
         if (!themeSettings.colorSchemes[theme]) {
             theme = themeSettings.defaultTheme;
         }
-        
-        // Сохранение темы
         localStorage.setItem('mishura_theme', theme);
-        
-        // Установка атрибута темы на корневом элементе
         document.documentElement.setAttribute('data-theme', theme);
         
-        // Установка мета-тега для адаптации цвета темы в мобильных браузерах
         const metaThemeColor = document.querySelector('meta[name="theme-color"]');
         if (metaThemeColor) {
-            metaThemeColor.setAttribute('content', 
-                theme === 'dark' ? themeSettings.colorSchemes.dark.primary : themeSettings.colorSchemes.light.primary);
+            const activeScheme = themeSettings.colorSchemes[theme] || themeSettings.colorSchemes.light;
+            metaThemeColor.setAttribute('content', activeScheme.primary);
         }
     }
     
-    /**
-     * Получение текущей темы
-     * @public
-     * @returns {string} - 'light' или 'dark'
-     */
     function getTheme() {
         return localStorage.getItem('mishura_theme') || themeSettings.defaultTheme;
     }
     
-    // Публичный API
     return {
         init,
         appSettings,
         themeSettings,
-        apiSettings,
-        LIMITS, // Добавляем LIMITS в публичный API
+        apiSettings, 
+        LIMITS,
         setTheme,
         getTheme,
         get userId() { return userId; }

@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Загрузчик приложения (app.js)
-ВЕРСИЯ: 0.4.3 (Улучшенная проверка инициализации модулей)
+ВЕРСИЯ: 0.4.4 (Восстановлен setupButtonHandlers, улучшена логика инициализации)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -14,94 +14,162 @@ document.addEventListener('DOMContentLoaded', function() {
     'use strict';
     
     window.MishuraApp = window.MishuraApp || {};
-    // Обеспечиваем существование всех основных пространств имен
     ['utils', 'api', 'components', 'features'].forEach(ns => {
         window.MishuraApp[ns] = window.MishuraApp[ns] || {};
     });
     
-    const appLogger = window.MishuraApp.utils.logger || { 
-        debug: (...args)=>console.debug("AppLoader:",...args), 
-        info: (...args)=>console.info("AppLoader:",...args), 
-        warn: (...args)=>console.warn("AppLoader:",...args), 
-        error: (...args)=>console.error("AppLoader:",...args) 
-    };
+    // Инициализируем логгер как можно раньше, но после создания MishuraApp.utils
+    // Резервный логгер, если основной еще не определен
+    const earlyLogger = (window.MishuraApp.utils && window.MishuraApp.utils.logger && window.MishuraApp.utils.logger.info) 
+        ? window.MishuraApp.utils.logger 
+        : { 
+            debug: (...args) => console.debug("AppLoader(early):", ...args), 
+            info: (...args) => console.info("AppLoader(early):", ...args), 
+            warn: (...args) => console.warn("AppLoader(early):", ...args), 
+            error: (...args) => console.error("AppLoader(early):", ...args) 
+          };
 
     function tryInitModule(modulePath, moduleName) {
         const parts = modulePath.split('.');
         let current = window;
+        let pathConstructed = "";
         for (let i = 0; i < parts.length; i++) {
+            pathConstructed += (i > 0 ? "." : "") + parts[i];
             if (current && typeof current === 'object' && parts[i] in current) {
                 current = current[parts[i]];
             } else {
-                appLogger.warn(`Модуль или пространство имен '${modulePath}' не найдено (часть '${parts[i]}' отсутствует).`);
+                earlyLogger.warn(`Модуль или пространство имен по пути '${modulePath}' не найдено (ошибка на '${parts[i]}' в '${pathConstructed}').`);
                 return false;
             }
         }
         
         if (current && typeof current.init === 'function') {
             try {
-                current.init();
-                appLogger.info(`Модуль '${moduleName}' (${modulePath}) успешно инициализирован.`);
+                current.init(); // Вызываем init() модуля
+                // Логгер модуля должен сам сообщить об успешной инициализации
+                // earlyLogger.info(`Модуль '${moduleName}' (${modulePath}) вызвал init().`);
                 return true;
             } catch (e) {
-                appLogger.error(`Ошибка при инициализации модуля '${moduleName}' (${modulePath}):`, e);
+                earlyLogger.error(`Ошибка при вызове init() для модуля '${moduleName}' (${modulePath}):`, e.message, e.stack);
                 return false;
             }
         } else {
-            appLogger.warn(`Модуль '${moduleName}' (${modulePath}) найден, но функция init отсутствует или не является функцией.`);
+            earlyLogger.warn(`Модуль '${moduleName}' (${modulePath}) найден, но функция init отсутствует или не является функцией.`);
             return false;
         }
     }
 
     try {
-        appLogger.info("Инициализация приложения МИШУРА (v0.4.3)...");
+        earlyLogger.info("Инициализация приложения МИШУРА (v0.4.4)...");
         
-        // 1. Конфигурация (должна быть первой)
+        // Порядок инициализации важен!
         tryInitModule('MishuraApp.config', 'Конфигурация');
+        tryInitModule('MishuraApp.utils.logger', 'Логгер'); // Logger должен быть инициализирован как можно раньше
         
-        // 2. Базовые утилиты (Логгер должен быть одним из первых после конфига)
-        tryInitModule('MishuraApp.utils.logger', 'Логгер');
-        // Обновляем appLogger, если основной логгер только что инициализировался
-        if(window.MishuraApp.utils.logger && typeof window.MishuraApp.utils.logger.info === 'function') {
-           // appLogger = window.MishuraApp.utils.logger; // Не переназначаем, т.к. он может быть уже использован
-        }
+        // Теперь, когда основной логгер MishuraApp.utils.logger должен быть доступен, можно его использовать
+        const logger = window.MishuraApp.utils.logger || earlyLogger; // Используем основной, если он есть
+
         tryInitModule('MishuraApp.utils.deviceDetector', 'Определение устройства');
         tryInitModule('MishuraApp.utils.uiHelpers', 'UI-хелперы');
         
-        // 3. API-сервис
-        tryInitModule('MishuraApp.api.service', 'API-сервис');
+        tryInitModule('MishuraApp.api.service', 'API-сервис'); // API сервис ДО компонентов и фич, которые его используют
         
-        // 4. Компоненты интерфейса
         tryInitModule('MishuraApp.components.navigation', 'Навигация');
-        tryInitModule('MishuraApp.components.modals', 'Модальные окна');
+        tryInitModule('MishuraApp.components.modals', 'Модальные окна'); // Modals ДО фич, которые их открывают
         tryInitModule('MishuraApp.components.imageUpload', 'Загрузка изображений');
         
-        // 5. Функциональные модули (Features)
         tryInitModule('MishuraApp.features.consultation', 'Консультации');
         tryInitModule('MishuraApp.features.comparison', 'Сравнение образов');
         tryInitModule('MishuraApp.features.tryOn', 'Виртуальная примерка');
         
-        // 6. Основной модуль приложения (должен быть последним из логики приложения)
-        tryInitModule('MishuraApp.main', 'Основной модуль');
+        tryInitModule('MishuraApp.main', 'Основной модуль'); // Main обычно в конце, он может зависеть от всего
         
-        // 7. Настройка глобальных обработчиков кнопок (если они не в main.js)
-        // setupButtonHandlers(); // Эта функция была в старой версии, ее логика теперь должна быть в main.js или других модулях.
-        // Если setupButtonHandlers была специфична для app.js, ее нужно пересмотреть или интегрировать в main.js
-        // Пока закомментируем, так как ее определение отсутствует в текущей версии app.js.
+        // Настройка глобальных обработчиков кнопок, которые инициируют действия
+        setupButtonHandlers();
 
-        appLogger.info("Инициализация всех модулей приложения МИШУРА завершена.");
+        logger.info("Инициализация всех модулей приложения МИШУРА успешно завершена.");
         
     } catch (error) {
-        appLogger.error("Критическая ошибка при инициализации приложения МИШУРА:", error);
-        const uiHelpers = window.MishuraApp.utils.uiHelpers;
+        earlyLogger.error("Критическая ошибка на верхнем уровне инициализации приложения МИШУРА:", error.message, error.stack);
+        const uiHelpers = window.MishuraApp.utils.uiHelpers; // Попытка получить uiHelpers
         if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-            uiHelpers.showToast('Произошла критическая ошибка при запуске. Обновите страницу.', 5000);
+            uiHelpers.showToast('Критическая ошибка при запуске. Обновите страницу.', 5000);
         } else {
             alert('Произошла критическая ошибка при запуске приложения. Пожалуйста, обновите страницу.');
         }
     }
 });
 
-// Убрал старые функции initializeUtilities, initializeComponents, initializeFeatures, setupButtonHandlers,
-// так как их логика теперь встроена в основной поток с tryInitModule.
-// Если setupButtonHandlers должна быть, ее нужно определить или перенести в main.js.
+/**
+ * Настройка обработчиков для кнопок, инициирующих открытие модальных окон.
+ * Эта функция вызывается после инициализации всех модулей, включая modals.
+ */
+function setupButtonHandlers() {
+    const logger = (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) || console;
+    logger.debug("App.js: Настройка обработчиков глобальных кнопок...");
+
+    const modals = window.MishuraApp.components.modals;
+    const uiHelpers = window.MishuraApp.utils.uiHelpers;
+
+    if (!modals || typeof modals.openConsultationModal !== 'function' || typeof modals.openTryOnModal !== 'function') {
+        logger.error("App.js: Модуль modals или его методы openConsultationModal/openTryOnModal не найдены! Кнопки не будут работать.");
+        if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+            uiHelpers.showToast("Ошибка интерфейса: некоторые функции недоступны (A01).");
+        }
+        return; // Прерываем настройку, если модуль модалок недоступен
+    }
+
+    // Кнопка "Получить консультацию"
+    const consultationButton = document.getElementById('consultation-button');
+    if (consultationButton) {
+        consultationButton.addEventListener('click', function() {
+            logger.debug("App.js: Кнопка 'consultation-button' нажата.");
+            // Модуль consultation.js сам должен позаботиться о сбросе своей формы перед открытием
+            // через modals.openConsultationModal() -> modals.openModal() -> событие 'modalOpened'
+            // или модуль consultation.js должен иметь свой public метод open() который делает reset и вызывает modals
+            if (window.MishuraApp.features.consultation && typeof window.MishuraApp.features.consultation.openConsultationModal === 'function') {
+                 window.MishuraApp.features.consultation.openConsultationModal();
+            } else {
+                logger.warn("App.js: MishuraApp.features.consultation.openConsultationModal не найден, пытаемся открыть напрямую через modals.");
+                modals.openConsultationModal();
+            }
+        });
+        logger.info("App.js: Обработчик для 'consultation-button' назначен.");
+    } else {
+        logger.warn("App.js: Кнопка 'consultation-button' не найдена в DOM.");
+    }
+
+    // Кнопка "Примерить"
+    const tryOnButton = document.getElementById('try-on-button');
+    if (tryOnButton) {
+        tryOnButton.addEventListener('click', function() {
+            logger.debug("App.js: Кнопка 'try-on-button' нажата.");
+            // Аналогично, модуль tryOn должен сам управлять сбросом своей формы
+            if (window.MishuraApp.features.tryOn && typeof window.MishuraApp.features.tryOn.resetFittingForm === 'function'){
+                window.MishuraApp.features.tryOn.resetFittingForm(); // Вызываем сброс перед открытием
+            }
+            modals.openTryOnModal();
+        });
+        logger.info("App.js: Обработчик для 'try-on-button' назначен.");
+    } else {
+        logger.warn("App.js: Кнопка 'try-on-button' не найдена в DOM.");
+    }
+
+    // Плавающая кнопка (FAB)
+    const fabButton = document.getElementById('fab-button');
+    if (fabButton) {
+        fabButton.addEventListener('click', function() {
+            logger.debug("App.js: Кнопка 'fab-button' (FAB) нажата.");
+            if (window.MishuraApp.features.consultation && typeof window.MishuraApp.features.consultation.openConsultationModal === 'function') {
+                 window.MishuraApp.features.consultation.openConsultationModal();
+            } else {
+                logger.warn("App.js: MishuraApp.features.consultation.openConsultationModal не найден для FAB, пытаемся открыть напрямую через modals.");
+                modals.openConsultationModal();
+            }
+        });
+        logger.info("App.js: Обработчик для 'fab-button' назначен.");
+    } else {
+        logger.warn("App.js: Кнопка 'fab-button' не найдена в DOM.");
+    }
+    logger.debug("App.js: Настройка обработчиков глобальных кнопок завершена.");
+}

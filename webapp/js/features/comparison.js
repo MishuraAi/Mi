@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Сравнение образов (comparison.js)
-ВЕРСИЯ: 0.4.3 (Улучшенная интеграция с API и управлением состоянием кнопки)
+ВЕРСИЯ: 0.4.4 (Усиленная проверка API, управление состоянием кнопки)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -16,12 +16,12 @@ window.MishuraApp.features.comparison = (function() {
     'use strict';
     
     let config, logger, uiHelpers, modals, imageUpload, apiService;
-    let compareSubmitButton, resultsContainer; // Используем общую кнопку и контейнер результатов
+    let compareSubmitButton, resultsContainer; 
     let validCompareImagesCount = 0; 
     
     function init() {
         config = window.MishuraApp.config;
-        logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("ComparisonLogger:",...args), info: (...args)=>console.info("ComparisonLogger:",...args), warn: (...args)=>console.warn("ComparisonLogger:",...args), error: (...args)=>console.error("ComparisonLogger:",...args) };
+        logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("Comparison(f):",...args), info: (...args)=>console.info("Comparison(f):",...args), warn: (...args)=>console.warn("Comparison(f):",...args), error: (...args)=>console.error("Comparison(f):",...args) };
         uiHelpers = window.MishuraApp.utils.uiHelpers;
         modals = window.MishuraApp.components.modals;
         imageUpload = window.MishuraApp.components.imageUpload;
@@ -29,56 +29,52 @@ window.MishuraApp.features.comparison = (function() {
         if (window.MishuraApp.api && window.MishuraApp.api.service) {
             apiService = window.MishuraApp.api.service;
             if (typeof apiService.isInitialized === 'function' && !apiService.isInitialized()) {
-                logger.warn("Модуль comparison: API сервис (api.service) найден, но isInitialized() false. Попытка инициализации...");
+                logger.warn("Comparison: API сервис найден, но isInitialized()=false. Вызов init().");
                 if(typeof apiService.init === 'function') apiService.init();
             }
         } else {
-            logger.error("Модуль comparison: API сервис (window.MishuraApp.api.service) НЕ НАЙДЕН!");
+            logger.error("Comparison: API сервис НЕ НАЙДЕН! Запросы не будут работать.");
         }
 
-        logger.debug('Инициализация модуля Сравнение (v0.4.3)');
+        logger.debug('Инициализация модуля Сравнение (v0.4.4)');
         initDOMElements();
         initEventListeners();
-        updateSubmitButtonState(); // Обновляем при инициализации
-        logger.info('Модуль Сравнение инициализирован (v0.4.3)');
+        updateSubmitButtonState(); 
+        logger.info('Модуль Сравнение инициализирован (v0.4.4)');
     }
     
     function initDOMElements() {
-        // Используем элементы из общей формы модального окна консультации
         compareSubmitButton = document.getElementById('submit-consultation'); 
         resultsContainer = document.getElementById('results-container'); 
 
-        if (!compareSubmitButton) logger.warn("Comparison DOM: 'submit-consultation' (для кнопки) не найден");
-        if (!resultsContainer) logger.warn("Comparison DOM: 'results-container' (для результатов) не найден");
+        if (!compareSubmitButton) logger.warn("Comparison DOM: 'submit-consultation' не найден");
+        if (!resultsContainer) logger.warn("Comparison DOM: 'results-container' не найден");
     }
     
     function initEventListeners() {
-        document.addEventListener('compareImageUploaded', function(e) {
+        const updateCountAndButton = () => {
             validCompareImagesCount = countValidCompareImages();
-            logger.debug(`Событие compareImageUploaded. Фото для сравнения: ${validCompareImagesCount}`);
             updateSubmitButtonState();
-        });
-        
-        document.addEventListener('compareImageRemoved', function(e) {
-            validCompareImagesCount = countValidCompareImages();
-            logger.debug(`Событие compareImageRemoved. Фото для сравнения: ${validCompareImagesCount}`);
-            updateSubmitButtonState();
-        });
-        
-        document.addEventListener('allCompareImagesRemoved', function() {
-            validCompareImagesCount = 0;
-            logger.debug(`Событие allCompareImagesRemoved. Фото для сравнения: ${validCompareImagesCount}`);
-            updateSubmitButtonState();
-        });
+        };
 
-        // Слушаем событие смены режима от image-upload.js или consultation.js
+        document.addEventListener('compareImageUploaded', () => {
+            logger.debug(`Comparison (event compareImageUploaded): Обновляем счетчик и кнопку.`);
+            updateCountAndButton();
+        });
+        document.addEventListener('compareImageRemoved', () => {
+            logger.debug(`Comparison (event compareImageRemoved): Обновляем счетчик и кнопку.`);
+            updateCountAndButton();
+        });
+        document.addEventListener('allCompareImagesRemoved', () => {
+            logger.debug(`Comparison (event allCompareImagesRemoved): Обновляем счетчик и кнопку.`);
+            validCompareImagesCount = 0; // Явно сбрасываем
+            updateSubmitButtonState();
+        });
         document.addEventListener('modeChanged', function(e) {
-            logger.debug(`Comparison: получено событие modeChanged, новый режим ${e.detail.mode}`);
-            updateSubmitButtonState(); // Важно для правильной (де)активации кнопки
-            if (e.detail.mode !== 'compare' && validCompareImagesCount > 0) {
-                // Если ушли с режима сравнения, но фото были, можно их сбросить, чтобы не путать пользователя
-                // resetCompareForm(); // Это может быть слишком агрессивно. Пока просто обновим кнопку.
-            }
+            logger.debug(`Comparison (event modeChanged): режим ${e.detail.mode}. Обновление кнопки.`);
+            updateSubmitButtonState();
+            // Если переключились С режима сравнения, сбросим его форму
+            // Это происходит в consultation.js -> resetConsultationForm -> resetCompareForm
         });
     }
 
@@ -87,20 +83,28 @@ window.MishuraApp.features.comparison = (function() {
             const compareImages = imageUpload.getUploadedImages().compare;
             return compareImages.filter(img => img !== null && img !== undefined).length;
         }
+        logger.warn("Comparison: imageUpload.getUploadedImages не доступен для подсчета фото.");
         return 0;
     }
     
-    function updateSubmitButtonState() {
+    function updateSubmitButtonState() { // Публичный, чтобы consultation.js мог вызывать
         if (!compareSubmitButton) return;
         const currentModeButton = document.querySelector('#consultation-overlay .mode-button.active');
         const isActiveCompareMode = currentModeButton && currentModeButton.dataset.mode === 'compare';
         
-        compareSubmitButton.disabled = !(isActiveCompareMode && validCompareImagesCount >= 2);
-        logger.debug(`Статус кнопки отправки сравнения: ${compareSubmitButton.disabled ? 'отключена' : 'включена'} (режим compare: ${isActiveCompareMode}, фото: ${validCompareImagesCount})`);
+        if (isActiveCompareMode) {
+            compareSubmitButton.disabled = !(validCompareImagesCount >= 2);
+        } else {
+            // Если режим не 'compare', кнопка должна управляться другим модулем (consultation.js)
+            // или быть деактивирована, если это единственная кнопка.
+            // Пока оставляем ее состояние как есть, если не compare режим.
+            // consultation.js должен обновить ее для режима single.
+        }
+        logger.debug(`Comparison: Статус кнопки submit: ${compareSubmitButton.disabled ? 'отключена' : 'включена'} (режим compare: ${isActiveCompareMode}, фото: ${validCompareImagesCount})`);
     }
 
-    function handleCompareSubmit() { // Вызывается из consultation.js, когда режим 'compare'
-        logger.info("Обработка отправки формы для сравнения...");
+    function handleCompareSubmit() { 
+        logger.info("Comparison: Обработка отправки формы для сравнения...");
 
         const currentUploadedCompareImages = (imageUpload && typeof imageUpload.getUploadedImages === 'function')
                                      ? imageUpload.getUploadedImages().compare.filter(img => img !== null)
@@ -108,7 +112,7 @@ window.MishuraApp.features.comparison = (function() {
         
         if (currentUploadedCompareImages.length < 2) {
             if (uiHelpers) uiHelpers.showToast('Загрузите не менее 2 изображений для сравнения.');
-            logger.warn("Сравнение прервано: изображений меньше 2.");
+            logger.warn("Comparison: Отправка прервана - изображений < 2.");
             return;
         }
         
@@ -119,7 +123,7 @@ window.MishuraApp.features.comparison = (function() {
 
         if (occasion === '') {
             if (uiHelpers) uiHelpers.showToast('Выберите повод для сравнения.');
-            logger.warn('Сравнение прервано: повод не выбран.');
+            logger.warn('Comparison: Отправка прервана - повод не выбран.');
             return;
         }
         
@@ -132,37 +136,36 @@ window.MishuraApp.features.comparison = (function() {
         
         if (uiHelpers) uiHelpers.showLoading('Мишура сравнивает ваши образы...');
         
-        if (!apiService) {
-            logger.error('КРИТИЧЕСКАЯ ОШИБКА: apiService не определен в comparison.js!');
-            if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Сервис API недоступен (CMP01).'); }
-            return;
-        }
-        if (typeof apiService.processCompareOutfits !== 'function') {
-            logger.error('КРИТИЧЕСКАЯ ОШИБКА: apiService.processCompareOutfits не является функцией!');
-            if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Метод API недоступен (CMP02).'); }
+        if (!apiService || typeof apiService.processCompareOutfits !== 'function') {
+            logger.error('Comparison: КРИТИЧЕСКАЯ ОШИБКА - apiService или processCompareOutfits недоступен!');
+            if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Сервис API недоступен (CMP01/CMP02).'); }
             return;
         }
 
         apiService.processCompareOutfits(formData)
             .then(response => {
-                logger.info("Ответ от API сравнения:", response);
-                if (response && response.status === 'success' && response.advice) {
-                    renderCompareResults(response.advice);
+                logger.info("Comparison: Ответ от API сравнения:", response);
+                const adviceText = response && response.advice;
+
+                if (response && response.status === 'success' && typeof adviceText === 'string') {
+                    renderCompareResults(adviceText);
                 } else {
-                    const errorMsg = response && response.message ? response.message : "Не удалось выполнить сравнение.";
-                    logger.error("Ошибка от API сравнения:", errorMsg, response);
+                    const errorMsg = response && response.message ? response.message : "Не удалось выполнить сравнение (пусто).";
+                    logger.error("Comparison: Ошибка от API сравнения:", errorMsg, response);
                     if (uiHelpers) uiHelpers.showToast(`Сравнение: ${errorMsg}`);
                     if (resultsContainer) resultsContainer.innerHTML = `<p>Мишура не смогла сравнить: ${errorMsg}</p>`;
                 }
-                 if (modals) { // Открываем модальное окно результатов в любом случае (успех или ошибка)
-                    // modals.closeModal('consultation-overlay'); // Закрытие окна ввода теперь обрабатывается в consultation.js или modals.js
+                 if (modals) { 
                     modals.openResultsModal(); 
+                }
+                if (modals && typeof modals.closeModal === 'function' && document.getElementById('consultation-overlay')?.classList.contains('active')) {
+                    modals.closeModal('consultation-overlay');
                 }
             })
             .catch(error => {
                 const errorMsg = error && error.message ? error.message : "Ошибка сети или сервера.";
-                logger.error("Сетевая ошибка или ошибка сервера при сравнении:", errorMsg, error);
-                if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMsg}`);
+                logger.error("Comparison: Сетевая ошибка или ошибка сервера:", errorMsg, error);
+                if (uiHelpers) uiHelpers.showToast(`Ошибка связи: ${errorMsg}`);
                 if (resultsContainer) resultsContainer.innerHTML = `<p>Не удалось сравнить: ${errorMsg}</p>`;
                 if (modals) modals.openResultsModal();
             })
@@ -172,33 +175,38 @@ window.MishuraApp.features.comparison = (function() {
     }
     
     function renderCompareResults(adviceText) {
-        if (!resultsContainer) return logger.warn("resultsContainer не найден для отображения результатов сравнения.");
+        if (!resultsContainer) return logger.warn("Comparison: resultsContainer не найден.");
         resultsContainer.innerHTML = ''; 
         
         if (uiHelpers && typeof uiHelpers.parseMarkdownToHtml === 'function') {
             resultsContainer.innerHTML = uiHelpers.parseMarkdownToHtml(adviceText);
         } else {
             resultsContainer.innerHTML = adviceText;
-            logger.warn("uiHelpers.parseMarkdownToHtml не найден, результат сравнения вставлен как есть.");
+            logger.warn("Comparison: uiHelpers.parseMarkdownToHtml не найден, результат вставлен как есть.");
         }
     }
     
     function resetCompareForm() { 
-        logger.debug('Сброс формы сравнения (через comparison.js)...');
+        logger.debug('Comparison: Сброс формы сравнения...');
         validCompareImagesCount = 0;
-        if (imageUpload && typeof imageUpload.resetCompareImageUploads === 'function') {
-            imageUpload.resetCompareImageUploads(); 
-        } else {
-            logger.warn("imageUpload.resetCompareImageUploads не найден.");
+        // imageUpload.resetCompareImageUploads() уже вызывается из consultation.js -> resetConsultationForm
+        // поэтому здесь достаточно обновить состояние кнопки.
+        // Если этот модуль будет использоваться независимо, то вызов resetCompareImageUploads нужен здесь.
+        if (imageUpload && typeof imageUpload.getUploadedImages === 'function' && imageUpload.getUploadedImages().compare.some(img => img !==null)){
+             // Если вдруг остались загруженные фото, а resetCompareImageUploads не был вызван
+             if (typeof imageUpload.resetCompareImageUploads === 'function') {
+                logger.warn("Comparison (resetCompareForm): Обнаружены загруженные фото, принудительный вызов imageUpload.resetCompareImageUploads()");
+                imageUpload.resetCompareImageUploads();
+             }
         }
         updateSubmitButtonState(); 
-        // if (resultsContainer) resultsContainer.innerHTML = ''; // Очистка результатов, если они в той же модалке
+        // if (resultsContainer) resultsContainer.innerHTML = ''; // Очищается в consultation.js или при открытии results-overlay
     }
         
     return {
         init,
         handleCompareSubmit, 
         resetCompareForm,
-        updateSubmitButtonState // Для вызова извне, например, из consultation.js при смене режима
+        updateSubmitButtonState 
     };
 })();

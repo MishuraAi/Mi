@@ -2,206 +2,182 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: API сервис (service.js)
-ВЕРСИЯ: 0.5.1 (Добавлены методы для сравнения и примерки, улучшена инициализация)
+ВЕРСИЯ: 0.5.2 (Более строгое управление инициализацией, улучшенное логирование ошибок fetch)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
 Предоставляет интерфейс для взаимодействия с серверным API.
-Обрабатывает запросы к стилисту, на сравнение и виртуальную примерку.
 ==========================================================================================
 */
 
-// Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
 window.MishuraApp.api = window.MishuraApp.api || {};
 
-// Проверяем, не был ли сервис уже инициализирован
-if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized && window.MishuraApp.api.service.isInitialized()) { //
-    // Если да, ничего не делаем, чтобы избежать повторной инициализации
-    console.warn("API сервис уже был инициализирован. Повторная инициализация пропускается.");
+if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized && window.MishuraApp.api.service.isInitialized()) {
+    // console.warn("API сервис (api.service) уже был инициализирован. Повторная инициализация пропускается.");
 } else {
     window.MishuraApp.api.service = (function() {
         'use strict';
         
-        // Локальные ссылки на другие модули
-        let config, logger;
+        let configModule, loggerModule; // Избегаем прямого использования config, logger до их инициализации
+        let apiBaseUrl = '/api/v1'; // Дефолт, если конфиг не загружен
+        let isInitializedLocal = false;
         
-        // Базовый URL API из конфигурации или значение по умолчанию
-        let apiBaseUrl = '/api/v1'; // FastAPI сервер слушает на этом относительном пути
-        let isInitialized = false;
-        
-        /**
-         * Инициализация модуля
-         */
+        function getLogger() {
+            if (!loggerModule && window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) {
+                loggerModule = window.MishuraApp.utils.logger;
+            }
+            return loggerModule || { 
+                debug: (...args) => console.debug('[DEBUG] API_Service(fallback):', ...args), 
+                info: (...args) => console.info('[INFO] API_Service(fallback):', ...args), 
+                warn: (...args) => console.warn('[WARN] API_Service(fallback):', ...args), 
+                error: (...args) => console.error('[ERROR] API_Service(fallback):', ...args) 
+            };
+        }
+
         function init() {
-            if (isInitialized) {
-                // logger может быть еще не определен здесь, если init вызывается несколько раз до инициализации logger
-                (logger || console).debug("API сервис уже инициализирован. Пропуск.");
+            const currentLogger = getLogger();
+            if (isInitializedLocal) {
+                currentLogger.debug("API сервис уже инициализирован. Пропуск.");
                 return;
             }
-            // console.log("Инициализация API сервиса (v0.5.1)"); // Дублируется с логгером ниже
             
-            // Получаем ссылки на другие модули
             if (window.MishuraApp && window.MishuraApp.config) {
-                config = window.MishuraApp.config;
-                
-                if (config.appSettings && config.appSettings.apiUrl) {
-                    apiBaseUrl = config.appSettings.apiUrl;
-                    // console.log(`API сервис: базовый URL API установлен из config.appSettings: ${apiBaseUrl}`);
-                } else if (config.apiSettings && config.apiSettings.baseUrl) { 
-                    apiBaseUrl = config.apiSettings.baseUrl;
-                    //  console.log(`API сервис: базовый URL API установлен из config.apiSettings: ${apiBaseUrl}`);
-                } else {
-                    //  console.log(`API сервис: используется базовый URL API по умолчанию: ${apiBaseUrl}`);
+                configModule = window.MishuraApp.config;
+                // Убедимся, что сам config.init() был вызван
+                if (typeof configModule.init === 'function' && (typeof configModule.appSettings === 'undefined')) { // Проверяем, если appSettings еще нет
+                    // currentLogger.debug("API_Service: Вызов config.init(), так как он мог быть не вызван ранее.");
+                    // configModule.init(); // Вызывать init другого модуля здесь может быть рискованно. Предполагаем, что app.js это сделал.
+                }
+
+                if (configModule.appSettings && configModule.appSettings.apiUrl) {
+                    apiBaseUrl = configModule.appSettings.apiUrl;
+                } else if (configModule.apiSettings && configModule.apiSettings.baseUrl) { 
+                    apiBaseUrl = configModule.apiSettings.baseUrl;
                 }
             } else {
-                // console.warn("API сервис: модуль конфигурации не найден. Используется URL API по умолчанию.");
+                currentLogger.warn("API сервис: модуль конфигурации не найден. Используется URL API по умолчанию:", apiBaseUrl);
             }
             
-            if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) {
-                logger = window.MishuraApp.utils.logger;
-            } else {
-                // Резервный логгер, если основной еще не инициализирован
-                logger = {
-                    debug: function(...args) { console.debug('[DEBUG] API_Service:', ...args); },
-                    info: function(...args) { console.info('[INFO] API_Service:', ...args); },
-                    warn: function(...args) { console.warn('[WARN] API_Service:', ...args); },
-                    error: function(...args) { console.error('[ERROR] API_Service:', ...args); }
-                };
-                logger.warn("Основной логгер не найден, используется резервный для API_Service.");
-            }
-            
-            logger.info(`API сервис инициализирован (v0.5.1) с базовым URL: ${apiBaseUrl}`);
-            isInitialized = true;
+            isInitializedLocal = true; // Устанавливаем флаг в конце, после всех проверок
+            currentLogger.info(`API сервис инициализирован (v0.5.2) с базовым URL: ${apiBaseUrl}`);
         }
         
-        /**
-         * Отправка запроса на анализ стиля (одиночная консультация)
-         * @param {FormData} formData - данные формы (image, occasion, preferences)
-         * @returns {Promise<Object>} - Promise с результатом запроса
-         */
         function processStylistConsultation(formData) {
-            if (!isInitialized) init(); 
-            logger.debug('Отправка запроса на консультацию стилиста (одиночный анализ)');
-            return fetchWithTimeout(`${apiBaseUrl}/analyze-outfit`, {
-                method: 'POST',
-                body: formData,
-            });
+            if (!isInitializedLocal) init(); 
+            const currentLogger = getLogger();
+            currentLogger.debug('API_Service: Отправка запроса на /analyze-outfit');
+            const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.consultation)
+                             ? configModule.apiSettings.endpoints.consultation
+                             : '/analyze-outfit';
+            return fetchWithTimeout(`${apiBaseUrl}${endpoint}`, { method: 'POST', body: formData });
         }
 
-        /**
-         * Отправка запроса на сравнение образов
-         * @param {FormData} formData - данные формы (images, occasion, preferences)
-         * @returns {Promise<Object>} - Promise с результатом запроса
-         */
         function processCompareOutfits(formData) {
-            if (!isInitialized) init();
-            logger.debug('Отправка запроса на сравнение образов');
-            return fetchWithTimeout(`${apiBaseUrl}/compare-outfits`, {
-                method: 'POST',
-                body: formData,
-            });
+            if (!isInitializedLocal) init();
+            const currentLogger = getLogger();
+            currentLogger.debug('API_Service: Отправка запроса на /compare-outfits');
+            const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.compare)
+                             ? configModule.apiSettings.endpoints.compare
+                             : '/compare-outfits';
+            return fetchWithTimeout(`${apiBaseUrl}${endpoint}`, { method: 'POST', body: formData });
         }
         
-        /**
-         * Отправка запроса на виртуальную примерку
-         * @param {FormData} formData - данные формы (personImage, outfitImage, styleType)
-         * @returns {Promise<Object>} - Promise с результатом запроса
-         */
         function processTryOn(formData) {
-            if (!isInitialized) init();
-            logger.debug('Отправка запроса на виртуальную примерку');
-            
-            const tryOnEndpoint = (config && config.apiSettings && config.apiSettings.endpoints && config.apiSettings.endpoints.virtualFitting)
-                                ? config.apiSettings.endpoints.virtualFitting
+            if (!isInitializedLocal) init();
+            const currentLogger = getLogger();
+            currentLogger.debug('API_Service: Отправка запроса на /virtual-fitting');
+            const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.virtualFitting)
+                                ? configModule.apiSettings.endpoints.virtualFitting
                                 : '/virtual-fitting'; 
-
-            return fetchWithTimeout(`${apiBaseUrl}${tryOnEndpoint}`, { 
-                method: 'POST',
-                body: formData,
-            });
+            return fetchWithTimeout(`${apiBaseUrl}${endpoint}`, { method: 'POST', body: formData });
         }
         
-        /**
-         * Общий метод для fetch с таймаутом и обработкой ответа как JSON.
-         * @private
-         * @param {string} url - URL запроса
-         * @param {Object} options - опции fetch
-         * @param {number} customTimeout - таймаут в миллисекундах (по умолчанию из config или 30000)
-         * @returns {Promise<Object>} - Promise с результатом запроса (JSON)
-         */
         function fetchWithTimeout(url, options, customTimeout) {
-            // Гарантируем, что логгер доступен, даже если init() не был вызван явно (например, при самом первом вызове fetchWithTimeout)
-            const currentLogger = logger || { debug: console.debug, info: console.info, warn: console.warn, error: console.error };
-
-            if (!isInitialized && url.indexOf('/debug/info') === -1) { 
-                currentLogger.warn("API сервис вызван до полной инициализации (fetchWithTimeout). Попытка инициализации...");
-                init(); // Убедимся, что logger внутри init теперь будет доступен
+            const currentLogger = getLogger();
+            if (!isInitializedLocal && url.indexOf('/debug/info') === -1) { 
+                currentLogger.warn("API_Service (fetchWithTimeout): вызван до полной инициализации. Попытка инициализации...");
+                init(); 
             }
 
             const controller = new AbortController();
             const signal = controller.signal;
             
-            const effectiveTimeout = customTimeout || (config && config.apiSettings && config.apiSettings.timeout) || 30000;
-            currentLogger.debug(`Выполнение fetch запроса: ${options.method || 'GET'} ${url} с таймаутом ${effectiveTimeout}мс`);
+            const effectiveTimeout = customTimeout || (configModule && configModule.apiSettings && configModule.apiSettings.timeout) || 30000;
+            currentLogger.debug(`Workspace: ${options.method || 'GET'} ${url} (таймаут: ${effectiveTimeout}мс)`);
 
             const timeoutId = setTimeout(() => {
-                currentLogger.warn(`Таймаут запроса к ${url} (${effectiveTimeout}мс)`);
+                currentLogger.warn(`Workspace: Таймаут запроса к ${url} (${effectiveTimeout}мс)`);
                 controller.abort();
             }, effectiveTimeout);
             
             return fetch(url, { ...options, signal })
                 .then(response => {
                     clearTimeout(timeoutId);
-                    currentLogger.debug(`Ответ от ${url} получен со статусом: ${response.status}`);
+                    currentLogger.debug(`Workspace: Ответ от ${url} статус: ${response.status}`);
                     if (!response.ok) {
                         return response.text().then(text => {
                             let errorData = { 
+                                status: "error_http",
+                                httpStatus: response.status,
                                 message: `Ошибка HTTP: ${response.status} ${response.statusText}.`,
                                 details: text 
                             };
                             try {
-                                const parsedText = JSON.parse(text);
-                                if (parsedText && parsedText.message) errorData.message = parsedText.message;
-                                if (parsedText && parsedText.details) errorData.details = parsedText.details;
-                                else if (parsedText && !parsedText.details) errorData.details = parsedText;
-
-                            } catch (e) { /* Оставляем текстовое сообщение в details, если не JSON */ }
-                            currentLogger.error(`Ошибка HTTP при запросе к ${url}: ${response.status}`, errorData);
-                            // throw new Error(errorData.message); // Это приведет к попаданию в .catch ниже, но с простым Error
-                            return Promise.reject(errorData); // Отклоняем Promise с объектом ошибки
+                                const parsedError = JSON.parse(text);
+                                errorData.message = parsedError.message || errorData.message;
+                                errorData.details = parsedError.detail || parsedError.details || text;
+                            } catch (e) { /* text уже в details */ }
+                            currentLogger.error(`Workspace: Ошибка HTTP ${response.status} для ${url}`, errorData);
+                            return Promise.reject(errorData); 
                         });
                     }
                     const contentType = response.headers.get("content-type");
                     if (contentType && contentType.includes("application/json")) {
                         return response.json();
                     } else {
-                        currentLogger.warn(`Ответ от ${url} не является JSON (Content-Type: ${contentType}). Возвращаем как текст.`);
-                        return response.text().then(text => ({ resultImage: text, status: "success_text_response" })); // Для try-on, API может вернуть URL картинки как text/plain
+                        currentLogger.warn(`Workspace: Ответ от ${url} не JSON (Content-Type: ${contentType}). Возврат как текст.`);
+                        // Для try-on API может вернуть URL картинки как text/plain или image/*
+                        // Оборачиваем в объект для консистентности, если это простой текст
+                        if (contentType && (contentType.startsWith("text/") || !contentType.startsWith("image/"))) {
+                           return response.text().then(text => ({ 
+                                advice: text, // Предполагаем, что текстовый ответ - это 'advice'
+                                resultImage: text, // Для try-on, где resultImage может быть URL
+                                status: "success_text_response" 
+                            }));
+                        }
+                        // Если это изображение, то как его обработать здесь? Promise<Blob> ?
+                        // Пока что, если это не json и не текст, вернем сырой response, чтобы вызывающий код решил.
+                        // Это не идеально. Лучше, чтобы API всегда возвращал JSON статус.
+                        currentLogger.warn(`Workspace: Ответ от ${url} с Content-Type: ${contentType}. Возвращаем как Blob (потенциально).`);
+                        return response.blob().then(blob => ({
+                            blob: blob,
+                            contentType: contentType,
+                            status: "success_blob_response"
+                        }));
+
                     }
                 })
                 .catch(error => {
                     clearTimeout(timeoutId);
-                    // Если error уже наш объект {message, details}, то просто передаем его дальше
-                    if (error && typeof error.message === 'string') {
-                        currentLogger.error(`Ошибка (уже обработанная HTTP или другая) для ${url}:`, error.message, error.details || '');
+                    if (error && error.status === "error_http") { // Уже обработанная HTTP ошибка
+                        currentLogger.error(`Workspace: Перехвачена ошибка HTTP для ${url}:`, error.message, error.details);
                         return Promise.reject(error);
                     }
-                    // Иначе это AbortError или другая сетевая ошибка
                     const errorMessage = error.name === 'AbortError' ? 'Превышено время ожидания ответа от сервера.' : (error.message || 'Ошибка сети или выполнения запроса.');
-                    currentLogger.error(`Ошибка сети или выполнения fetch для ${url}:`, errorMessage, error);
+                    currentLogger.error(`Workspace: Ошибка сети/выполнения для ${url}: ${errorMessage}`, error.name, error);
                     return Promise.reject({ 
-                        status: "error", 
+                        status: "error_network", 
                         message: errorMessage,
-                        details: error.toString()
+                        details: error.toString(),
+                        name: error.name
                     });
                 });
         }
                 
-        // Публичный API
         return {
             init,
-            isInitialized: () => isInitialized,
+            isInitialized: () => isInitializedLocal,
             processStylistConsultation,
             processCompareOutfits,
             processTryOn

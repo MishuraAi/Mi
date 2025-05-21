@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Загрузка изображений (image-upload.js)
-ВЕРСИЯ: 0.4.6 (Улучшенное логирование, проверка DOM элементов)
+ВЕРСИЯ: 0.4.7 (Усиленный сброс инпутов, более детальное логирование DOM)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -23,18 +23,24 @@ window.MishuraApp.components.imageUpload = (function() {
     
     let isUploadingActive = false;
     let uploadedImages = { single: null, compare: [null, null, null, null] };
+    let isImageUploadInitialized = false;
     
     function init() {
+        if (isImageUploadInitialized) {
+            // console.warn("ImageUpload: Повторная инициализация пропущена.");
+            return;
+        }
         config = window.MishuraApp.config;
         logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("ImageUpload(f):",...args), info: (...args)=>console.info("ImageUpload(f):",...args), warn: (...args)=>console.warn("ImageUpload(f):",...args), error: (...args)=>console.error("ImageUpload(f):",...args) };
         uiHelpers = window.MishuraApp.utils.uiHelpers;
         
-        logger.debug("Инициализация модуля загрузки изображений (v0.4.6)");
-        initDOMElements();
-        initModeButtons(); 
-        initSingleImageUpload();
+        logger.debug("Инициализация модуля загрузки изображений (v0.4.7)");
+        initDOMElements(); // Сначала DOM
+        initModeButtons();   // Потом режимы
+        initSingleImageUpload(); // Потом загрузчики
         initCompareImageUpload();
-        logger.info("Модуль загрузки изображений инициализирован (v0.4.6)");
+        isImageUploadInitialized = true;
+        logger.info("Модуль загрузки изображений инициализирован (v0.4.7)");
     }
     
     function initDOMElements() {
@@ -51,23 +57,37 @@ window.MishuraApp.components.imageUpload = (function() {
         singleAnalysisMode = document.getElementById('single-analysis-mode');
         compareAnalysisMode = document.getElementById('compare-analysis-mode');
 
-        // Логирование для проверки
         const elementsToLog = {singleUploadArea, singleFileInput, singlePreviewContainer, singlePreviewImage, singleDeleteButton, imageSlotsContainer, modeButtonsLength: modeButtons.length, singleAnalysisMode, compareAnalysisMode};
         for(const key in elementsToLog){
-            if(elementsToLog[key] === null || (typeof elementsToLog[key] === 'number' && elementsToLog[key] === 0) || (typeof elementsToLog[key] === 'object' && !elementsToLog[key])) {
+            const element = elementsToLog[key];
+            if(element === null || (typeof element === 'number' && element === 0) || (typeof element === 'object' && !element && key !== 'modeButtonsLength')) { // Для modeButtonsLength 0 - это валидное состояние если их нет
                  logger.warn(`ImageUpload DOM: Элемент или коллекция '${key}' не найден(а) или пуст(а).`);
+            } else {
+                 logger.debug(`ImageUpload DOM: Элемент '${key}' найден.`);
             }
         }
     }
     
     function initModeButtons() {
-        if (!modeButtons || !modeButtons.length) return logger.warn("ImageUpload: Переключатели режимов не найдены.");
+        if (!modeButtons || !modeButtons.length) {
+            logger.warn("ImageUpload: Переключатели режимов (.mode-button в #consultation-overlay) не найдены.");
+            // Если режимов нет, возможно, по умолчанию должен быть активен 'single-analysis-mode'
+            if(singleAnalysisMode && compareAnalysisMode) {
+                singleAnalysisMode.classList.remove('hidden');
+                compareAnalysisMode.classList.add('hidden');
+                logger.debug("ImageUpload: Режим 'single' установлен по умолчанию, т.к. кнопок режимов нет.");
+            }
+            return;
+        }
         
         modeButtons.forEach(button => {
-            button.addEventListener('click', function() {
+            // Удаляем старые обработчики (если были) и добавляем новый
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+            newButton.addEventListener('click', function() {
                 const mode = this.getAttribute('data-mode');
                 logger.debug(`ImageUpload: Кнопка режима нажата - '${mode}'`);
-                modeButtons.forEach(btn => btn.classList.remove('active'));
+                modeButtons.forEach(btn => document.getElementById(btn.id)?.classList.remove('active')); // Обновляем оригинальные кнопки
                 this.classList.add('active');
                 
                 if (singleAnalysisMode) singleAnalysisMode.classList.add('hidden');
@@ -79,54 +99,88 @@ window.MishuraApp.components.imageUpload = (function() {
                 document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
             });
         });
+        
+        // Обновляем коллекцию modeButtons после клонирования
+        modeButtons = document.querySelectorAll('#consultation-overlay .mode-button');
+
         const initialActiveButton = document.querySelector('#consultation-overlay .mode-button.active') || 
                                    (modeButtons.length > 0 ? modeButtons[0] : null);
         if (initialActiveButton) {
-            if(!initialActiveButton.classList.contains('active')){ // Кликаем, только если еще не активен
-                logger.debug(`ImageUpload: Установка начального режима через клик: ${initialActiveButton.dataset.mode}`);
-                initialActiveButton.click();
-            } else {
-                logger.debug(`ImageUpload: Начальный режим уже установлен: ${initialActiveButton.dataset.mode}`);
-                 // Явно диспатчим событие, чтобы другие модули тоже обновились
-                document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: initialActiveButton.dataset.mode } }));
-            }
+            logger.debug(`ImageUpload: Установка начального активного режима на '${initialActiveButton.dataset.mode}'`);
+            initialActiveButton.click();
         } else {
-            logger.warn("ImageUpload: Не удалось установить начальный активный режим.");
+            logger.warn("ImageUpload: Не удалось установить начальный активный режим (кнопки не найдены или нет активной).");
+            if(singleAnalysisMode && compareAnalysisMode) { // Фоллбэк, если кнопки есть, но ни одна не активна
+                singleAnalysisMode.classList.remove('hidden');
+                compareAnalysisMode.classList.add('hidden');
+                if (modeButtons.length > 0) modeButtons[0].classList.add('active');
+                logger.debug("ImageUpload: Режим 'single' и первая кнопка активированы по умолчанию.");
+                 document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: 'single' } }));
+            }
         }
     }
 
     function resetFileInput(inputElement) {
         if (inputElement) {
+            const inputId = inputElement.id || inputElement.className || 'unknown_input';
             try {
-                inputElement.value = null;
+                inputElement.value = ""; // Попробуем сначала так
+                 // Для некоторых браузеров и ситуаций может потребоваться пересоздание
+                if (inputElement.value) { // Если value не сбросился
+                    logger.warn(`ImageUpload: input.value для '${inputId}' не сбросился на пустую строку. Попытка через type.`);
+                    inputElement.type = ''; // Это трюк
+                    inputElement.type = 'file';
+                    if (inputElement.value) {
+                         logger.warn(`ImageUpload: input.value для '${inputId}' все еще не сброшен.`);
+                    } else {
+                        logger.debug(`ImageUpload: input.value для '${inputId}' сброшен через смену типа.`);
+                    }
+                } else {
+                     logger.debug(`ImageUpload: input.value для '${inputId}' успешно сброшен на пустую строку.`);
+                }
             } catch (ex) {
-                logger.warn(`ImageUpload: Не удалось сбросить input.value для '${inputElement.id || 'unknown_input'}'.`, ex);
+                logger.error(`ImageUpload: Ошибка при сбросе input.value для '${inputId}'.`, ex);
             }
+        } else {
+            logger.warn("ImageUpload: Попытка сбросить несуществующий file input.");
         }
+    }
+
+    function setupInputClick(triggerElement, fileInputElement) {
+        if (!triggerElement || !fileInputElement) return;
+        
+        // Удаляем старые обработчики перед добавлением нового
+        const newTrigger = triggerElement.cloneNode(true);
+        triggerElement.parentNode.replaceChild(newTrigger, triggerElement);
+        
+        newTrigger.addEventListener('click', () => {
+            const inputId = fileInputElement.id || 'unknown_input';
+            logger.debug(`ImageUpload: Клик на триггер для '${inputId}'. Сброс инпута.`);
+            resetFileInput(fileInputElement); 
+            fileInputElement.click();
+        });
+        return newTrigger; // Возвращаем новый элемент, чтобы другие обработчики (drag/drop) вешались на него
     }
 
     function initSingleImageUpload() {
         if (!singleUploadArea || !singleFileInput || !singleDeleteButton) {
             return logger.warn("ImageUpload (Single): Пропуск инициализации - ключевые DOM элементы не найдены.");
         }
-
-        singleUploadArea.addEventListener('click', () => {
-            logger.debug("ImageUpload (Single): Клик на область загрузки. Сброс инпута.");
-            resetFileInput(singleFileInput); 
-            singleFileInput.click();
-        });
+        singleUploadArea = setupInputClick(singleUploadArea, singleFileInput) || singleUploadArea; // Обновляем ссылку
         
-        singleFileInput.addEventListener('change', (event) => {
+        singleFileInput.addEventListener('change', (event) => { /* ... как было ... */ 
             const file = event.target.files[0];
             if (file) {
                 logger.debug(`ImageUpload (Single): Файл выбран: ${file.name}`);
                 handleSingleImageSelection(file);
+            } else {
+                logger.debug("ImageUpload (Single): Диалог выбора файла отменен.");
             }
         });
         
         singleUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); singleUploadArea.classList.add('dragover'); });
         singleUploadArea.addEventListener('dragleave', () => singleUploadArea.classList.remove('dragover'));
-        singleUploadArea.addEventListener('drop', (e) => {
+        singleUploadArea.addEventListener('drop', (e) => { /* ... как было ... */ 
             e.preventDefault();
             singleUploadArea.classList.remove('dragover');
             if (e.dataTransfer.files.length) {
@@ -134,13 +188,18 @@ window.MishuraApp.components.imageUpload = (function() {
                 handleSingleImageSelection(e.dataTransfer.files[0]);
             }
         });
+
+        const newSingleDeleteButton = singleDeleteButton.cloneNode(true);
+        singleDeleteButton.parentNode.replaceChild(newSingleDeleteButton, singleDeleteButton);
+        singleDeleteButton = newSingleDeleteButton;
+
         singleDeleteButton.addEventListener('click', () => {
             logger.debug("ImageUpload (Single): Нажата кнопка удаления.");
             resetSingleImageUpload();
         });
     }
     
-    function handleSingleImageSelection(file) {
+    function handleSingleImageSelection(file) { /* ... как в версии 0.4.6 ... */ 
         logger.debug(`ImageUpload (Single): Обработка изображения: ${file.name}`);
         if (!isValidImageFile(file)) return;
 
@@ -165,7 +224,7 @@ window.MishuraApp.components.imageUpload = (function() {
                 logger.info(`ImageUpload (Single): Изображение ${file.name} загружено и отображено.`);
                 document.dispatchEvent(new CustomEvent('singleImageUploaded', { detail: { file: file } }));
             } else {
-                logger.error("ImageUpload (Single): DOM элементы для превью не найдены.");
+                logger.error("ImageUpload (Single): DOM элементы для превью не найдены при попытке отображения.");
             }
             isUploadingActive = false;
         };
@@ -183,33 +242,41 @@ window.MishuraApp.components.imageUpload = (function() {
         const slots = imageSlotsContainer.querySelectorAll('.image-slot');
         if (!slots.length) return logger.warn("ImageUpload (Compare): Слоты (.image-slot) не найдены.");
 
-        slots.forEach(slot => {
-            const slotIndex = parseInt(slot.dataset.slot, 10);
-            const input = slot.querySelector('.compare-upload-input');
-            if (!input) return logger.warn(`ImageUpload (Compare): Инпут для слота ${slotIndex} не найден.`);
+        slots.forEach(currentSlot => {
+            const slotIndex = parseInt(currentSlot.dataset.slot, 10);
+            const input = currentSlot.querySelector('.compare-upload-input');
+            if (!input) {
+                logger.warn(`ImageUpload (Compare): Инпут для слота ${slotIndex} не найден.`);
+                return; // Пропускаем этот слот, если нет инпута
+            }
+            // Переназначаем обработчик клика на слот через клонирование
+            let newSlot = currentSlot.cloneNode(true); // Клонируем весь слот
+            currentSlot.parentNode.replaceChild(newSlot, currentSlot);
+            const newSlotInput = newSlot.querySelector('.compare-upload-input'); // Находим инпут в новом слоте
 
-            slot.addEventListener('click', function() {
+            newSlot.addEventListener('click', function() {
                 if (!this.classList.contains('filled')) {
                     logger.debug(`ImageUpload (Compare): Клик на пустой слот ${slotIndex}. Сброс инпута.`);
-                    resetFileInput(input); 
-                    input.click();
+                    resetFileInput(newSlotInput); 
+                    newSlotInput.click();
                 }
             });
             
-            input.addEventListener('change', (e) => {
+            // Обработчик change для инпута в новом слоте
+            newSlotInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     logger.debug(`ImageUpload (Compare): Файл выбран для слота ${slotIndex}: ${file.name}`);
-                    handleCompareImageSelection(file, slotIndex);
+                    handleCompareImageSelection(file, slotIndex); // slotIndex правильный
                 }
             });
 
-            slot.addEventListener('dragover', (e) => { e.preventDefault(); if (!slot.classList.contains('filled')) slot.classList.add('dragover'); });
-            slot.addEventListener('dragleave', () => slot.classList.remove('dragover'));
-            slot.addEventListener('drop', (e) => {
+            newSlot.addEventListener('dragover', (e) => { e.preventDefault(); if (!newSlot.classList.contains('filled')) newSlot.classList.add('dragover'); });
+            newSlot.addEventListener('dragleave', () => newSlot.classList.remove('dragover'));
+            newSlot.addEventListener('drop', (e) => {
                 e.preventDefault();
-                slot.classList.remove('dragover');
-                if (!slot.classList.contains('filled') && e.dataTransfer.files.length) {
+                newSlot.classList.remove('dragover');
+                if (!newSlot.classList.contains('filled') && e.dataTransfer.files.length) {
                      logger.debug(`ImageUpload (Compare): Файл перетащен для слота ${slotIndex}: ${e.dataTransfer.files[0].name}`);
                     handleCompareImageSelection(e.dataTransfer.files[0], slotIndex);
                 }
@@ -217,12 +284,13 @@ window.MishuraApp.components.imageUpload = (function() {
         });
     }
     
-    function handleCompareImageSelection(file, slotIndex) {
+    function handleCompareImageSelection(file, slotIndex) { /* ... как в версии 0.4.6 ... */ 
         logger.debug(`ImageUpload (Compare): Обработка изображения для слота ${slotIndex}: ${file.name}`);
         if (!isValidImageFile(file)) return;
         
+        // Важно использовать актуальный DOM элемент, а не тот, что мог быть заменен cloneNode
         const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
-        if (!slot) return logger.error(`ImageUpload (Compare): Слот ${slotIndex} не найден.`);
+        if (!slot) return logger.error(`ImageUpload (Compare): Слот ${slotIndex} не найден в DOM для обновления.`);
         
         isUploadingActive = true;
         const reader = new FileReader();
@@ -236,26 +304,28 @@ window.MishuraApp.components.imageUpload = (function() {
             img.alt = `Изображение ${slotIndex + 1}`;
             
             let removeBtn = slot.querySelector('.remove-image');
-            if (!removeBtn) {
-                removeBtn = document.createElement('div');
-                removeBtn.className = 'remove-image'; removeBtn.textContent = '✕';
-                removeBtn.setAttribute('role', 'button'); removeBtn.tabIndex = 0;
-                removeBtn.dataset.slot = slotIndex;
-                removeBtn.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    logger.debug(`ImageUpload (Compare): Нажата кнопка удаления для слота ${slotIndex}.`);
-                    resetSlot(slotIndex);
-                });
-                slot.appendChild(removeBtn);
-            }
+            if (removeBtn) removeBtn.removeEventListener('click', resetSlotHandler); // Удаляем старый, если был
+            else removeBtn = document.createElement('div');
+
+            removeBtn.className = 'remove-image'; removeBtn.textContent = '✕';
+            removeBtn.setAttribute('role', 'button'); removeBtn.tabIndex = 0;
+            removeBtn.dataset.slot = slotIndex; // Убедимся, что data-slot есть
+            
+            // Обертка для обработчика, чтобы передать slotIndex
+            const currentSlotIndex = slotIndex; 
+            removeBtn.addEventListener('click', function localResetSlotHandler(ev) {
+                ev.stopPropagation();
+                logger.debug(`ImageUpload (Compare): Нажата кнопка удаления для слота ${currentSlotIndex} (динамическая).`);
+                resetSlot(currentSlotIndex); // Вызываем resetSlot с правильным индексом
+            });
+            if (!slot.contains(removeBtn)) slot.appendChild(removeBtn); // Добавляем, если еще не там
             removeBtn.style.display = 'flex';
 
             slot.classList.add('filled');
             uploadedImages.compare[slotIndex] = file;
             
             const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
-            logger.debug(`ImageUpload (Compare): Заполнено слотов: ${filledSlotsCount}`);
-            if (filledSlotsCount >= 2) {
+            if (filledSlotsCount >= 2) { /* ... показать поля формы ... */ 
                 const formContainer = document.getElementById('consultation-overlay');
                 if(formContainer){
                     const occasionSel = formContainer.querySelector('.occasion-selector');
@@ -270,17 +340,29 @@ window.MishuraApp.components.imageUpload = (function() {
             document.dispatchEvent(new CustomEvent('compareImageUploaded', { detail: { file: file, slot: slotIndex } }));
             isUploadingActive = false;
         };
-        reader.onerror = (error) => {
+        reader.onerror = (error) => { /* ... как было ... */ 
             logger.error(`ImageUpload (Compare): Ошибка FileReader для слота ${slotIndex}:`, error);
             if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла.');
             isUploadingActive = false;
         };
         reader.readAsDataURL(file);
     }
+    
+    // Вспомогательная функция для обработчика кнопки удаления слота
+    function resetSlotHandler(event) {
+        event.stopPropagation();
+        const slotIndex = parseInt(event.currentTarget.dataset.slot, 10);
+        if (!isNaN(slotIndex)) {
+            logger.debug(`ImageUpload (Compare): Нажата кнопка удаления (через resetSlotHandler) для слота ${slotIndex}.`);
+            resetSlot(slotIndex);
+        } else {
+            logger.error("ImageUpload (Compare): Не удалось определить slotIndex для кнопки удаления.");
+        }
+    }
         
-    function isValidImageFile(file) {
+    function isValidImageFile(file) { /* ... как в версии 0.4.6 ... */ 
         const validTypes = (config && config.appSettings && config.appSettings.supportedImageFormats) 
-                           ? config.appSettings.supportedImageFormats.map(fmt => `image/${fmt.replace('jpg','jpeg')}`) // Преобразуем 'jpg' в 'image/jpeg'
+                           ? config.appSettings.supportedImageFormats.map(fmt => `image/${fmt.replace('jpg','jpeg')}`) 
                            : ['image/jpeg', 'image/png', 'image/webp'];
         const defaultMaxSize = 5 * 1024 * 1024; 
         const maxSize = (config && config.LIMITS && config.LIMITS.MAX_FILE_SIZE) ? config.LIMITS.MAX_FILE_SIZE : defaultMaxSize;
@@ -301,8 +383,8 @@ window.MishuraApp.components.imageUpload = (function() {
         return true;
     }
     
-    function resetSingleImageUpload() {
-        logger.debug('ImageUpload: Сброс одиночного изображения...');
+    function resetSingleImageUpload() { /* ... как в версии 0.4.6 ... */ 
+        logger.debug('ImageUpload: Сброс одиночного изображения (resetSingleImageUpload)...');
         resetFileInput(singleFileInput);
         if (singlePreviewContainer) singlePreviewContainer.classList.add('hidden');
         if (singlePreviewImage) singlePreviewImage.src = '';
@@ -318,16 +400,16 @@ window.MishuraApp.components.imageUpload = (function() {
             if (occasionSel) occasionSel.classList.add('hidden');
             labels.forEach(l => l.classList.add('hidden'));
             if (prefsInput) prefsInput.classList.add('hidden');
-            if (submitBtn) submitBtn.disabled = true;
+            if (submitBtn) submitBtn.disabled = true; 
         }
         document.dispatchEvent(new CustomEvent('singleImageRemoved'));
         logger.debug('ImageUpload: Одиночное изображение сброшено.');
     }
     
-    function resetSlot(slotIndex) {
+    function resetSlot(slotIndex) { /* ... как в версии 0.4.6, но используем актуальный DOM элемент для слота ... */ 
         logger.debug(`ImageUpload: Сброс слота сравнения ${slotIndex}...`);
         const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
-        if (!slot) return logger.error(`ImageUpload: Слот ${slotIndex} не найден для сброса.`);
+        if (!slot) return logger.error(`ImageUpload: Слот ${slotIndex} не найден в DOM для сброса.`);
         
         const img = slot.querySelector('.slot-image');
         if (img) img.remove();
@@ -339,14 +421,14 @@ window.MishuraApp.components.imageUpload = (function() {
         
         slot.classList.remove('filled');
         const input = slot.querySelector('.compare-upload-input');
-        resetFileInput(input);
+        resetFileInput(input); // Убедимся, что инпут сброшен
         uploadedImages.compare[slotIndex] = null;
         
         const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
         logger.debug(`ImageUpload: Кол-во заполненных слотов после сброса слота ${slotIndex}: ${filledSlotsCount}`);
-        if (filledSlotsCount < 2) { // Если стало меньше двух фото, скрываем поля и деактивируем кнопку
+        if (filledSlotsCount < 2) { 
              const formContainer = document.getElementById('consultation-overlay');
-             if(formContainer){
+             if(formContainer){ /* ... скрыть поля, деактивировать кнопку ... */ 
                 const occasionSel = formContainer.querySelector('.occasion-selector');
                 const labels = formContainer.querySelectorAll('.input-label');
                 const prefsInput = formContainer.querySelector('.preferences-input');
@@ -354,22 +436,21 @@ window.MishuraApp.components.imageUpload = (function() {
                 if (occasionSel) occasionSel.classList.add('hidden');
                 labels.forEach(l => l.classList.add('hidden'));
                 if (prefsInput) prefsInput.classList.add('hidden');
-                if (submitBtn) submitBtn.disabled = true; // Деактивируем, если фото стало < 2
+                if (submitBtn) submitBtn.disabled = true; 
             }
         }
         document.dispatchEvent(new CustomEvent('compareImageRemoved', { detail: { slot: slotIndex } }));
         logger.debug(`ImageUpload: Слот сравнения ${slotIndex} сброшен.`);
     }
     
-    function resetCompareImageUploads() {
+    function resetCompareImageUploads() { /* ... как в версии 0.4.6 ... */ 
         logger.debug('ImageUpload: Сброс всех слотов сравнения...');
         if (imageSlotsContainer) {
             const slots = imageSlotsContainer.querySelectorAll('.image-slot');
             slots.forEach(slot => resetSlot(parseInt(slot.dataset.slot, 10)));
         }
-        // Дополнительный сброс общих полей формы и кнопки
         const formContainer = document.getElementById('consultation-overlay');
-        if(formContainer){
+        if(formContainer){ /* ... скрыть поля, деактивировать кнопку ... */ 
             const occasionSel = formContainer.querySelector('.occasion-selector');
             const labels = formContainer.querySelectorAll('.input-label');
             const prefsInput = formContainer.querySelector('.preferences-input');
@@ -386,5 +467,13 @@ window.MishuraApp.components.imageUpload = (function() {
     function isUploading() { return isUploadingActive; }
     function getUploadedImages() { return uploadedImages; }
     
-    return { init, resetSingleImageUpload, resetCompareImageUploads, resetSlot, isUploading, getUploadedImages };
+    return { 
+        init, 
+        resetSingleImageUpload, 
+        resetCompareImageUploads, 
+        resetSlot, // Оставляем публичным на всякий случай
+        isUploading, 
+        getUploadedImages,
+        isInitialized: () => isImageUploadInitialized // Экспортируем флаг
+    };
 })();

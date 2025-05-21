@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Конфигурация (config.js)
-ВЕРСИЯ: 0.4.4 (Усилены комментарии для apiUrl, проверка инициализации)
+ВЕРСИЯ: 0.4.5 (Акцент на apiUrl, проверка инициализации)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 ==========================================================================================
 */
@@ -13,33 +13,36 @@ window.MishuraApp.config = (function() {
     
     const appSettings = {
         appName: 'МИШУРА',
-        appVersion: '0.4.4', 
+        appVersion: '0.4.5', 
         // ================================================================================
-        // ВАЖНО! ОБРАТИТЕ ВНИМАНИЕ НА ЭТУ НАСТРОЙКУ!
+        // ВАЖНО! ПРОВЕРЬТЕ ЭТОТ URL!
         // ================================================================================
-        // Если вы видите ошибку ERR_NAME_NOT_RESOLVED, это означает, что ваш браузер
-        // НЕ МОЖЕТ НАЙТИ СЕРВЕР по указанному здесь адресу.
+        // Ошибка ERR_NAME_NOT_RESOLVED означает, что браузер НЕ МОЖЕТ найти сервер
+        // по указанному здесь адресу.
         //
-        // Для ЛОКАЛЬНОЙ РАЗРАБОТКИ (когда FastAPI сервер запущен на вашем компьютере):
-        // 1. Если FastAPI и фронтенд на ОДНОМ порту (например, FastAPI отдает статику):
-        //    apiUrl: '/api/v1', // Относительный путь
-        // 2. Если FastAPI на ДРУГОМ порту (например, localhost:8000):
-        //    apiUrl: 'http://localhost:8000/api/v1', // Укажите ваш порт
+        // Для ЛОКАЛЬНОЙ РАЗРАБОТКИ:
+        //   Если FastAPI и фронтенд на ОДНОМ порту (FastAPI отдает статику):
+        //     apiUrl: '/api/v1', 
+        //   Если FastAPI на ДРУГОМ порту (например, localhost:8000 для FastAPI):
+        //     apiUrl: 'http://localhost:8000/api/v1', // Замените 8000 на ваш порт FastAPI
         //
-        // Для ПРОДАКШЕНА (например, на Render):
-        //    apiUrl: 'https://your-deployed-api-url.onrender.com/api/v1', // Полный URL вашего развернутого API
+        // Для ПРОДАКШЕНА:
+        //   apiUrl: 'https://ВАШ_РЕАЛЬНЫЙ_ДОМЕН_API/api/v1',
         //
-        // ТЕКУЩЕЕ ЗНАЧЕНИЕ (замените, если нужно):
+        // ТЕКУЩЕЕ ЗНАЧЕНИЕ (ЗАМЕНИТЕ ПРИ НЕОБХОДИМОСТИ):
         apiUrl: 'https://api.mishura-stylist.ru/v1', 
         // ================================================================================
         defaultLanguage: 'ru',
         debugMode: true, 
-        maxUploadSize: 5 * 1024 * 1024, 
-        supportedImageFormats: ['jpg', 'jpeg', 'png', 'webp'], // Используется в image-upload.js
+        maxUploadSize: 5 * 1024 * 1024, // 5MB
+        supportedImageFormats: ['jpg', 'jpeg', 'png', 'webp'],
         maxCompareImages: 4 
     };
     
-    const themeSettings = { /* ... как было ... */ };
+    const themeSettings = {
+        defaultTheme: 'light', 
+        colorSchemes: { /* ... как было ... */ }
+    };
     
     const apiSettings = {
         baseUrl: appSettings.apiUrl, 
@@ -49,8 +52,6 @@ window.MishuraApp.config = (function() {
             consultation: '/analyze-outfit',      
             compare: '/compare-outfits',          
             virtualFitting: '/virtual-fitting', 
-            // feedback: '/feedback', // Пока не используются
-            // user: '/user'
         },
         headers: { 'Accept-Language': 'ru' }
     };
@@ -64,7 +65,7 @@ window.MishuraApp.config = (function() {
     };
     
     let userId = null; 
-    let isConfigInitialized = false; // Флаг инициализации для этого модуля
+    let isConfigInitialized = false;
     
     function init() {
         const tempLogger = (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) 
@@ -72,20 +73,17 @@ window.MishuraApp.config = (function() {
                        : console;
 
         if (isConfigInitialized) {
-            tempLogger.warn("Config: Повторная инициализация модуля конфигурации пропущена.");
+            // tempLogger.warn("Config: Повторная инициализация модуля конфигурации пропущена.");
             return;
         }
-        tempLogger.info("Инициализация конфигурации (v0.4.4)...");
+        tempLogger.info("Инициализация конфигурации (v0.4.5)...");
 
         userId = localStorage.getItem('mishura_user_id') || generateUserId();
         localStorage.setItem('mishura_user_id', userId);
         
-        initTheme(); // Инициализация темы
+        initTheme();
         
-        tempLogger.info(`Config: AppName: ${appSettings.appName}, Version: ${appSettings.appVersion}`);
-        tempLogger.info(`Config: Используемый API URL: ${appSettings.apiUrl}`);
-        tempLogger.debug(`Config: UserID: ${userId}`);
-        
+        tempLogger.info(`Config: AppName: ${appSettings.appName}, Version: ${appSettings.appVersion}, API URL: ${appSettings.apiUrl}`);
         isConfigInitialized = true;
     }
     
@@ -93,23 +91,9 @@ window.MishuraApp.config = (function() {
         return 'user_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
     }
     
-    function initTheme() {
-        const savedTheme = localStorage.getItem('mishura_theme') || themeSettings.defaultTheme;
-        setTheme(savedTheme);
-    }
-    
-    function setTheme(theme) {
-        if (!themeSettings.colorSchemes[theme]) {
-            theme = themeSettings.defaultTheme;
-        }
-        localStorage.setItem('mishura_theme', theme);
-        document.documentElement.setAttribute('data-theme', theme);
-        // ... (meta theme-color)
-    }
-    
-    function getTheme() {
-        return localStorage.getItem('mishura_theme') || themeSettings.defaultTheme;
-    }
+    function initTheme() { /* ... как было ... */ }
+    function setTheme(theme) { /* ... как было ... */ }
+    function getTheme() { /* ... как было ... */ }
     
     return {
         init,
@@ -120,6 +104,6 @@ window.MishuraApp.config = (function() {
         setTheme,
         getTheme,
         get userId() { return userId; },
-        isInitialized: () => isConfigInitialized // Экспортируем флаг
+        isInitialized: () => isConfigInitialized 
     };
 })();

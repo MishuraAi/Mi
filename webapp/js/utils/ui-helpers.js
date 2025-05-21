@@ -20,13 +20,17 @@ window.MishuraApp.utils.uiHelpers = (function() {
     // Локальные ссылки на другие модули
     let config, logger;
     
+    // Константы по умолчанию
+    const DEFAULT_TOAST_DURATION = 3000; // 3 секунды
+    
     /**
      * Показывает уведомление пользователю
      * @param {string} message - текст уведомления
-     * @param {number} duration - длительность показа в мс (по умолчанию из конфигурации)
+     * @param {number} duration - длительность показа в мс (по умолчанию 3000)
      */
     function showToast(message, duration) {
-        const toastDuration = duration || config.LIMITS.TOAST_DURATION;
+        // Исправлено: используем значение по умолчанию вместо config.LIMITS.TOAST_DURATION
+        const toastDuration = duration || DEFAULT_TOAST_DURATION;
         const toastElement = document.getElementById('toast');
         
         if (toastElement) {
@@ -34,7 +38,11 @@ window.MishuraApp.utils.uiHelpers = (function() {
             toastElement.classList.add('show');
             setTimeout(() => toastElement.classList.remove('show'), toastDuration);
         } else {
-            logger.warn("Элемент #toast не найден для показа сообщения:", message);
+            if (logger) {
+                logger.warn("Элемент #toast не найден для показа сообщения:", message);
+            } else {
+                console.warn("Элемент #toast не найден для показа сообщения:", message);
+            }
             // Запасной вариант - обычный alert в крайнем случае
             if (message.includes('ошибка') || message.includes('Ошибка')) {
                 alert(message);
@@ -47,7 +55,9 @@ window.MishuraApp.utils.uiHelpers = (function() {
      * @param {string} message - текст, отображаемый в индикаторе
      */
     function showLoading(message = 'Загрузка...') {
-        logger.debug(`Показ индикатора загрузки: ${message}`);
+        if (logger) {
+            logger.debug(`Показ индикатора загрузки: ${message}`);
+        }
         
         const loadingText = document.getElementById('loading-text');
         if (loadingText) loadingText.textContent = message;
@@ -57,7 +67,11 @@ window.MishuraApp.utils.uiHelpers = (function() {
             loadingOverlay.classList.add('active');
             document.body.style.overflow = 'hidden'; // Предотвращаем прокрутку фона
         } else {
-            logger.error("Элемент #loading-overlay не найден.");
+            if (logger) {
+                logger.error("Элемент #loading-overlay не найден.");
+            } else {
+                console.error("Элемент #loading-overlay не найден.");
+            }
         }
     }
     
@@ -65,7 +79,9 @@ window.MishuraApp.utils.uiHelpers = (function() {
      * Скрывает глобальный индикатор загрузки
      */
     function hideLoading() {
-        logger.debug('Скрытие индикатора загрузки');
+        if (logger) {
+            logger.debug('Скрытие индикатора загрузки');
+        }
         
         const loadingOverlay = document.getElementById('loading-overlay');
         if (loadingOverlay) {
@@ -192,7 +208,11 @@ window.MishuraApp.utils.uiHelpers = (function() {
         config = window.MishuraApp.config;
         logger = window.MishuraApp.utils.logger;
         
-        logger.debug('UI-хелперы инициализированы');
+        if (logger) {
+            logger.debug('UI-хелперы инициализированы');
+        } else {
+            console.debug('UI-хелперы инициализированы');
+        }
     }
     
     // Публичный API модуля

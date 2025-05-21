@@ -64,6 +64,15 @@ window.MishuraApp.config = (function() {
         }
     };
     
+    // Добавляем лимиты и ограничения
+    const LIMITS = {
+        TOAST_DURATION: 3000, // 3 секунды для показа тоста
+        MAX_FILE_SIZE: 5 * 1024 * 1024, // 5 МБ
+        MAX_COMPARE_ITEMS: 4,
+        MAX_TEXT_LENGTH: 500, // Максимальная длина текстовых полей
+        MIN_PASSWORD_LENGTH: 6
+    };
+    
     // Идентификатор пользователя (может быть загружен из localStorage)
     let userId = localStorage.getItem('mishura_user_id') || null;
     
@@ -145,6 +154,7 @@ window.MishuraApp.config = (function() {
         appSettings,
         themeSettings,
         apiSettings,
+        LIMITS, // Добавляем LIMITS в публичный API
         setTheme,
         getTheme,
         get userId() { return userId; }

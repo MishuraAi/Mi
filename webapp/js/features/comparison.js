@@ -2,298 +2,203 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Сравнение образов (comparison.js)
-ВЕРСИЯ: 0.4.1 (Модульная структура)
+ВЕРСИЯ: 0.4.3 (Улучшенная интеграция с API и управлением состоянием кнопки)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
 Реализует функциональность сравнения нескольких образов.
-Обрабатывает загрузку изображений и отображение результатов сравнения.
 ==========================================================================================
 */
 
-// Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
 window.MishuraApp.features = window.MishuraApp.features || {};
 window.MishuraApp.features.comparison = (function() {
     'use strict';
     
-    // Локальные ссылки на другие модули
     let config, logger, uiHelpers, modals, imageUpload, apiService;
+    let compareSubmitButton, resultsContainer; // Используем общую кнопку и контейнер результатов
+    let validCompareImagesCount = 0; 
     
-    // Элементы DOM
-    let compareForm, compareSubmitButton, compareResults;
-    
-    // Текущие данные
-    let uploadedImages = [];
-    
-    /**
-     * Инициализация модуля
-     */
     function init() {
-        // Получаем ссылки на другие модули
-        if (window.MishuraApp.config) {
-            config = window.MishuraApp.config;
-        }
+        config = window.MishuraApp.config;
+        logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("ComparisonLogger:",...args), info: (...args)=>console.info("ComparisonLogger:",...args), warn: (...args)=>console.warn("ComparisonLogger:",...args), error: (...args)=>console.error("ComparisonLogger:",...args) };
+        uiHelpers = window.MishuraApp.utils.uiHelpers;
+        modals = window.MishuraApp.components.modals;
+        imageUpload = window.MishuraApp.components.imageUpload;
         
-        if (window.MishuraApp.utils) {
-            logger = window.MishuraApp.utils.logger;
-            uiHelpers = window.MishuraApp.utils.uiHelpers;
-        }
-        
-        if (window.MishuraApp.components) {
-            modals = window.MishuraApp.components.modals;
-            imageUpload = window.MishuraApp.components.imageUpload;
-        }
-        
-        if (window.MishuraApp.api) {
+        if (window.MishuraApp.api && window.MishuraApp.api.service) {
             apiService = window.MishuraApp.api.service;
-        }
-        
-        // Инициализация элементов DOM
-        initDOMElements();
-        
-        // Настройка обработчиков событий
-        initEventListeners();
-        
-        if (logger) {
-            logger.info('Модуль Сравнение инициализирован');
+            if (typeof apiService.isInitialized === 'function' && !apiService.isInitialized()) {
+                logger.warn("Модуль comparison: API сервис (api.service) найден, но isInitialized() false. Попытка инициализации...");
+                if(typeof apiService.init === 'function') apiService.init();
+            }
         } else {
-            console.log('Модуль Сравнение инициализирован');
+            logger.error("Модуль comparison: API сервис (window.MishuraApp.api.service) НЕ НАЙДЕН!");
         }
+
+        logger.debug('Инициализация модуля Сравнение (v0.4.3)');
+        initDOMElements();
+        initEventListeners();
+        updateSubmitButtonState(); // Обновляем при инициализации
+        logger.info('Модуль Сравнение инициализирован (v0.4.3)');
     }
     
-    /**
-     * Инициализация элементов DOM
-     * @private
-     */
     function initDOMElements() {
-        compareForm = document.getElementById('compare-form');
-        compareSubmitButton = document.getElementById('submit-compare');
-        compareResults = document.getElementById('compare-results');
+        // Используем элементы из общей формы модального окна консультации
+        compareSubmitButton = document.getElementById('submit-consultation'); 
+        resultsContainer = document.getElementById('results-container'); 
+
+        if (!compareSubmitButton) logger.warn("Comparison DOM: 'submit-consultation' (для кнопки) не найден");
+        if (!resultsContainer) logger.warn("Comparison DOM: 'results-container' (для результатов) не найден");
     }
     
-    /**
-     * Инициализация обработчиков событий
-     * @private
-     */
     function initEventListeners() {
-        // Обработчик загрузки изображения
         document.addEventListener('compareImageUploaded', function(e) {
-            const { file, slot } = e.detail;
-            uploadedImages[slot] = file;
+            validCompareImagesCount = countValidCompareImages();
+            logger.debug(`Событие compareImageUploaded. Фото для сравнения: ${validCompareImagesCount}`);
             updateSubmitButtonState();
         });
         
-        // Обработчик удаления изображения
         document.addEventListener('compareImageRemoved', function(e) {
-            const { slot } = e.detail;
-            uploadedImages[slot] = null;
+            validCompareImagesCount = countValidCompareImages();
+            logger.debug(`Событие compareImageRemoved. Фото для сравнения: ${validCompareImagesCount}`);
             updateSubmitButtonState();
         });
         
-        // Обработчик удаления всех изображений
         document.addEventListener('allCompareImagesRemoved', function() {
-            uploadedImages = [];
+            validCompareImagesCount = 0;
+            logger.debug(`Событие allCompareImagesRemoved. Фото для сравнения: ${validCompareImagesCount}`);
             updateSubmitButtonState();
         });
-        
-        // Обработчик отправки формы
-        if (compareForm) {
-            compareForm.addEventListener('submit', handleCompareSubmit);
+
+        // Слушаем событие смены режима от image-upload.js или consultation.js
+        document.addEventListener('modeChanged', function(e) {
+            logger.debug(`Comparison: получено событие modeChanged, новый режим ${e.detail.mode}`);
+            updateSubmitButtonState(); // Важно для правильной (де)активации кнопки
+            if (e.detail.mode !== 'compare' && validCompareImagesCount > 0) {
+                // Если ушли с режима сравнения, но фото были, можно их сбросить, чтобы не путать пользователя
+                // resetCompareForm(); // Это может быть слишком агрессивно. Пока просто обновим кнопку.
+            }
+        });
+    }
+
+    function countValidCompareImages() {
+        if (imageUpload && typeof imageUpload.getUploadedImages === 'function') {
+            const compareImages = imageUpload.getUploadedImages().compare;
+            return compareImages.filter(img => img !== null && img !== undefined).length;
         }
-        
-        // Обработчики для кнопок сравнения
-        const compareTriggers = document.querySelectorAll('.compare-trigger');
-        if (compareTriggers) {
-            compareTriggers.forEach(trigger => {
-                trigger.addEventListener('click', function() {
-                    if (modals) {
-                        modals.openCompareModal();
-                    }
-                });
-            });
-        }
+        return 0;
     }
     
-    /**
-     * Обновление состояния кнопки отправки
-     * @private
-     */
     function updateSubmitButtonState() {
         if (!compareSubmitButton) return;
+        const currentModeButton = document.querySelector('#consultation-overlay .mode-button.active');
+        const isActiveCompareMode = currentModeButton && currentModeButton.dataset.mode === 'compare';
         
-        // Проверяем, загружено ли хотя бы 2 изображения
-        const validImagesCount = uploadedImages.filter(img => img !== null && img !== undefined).length;
-        compareSubmitButton.disabled = validImagesCount < 2;
+        compareSubmitButton.disabled = !(isActiveCompareMode && validCompareImagesCount >= 2);
+        logger.debug(`Статус кнопки отправки сравнения: ${compareSubmitButton.disabled ? 'отключена' : 'включена'} (режим compare: ${isActiveCompareMode}, фото: ${validCompareImagesCount})`);
     }
-    
-    /**
-     * Обработка отправки формы сравнения
-     * @private
-     * @param {Event} e - событие отправки формы
-     */
-    function handleCompareSubmit(e) {
-        e.preventDefault();
+
+    function handleCompareSubmit() { // Вызывается из consultation.js, когда режим 'compare'
+        logger.info("Обработка отправки формы для сравнения...");
+
+        const currentUploadedCompareImages = (imageUpload && typeof imageUpload.getUploadedImages === 'function')
+                                     ? imageUpload.getUploadedImages().compare.filter(img => img !== null)
+                                     : [];
         
-        // Проверяем, загружено ли хотя бы 2 изображения
-        const validImages = uploadedImages.filter(img => img !== null && img !== undefined);
-        
-        if (validImages.length < 2) {
-            if (uiHelpers) {
-                uiHelpers.showToast('Пожалуйста, загрузите не менее 2 изображений для сравнения');
-            }
+        if (currentUploadedCompareImages.length < 2) {
+            if (uiHelpers) uiHelpers.showToast('Загрузите не менее 2 изображений для сравнения.');
+            logger.warn("Сравнение прервано: изображений меньше 2.");
             return;
         }
         
-        // Формируем данные для отправки
+        const occasionInput = document.getElementById('occasion-selector');
+        const preferencesInput = document.getElementById('preferences-input');
+        const occasion = occasionInput ? occasionInput.value : '';
+        const preferences = preferencesInput ? preferencesInput.value : '';
+
+        if (occasion === '') {
+            if (uiHelpers) uiHelpers.showToast('Выберите повод для сравнения.');
+            logger.warn('Сравнение прервано: повод не выбран.');
+            return;
+        }
+        
         const formData = new FormData();
-        
-        validImages.forEach((image, index) => {
-            formData.append(`image_${index}`, image);
+        currentUploadedCompareImages.forEach((imageFile) => {
+            formData.append(`images`, imageFile, imageFile.name); 
         });
+        formData.append('occasion', occasion);
+        formData.append('preferences', preferences);
         
-        if (config) {
-            formData.append('userId', config.userId || '');
-        }
+        if (uiHelpers) uiHelpers.showLoading('Мишура сравнивает ваши образы...');
         
-        // Показываем загрузку
-        showLoading(true);
-        
-        // Отправляем запрос на сервер
-        if (apiService) {
-            apiService.sendCompareRequest(formData)
-                .then(handleCompareResponse)
-                .catch(handleCompareError)
-                .finally(() => showLoading(false));
-        } else {
-            // Эмуляция задержки для демонстрации
-            setTimeout(() => {
-                showLoading(false);
-                
-                if (uiHelpers) {
-                    uiHelpers.showToast('Демо-режим: Функция сравнения временно недоступна');
-                }
-            }, 2000);
-        }
-    }
-    
-    /**
-     * Обработка ответа сервера на запрос сравнения
-     * @private
-     * @param {Object} response - ответ от сервера
-     */
-    function handleCompareResponse(response) {
-        if (!response || !response.success) {
-            handleCompareError(new Error('Неизвестная ошибка при сравнении'));
+        if (!apiService) {
+            logger.error('КРИТИЧЕСКАЯ ОШИБКА: apiService не определен в comparison.js!');
+            if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Сервис API недоступен (CMP01).'); }
             return;
         }
+        if (typeof apiService.processCompareOutfits !== 'function') {
+            logger.error('КРИТИЧЕСКАЯ ОШИБКА: apiService.processCompareOutfits не является функцией!');
+            if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Метод API недоступен (CMP02).'); }
+            return;
+        }
+
+        apiService.processCompareOutfits(formData)
+            .then(response => {
+                logger.info("Ответ от API сравнения:", response);
+                if (response && response.status === 'success' && response.advice) {
+                    renderCompareResults(response.advice);
+                } else {
+                    const errorMsg = response && response.message ? response.message : "Не удалось выполнить сравнение.";
+                    logger.error("Ошибка от API сравнения:", errorMsg, response);
+                    if (uiHelpers) uiHelpers.showToast(`Сравнение: ${errorMsg}`);
+                    if (resultsContainer) resultsContainer.innerHTML = `<p>Мишура не смогла сравнить: ${errorMsg}</p>`;
+                }
+                 if (modals) { // Открываем модальное окно результатов в любом случае (успех или ошибка)
+                    // modals.closeModal('consultation-overlay'); // Закрытие окна ввода теперь обрабатывается в consultation.js или modals.js
+                    modals.openResultsModal(); 
+                }
+            })
+            .catch(error => {
+                const errorMsg = error && error.message ? error.message : "Ошибка сети или сервера.";
+                logger.error("Сетевая ошибка или ошибка сервера при сравнении:", errorMsg, error);
+                if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMsg}`);
+                if (resultsContainer) resultsContainer.innerHTML = `<p>Не удалось сравнить: ${errorMsg}</p>`;
+                if (modals) modals.openResultsModal();
+            })
+            .finally(() => {
+                if (uiHelpers) uiHelpers.hideLoading();
+            });
+    }
+    
+    function renderCompareResults(adviceText) {
+        if (!resultsContainer) return logger.warn("resultsContainer не найден для отображения результатов сравнения.");
+        resultsContainer.innerHTML = ''; 
         
-        // Отображаем результаты
-        renderCompareResults(response.data);
-        
-        if (logger) {
-            logger.info('Сравнение успешно выполнено');
+        if (uiHelpers && typeof uiHelpers.parseMarkdownToHtml === 'function') {
+            resultsContainer.innerHTML = uiHelpers.parseMarkdownToHtml(adviceText);
+        } else {
+            resultsContainer.innerHTML = adviceText;
+            logger.warn("uiHelpers.parseMarkdownToHtml не найден, результат сравнения вставлен как есть.");
         }
     }
     
-    /**
-     * Обработка ошибки при запросе сравнения
-     * @private
-     * @param {Error} error - объект ошибки
-     */
-    function handleCompareError(error) {
-        if (logger) {
-            logger.error('Ошибка при запросе сравнения:', error);
-        }
-        
-        if (uiHelpers) {
-            uiHelpers.showToast('Произошла ошибка при сравнении. Пожалуйста, попробуйте позже.');
-        }
-        
-        // Скрываем загрузку
-        showLoading(false);
-    }
-    
-    /**
-     * Управление отображением индикатора загрузки
-     * @private
-     * @param {boolean} isLoading - флаг отображения загрузки
-     */
-    function showLoading(isLoading) {
-        const loadingIndicator = document.getElementById('compare-loading');
-        
-        if (loadingIndicator) {
-            loadingIndicator.classList.toggle('active', isLoading);
-        }
-        
-        if (compareSubmitButton) {
-            compareSubmitButton.disabled = isLoading;
-        }
-        
-        if (compareResults) {
-            compareResults.classList.toggle('hidden', isLoading);
-        }
-    }
-    
-    /**
-     * Отображение результатов сравнения
-     * @private
-     * @param {Object} data - данные сравнения
-     */
-    function renderCompareResults(data) {
-        if (!compareResults || !data) return;
-        
-        // Очищаем контейнер результатов
-        compareResults.innerHTML = '';
-        
-        // Временная заглушка для демонстрации
-        const resultContent = document.createElement('div');
-        resultContent.className = 'compare-results-content';
-        
-        const resultTitle = document.createElement('h3');
-        resultTitle.textContent = 'Результаты сравнения';
-        resultContent.appendChild(resultTitle);
-        
-        const resultText = document.createElement('p');
-        resultText.textContent = 'Функция сравнения находится в разработке. В скором времени вы сможете получить детальное сравнение ваших образов!';
-        resultContent.appendChild(resultText);
-        
-        compareResults.appendChild(resultContent);
-        compareResults.classList.remove('hidden');
-    }
-    
-    /**
-     * Сброс формы сравнения
-     * @public
-     */
-    function resetCompareForm() {
-        // Сбрасываем поля формы
-        if (compareForm) {
-            compareForm.reset();
-        }
-        
-        // Сбрасываем изображения
+    function resetCompareForm() { 
+        logger.debug('Сброс формы сравнения (через comparison.js)...');
+        validCompareImagesCount = 0;
         if (imageUpload && typeof imageUpload.resetCompareImageUploads === 'function') {
-            imageUpload.resetCompareImageUploads();
+            imageUpload.resetCompareImageUploads(); 
+        } else {
+            logger.warn("imageUpload.resetCompareImageUploads не найден.");
         }
-        
-        // Сбрасываем текущие данные
-        uploadedImages = [];
-        
-        // Отключаем кнопку отправки
-        if (compareSubmitButton) {
-            compareSubmitButton.disabled = true;
-        }
-        
-        // Скрываем результаты
-        if (compareResults) {
-            compareResults.classList.add('hidden');
-        }
+        updateSubmitButtonState(); 
+        // if (resultsContainer) resultsContainer.innerHTML = ''; // Очистка результатов, если они в той же модалке
     }
-    
-    // Публичный API
+        
     return {
         init,
-        resetCompareForm
+        handleCompareSubmit, 
+        resetCompareForm,
+        updateSubmitButtonState // Для вызова извне, например, из consultation.js при смене режима
     };
 })();

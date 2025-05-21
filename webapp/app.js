@@ -2,225 +2,106 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Загрузчик приложения (app.js)
-ВЕРСИЯ: 0.4.2 (Исправлен путь к модулю modals)
+ВЕРСИЯ: 0.4.3 (Улучшенная проверка инициализации модулей)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
 Загрузчик приложения, который инициализирует все модули в правильном порядке.
-Заменяет старый script.js, но с минимальным содержимым.
 ==========================================================================================
 */
 
-// Инициализация приложения при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
     
-    // Создаем глобальный объект приложения, если он еще не создан
     window.MishuraApp = window.MishuraApp || {};
-    window.MishuraApp.utils = window.MishuraApp.utils || {};
-    window.MishuraApp.api = window.MishuraApp.api || {};
-    window.MishuraApp.components = window.MishuraApp.components || {};
-    window.MishuraApp.features = window.MishuraApp.features || {};
+    // Обеспечиваем существование всех основных пространств имен
+    ['utils', 'api', 'components', 'features'].forEach(ns => {
+        window.MishuraApp[ns] = window.MishuraApp[ns] || {};
+    });
     
+    const appLogger = window.MishuraApp.utils.logger || { 
+        debug: (...args)=>console.debug("AppLoader:",...args), 
+        info: (...args)=>console.info("AppLoader:",...args), 
+        warn: (...args)=>console.warn("AppLoader:",...args), 
+        error: (...args)=>console.error("AppLoader:",...args) 
+    };
+
+    function tryInitModule(modulePath, moduleName) {
+        const parts = modulePath.split('.');
+        let current = window;
+        for (let i = 0; i < parts.length; i++) {
+            if (current && typeof current === 'object' && parts[i] in current) {
+                current = current[parts[i]];
+            } else {
+                appLogger.warn(`Модуль или пространство имен '${modulePath}' не найдено (часть '${parts[i]}' отсутствует).`);
+                return false;
+            }
+        }
+        
+        if (current && typeof current.init === 'function') {
+            try {
+                current.init();
+                appLogger.info(`Модуль '${moduleName}' (${modulePath}) успешно инициализирован.`);
+                return true;
+            } catch (e) {
+                appLogger.error(`Ошибка при инициализации модуля '${moduleName}' (${modulePath}):`, e);
+                return false;
+            }
+        } else {
+            appLogger.warn(`Модуль '${moduleName}' (${modulePath}) найден, но функция init отсутствует или не является функцией.`);
+            return false;
+        }
+    }
+
     try {
-        console.log("Инициализация приложения...");
+        appLogger.info("Инициализация приложения МИШУРА (v0.4.3)...");
         
-        // Инициализация конфигурации
-        if (window.MishuraApp.config && typeof window.MishuraApp.config.init === 'function') {
-            window.MishuraApp.config.init();
-            console.log("Конфигурация инициализирована");
-        } else {
-            console.warn("Модуль конфигурации не найден");
+        // 1. Конфигурация (должна быть первой)
+        tryInitModule('MishuraApp.config', 'Конфигурация');
+        
+        // 2. Базовые утилиты (Логгер должен быть одним из первых после конфига)
+        tryInitModule('MishuraApp.utils.logger', 'Логгер');
+        // Обновляем appLogger, если основной логгер только что инициализировался
+        if(window.MishuraApp.utils.logger && typeof window.MishuraApp.utils.logger.info === 'function') {
+           // appLogger = window.MishuraApp.utils.logger; // Не переназначаем, т.к. он может быть уже использован
         }
+        tryInitModule('MishuraApp.utils.deviceDetector', 'Определение устройства');
+        tryInitModule('MishuraApp.utils.uiHelpers', 'UI-хелперы');
         
-        // Инициализация базовых утилит
-        initializeUtilities();
-        console.log("Базовые утилиты инициализированы");
+        // 3. API-сервис
+        tryInitModule('MishuraApp.api.service', 'API-сервис');
         
-        // Инициализация API-сервиса
-        if (window.MishuraApp.api.service && typeof window.MishuraApp.api.service.init === 'function') {
-            window.MishuraApp.api.service.init();
-            console.log("API-сервис инициализирован");
-        } else {
-            console.warn("Модуль API-сервиса не найден");
-        }
+        // 4. Компоненты интерфейса
+        tryInitModule('MishuraApp.components.navigation', 'Навигация');
+        tryInitModule('MishuraApp.components.modals', 'Модальные окна');
+        tryInitModule('MishuraApp.components.imageUpload', 'Загрузка изображений');
         
-        // Инициализация компонентов интерфейса
-        initializeComponents();
-        console.log("Компоненты интерфейса инициализированы");
+        // 5. Функциональные модули (Features)
+        tryInitModule('MishuraApp.features.consultation', 'Консультации');
+        tryInitModule('MishuraApp.features.comparison', 'Сравнение образов');
+        tryInitModule('MishuraApp.features.tryOn', 'Виртуальная примерка');
         
-        // Инициализация функциональных модулей
-        initializeFeatures();
-        console.log("Функциональные модули инициализированы");
+        // 6. Основной модуль приложения (должен быть последним из логики приложения)
+        tryInitModule('MishuraApp.main', 'Основной модуль');
         
-        // Инициализация основного модуля
-        if (window.MishuraApp.main && typeof window.MishuraApp.main.init === 'function') {
-            window.MishuraApp.main.init();
-            console.log("Приложение инициализировано успешно");
-        } else {
-            console.warn("Основной модуль не найден");
-        }
-        
-        // Добавляем обработчики событий для кнопок
-        setupButtonHandlers();
+        // 7. Настройка глобальных обработчиков кнопок (если они не в main.js)
+        // setupButtonHandlers(); // Эта функция была в старой версии, ее логика теперь должна быть в main.js или других модулях.
+        // Если setupButtonHandlers была специфична для app.js, ее нужно пересмотреть или интегрировать в main.js
+        // Пока закомментируем, так как ее определение отсутствует в текущей версии app.js.
+
+        appLogger.info("Инициализация всех модулей приложения МИШУРА завершена.");
         
     } catch (error) {
-        console.error("Ошибка при инициализации приложения:", error);
-        
-        // Отображаем сообщение об ошибке пользователю
-        if (window.MishuraApp.utils.uiHelpers && typeof window.MishuraApp.utils.uiHelpers.showToast === 'function') {
-            window.MishuraApp.utils.uiHelpers.showToast('Произошла ошибка при запуске приложения. Пожалуйста, обновите страницу.');
+        appLogger.error("Критическая ошибка при инициализации приложения МИШУРА:", error);
+        const uiHelpers = window.MishuraApp.utils.uiHelpers;
+        if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+            uiHelpers.showToast('Произошла критическая ошибка при запуске. Обновите страницу.', 5000);
         } else {
-            alert('Произошла ошибка при запуске приложения. Пожалуйста, обновите страницу.');
+            alert('Произошла критическая ошибка при запуске приложения. Пожалуйста, обновите страницу.');
         }
     }
 });
 
-/**
- * Инициализация базовых утилит
- */
-function initializeUtilities() {
-    // Инициализация логгера
-    if (window.MishuraApp.utils.logger && typeof window.MishuraApp.utils.logger.init === 'function') {
-        window.MishuraApp.utils.logger.init();
-    } else {
-        console.warn("Модуль логгера не найден");
-    }
-    
-    // Инициализация определения устройства
-    if (window.MishuraApp.utils.deviceDetector && typeof window.MishuraApp.utils.deviceDetector.init === 'function') {
-        window.MishuraApp.utils.deviceDetector.init();
-    } else {
-        console.warn("Модуль определения устройства не найден");
-    }
-    
-    // Инициализация UI-хелперов
-    if (window.MishuraApp.utils.uiHelpers && typeof window.MishuraApp.utils.uiHelpers.init === 'function') {
-        window.MishuraApp.utils.uiHelpers.init();
-    } else {
-        console.warn("Модуль UI-хелперов не найден");
-    }
-}
-
-/**
- * Инициализация компонентов интерфейса
- */
-function initializeComponents() {
-    // Инициализация навигации
-    if (window.MishuraApp.components.navigation && typeof window.MishuraApp.components.navigation.init === 'function') {
-        window.MishuraApp.components.navigation.init();
-    } else {
-        // Удален старый fallback, если он был window.MishuraApp.utils.navigation
-        console.warn("Модуль навигации (components.navigation) не найден");
-    }
-    
-    // Инициализация модальных окон
-    if (window.MishuraApp.components.modals && typeof window.MishuraApp.components.modals.init === 'function') {
-        window.MishuraApp.components.modals.init();
-    } else {
-        console.warn("Модуль модальных окон (components.modals) не найден");
-    }
-    
-    // Инициализация компонента загрузки изображений
-    if (window.MishuraApp.components.imageUpload && typeof window.MishuraApp.components.imageUpload.init === 'function') {
-        window.MishuraApp.components.imageUpload.init();
-    } else {
-        console.warn("Компонент загрузки изображений не найден");
-    }
-}
-
-/**
- * Инициализация функциональных модулей
- */
-function initializeFeatures() {
-    // Инициализация модуля консультации
-    if (window.MishuraApp.features.consultation && typeof window.MishuraApp.features.consultation.init === 'function') {
-        window.MishuraApp.features.consultation.init();
-    } else {
-        console.warn("Модуль консультации не найден");
-    }
-    
-    // Инициализация модуля сравнения
-    if (window.MishuraApp.features.comparison && typeof window.MishuraApp.features.comparison.init === 'function') {
-        window.MishuraApp.features.comparison.init();
-    } else {
-        console.warn("Модуль сравнения не найден");
-    }
-    
-    // Инициализация модуля виртуальной примерки
-    if (window.MishuraApp.features.tryOn && typeof window.MishuraApp.features.tryOn.init === 'function') {
-        window.MishuraApp.features.tryOn.init();
-    } else {
-        console.warn("Модуль виртуальной примерки не найден");
-    }
-}
-
-/**
- * Настройка обработчиков для кнопок приложения
- */
-function setupButtonHandlers() {
-    console.log("Настройка обработчиков кнопок...");
-    
-    // Получаем ссылки на модули для обработки событий
-    // ИСПРАВЛЕНО: Путь к modals теперь components.modals
-    const modals = window.MishuraApp.components.modals; 
-    const uiHelpers = window.MishuraApp.utils.uiHelpers;
-    
-    // Кнопка "Получить консультацию"
-    const consultationButton = document.getElementById('consultation-button');
-    if (consultationButton) {
-        consultationButton.addEventListener('click', function() {
-            console.log("Нажата кнопка 'Получить консультацию'");
-            if (modals && typeof modals.openConsultationModal === 'function') {
-                modals.openConsultationModal();
-            } else {
-                console.error("Невозможно открыть модальное окно консультации: модуль modals или метод openConsultationModal недоступен");
-                if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                    uiHelpers.showToast('Функция временно недоступна');
-                }
-            }
-        });
-    } else {
-        console.warn("Кнопка 'Получить консультацию' не найдена в DOM");
-    }
-    
-    // Кнопка "Примерить"
-    const tryOnButton = document.getElementById('try-on-button');
-    if (tryOnButton) {
-        tryOnButton.addEventListener('click', function() {
-            console.log("Нажата кнопка 'Примерить'");
-            if (modals && typeof modals.openTryOnModal === 'function') {
-                modals.openTryOnModal();
-            } else {
-                // Старый fallback, если openTryOnModal специфически отсутствует, но openModal есть
-                // Однако, лучше убедиться, что openTryOnModal реализован в components.modals
-                console.error("Невозможно открыть модальное окно примерки: модуль modals или метод openTryOnModal недоступен");
-                if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                    uiHelpers.showToast('Функция временно недоступна');
-                }
-            }
-        });
-    } else {
-        console.warn("Кнопка 'Примерить' не найдена в DOM");
-    }
-    
-    // Плавающая кнопка (FAB)
-    const fabButton = document.getElementById('fab-button');
-    if (fabButton) {
-        fabButton.addEventListener('click', function() {
-            console.log("Нажата плавающая кнопка (FAB)");
-            if (modals && typeof modals.openConsultationModal === 'function') {
-                modals.openConsultationModal();
-            } else {
-                console.error("Невозможно открыть модальное окно консультации через FAB: модуль modals или метод openConsultationModal недоступен");
-                if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                    uiHelpers.showToast('Функция временно недоступна');
-                }
-            }
-        });
-    } else {
-        console.warn("Плавающая кнопка (FAB) не найдена в DOM");
-    }
-    
-    console.log("Настройка обработчиков кнопок завершена");
-}
+// Убрал старые функции initializeUtilities, initializeComponents, initializeFeatures, setupButtonHandlers,
+// так как их логика теперь встроена в основной поток с tryInitModule.
+// Если setupButtonHandlers должна быть, ее нужно определить или перенести в main.js.

@@ -1,376 +1,210 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Консультации (consultation.js)
-ВЕРСИЯ: 0.4.2 (Исправлено имя вызываемого API метода)
+КОМПОНЕНТ: API сервис (service.js)
+ВЕРСИЯ: 0.5.1 (Добавлены методы для сравнения и примерки, улучшена инициализация)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Реализует функциональность консультаций с ИИ-стилистом.
-Обрабатывает запросы пользователя, управляет формой и взаимодействует с API.
+Предоставляет интерфейс для взаимодействия с серверным API.
+Обрабатывает запросы к стилисту, на сравнение и виртуальную примерку.
 ==========================================================================================
 */
 
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.features = window.MishuraApp.features || {};
-window.MishuraApp.features.consultation = (function() {
-    'use strict';
-    
-    // Локальные ссылки на другие модули
-    let config, logger, uiHelpers, modals, imageUpload, api;
-    
-    // Элементы DOM
-    let consultationForm, occasionSelector, preferencesInput, submitButton;
-    let loadingIndicator, consultationResults, consultationResultsContainer;
-    let consultationTriggers;
-    
-    // Текущие данные
-    let currentConsultationData = null;
-    let uploadedImage = null;
-    
-    /**
-     * Инициализация модуля
-     */
-    function init() {
-        // Получаем ссылки на другие модули
-        config = window.MishuraApp.config;
-        logger = window.MishuraApp.utils.logger;
-        uiHelpers = window.MishuraApp.utils.uiHelpers;
-        modals = window.MishuraApp.components.modals; // Убедимся, что путь правильный
-        imageUpload = window.MishuraApp.components.imageUpload; // Убедимся, что путь правильный
-        api = window.MishuraApp.api.service; // Это сервис API
-        
-        // Инициализация элементов DOM
-        initDOMElements();
-        
-        // Настройка обработчиков событий
-        initEventListeners();
-        
-        logger.debug("Модуль консультаций инициализирован");
-    }
-    
-    /**
-     * Инициализация элементов DOM
-     * @private
-     */
-    function initDOMElements() {
-        // Элементы формы
-        consultationForm = document.getElementById('consultation-form');
-        occasionSelector = document.getElementById('occasion-selector');
-        preferencesInput = document.getElementById('preferences-input');
-        submitButton = document.getElementById('submit-consultation');
-        
-        // Элементы результатов
-        loadingIndicator = document.getElementById('consultation-loading'); // Может быть внутри модалки или глобальный
-        consultationResults = document.getElementById('results-container'); // ID из index.html для результатов
-        consultationResultsContainer = document.getElementById('results-overlay'); // ID оверлея для результатов
-        
-        // Триггеры для открытия модального окна
-        consultationTriggers = document.querySelectorAll('.consultation-trigger'); // Если есть такие кнопки на странице
-        
-        // Логирование ошибок, если элементы не найдены
-        if (!consultationForm) logger.warn("Элемент consultationForm не найден");
-        if (!occasionSelector) logger.warn("Элемент occasionSelector не найден");
-        if (!preferencesInput) logger.warn("Элемент preferencesInput не найден");
-        if (!submitButton) logger.warn("Элемент submitButton не найден");
-        if (!consultationResults) logger.warn("Элемент results-container (для вывода результатов) не найден");
-        if (!consultationResultsContainer) logger.warn("Элемент results-overlay (контейнер модалки результатов) не найден");
+window.MishuraApp.api = window.MishuraApp.api || {};
 
-    }
-    
-    /**
-     * Инициализация обработчиков событий
-     * @private
-     */
-    function initEventListeners() {
-        // Обработчики для триггеров открытия консультации
-        if (consultationTriggers) {
-            consultationTriggers.forEach(trigger => {
-                trigger.addEventListener('click', openConsultationModal);
-            });
-        }
+// Проверяем, не был ли сервис уже инициализирован
+if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized && window.MishuraApp.api.service.isInitialized()) { //
+    // Если да, ничего не делаем, чтобы избежать повторной инициализации
+    console.warn("API сервис уже был инициализирован. Повторная инициализация пропускается.");
+} else {
+    window.MishuraApp.api.service = (function() {
+        'use strict';
         
-        // Обработчик отправки формы
-        if (consultationForm) {
-            consultationForm.addEventListener('submit', handleConsultationSubmit);
-        }
+        // Локальные ссылки на другие модули
+        let config, logger;
         
-        // Обработчик загрузки изображения
-        document.addEventListener('singleImageUploaded', function(e) {
-            uploadedImage = e.detail.file;
-            logger.debug('Изображение загружено для консультации:', uploadedImage ? uploadedImage.name : 'файл отсутствует');
+        // Базовый URL API из конфигурации или значение по умолчанию
+        let apiBaseUrl = '/api/v1'; // FastAPI сервер слушает на этом относительном пути
+        let isInitialized = false;
+        
+        /**
+         * Инициализация модуля
+         */
+        function init() {
+            if (isInitialized) {
+                // logger может быть еще не определен здесь, если init вызывается несколько раз до инициализации logger
+                (logger || console).debug("API сервис уже инициализирован. Пропуск.");
+                return;
+            }
+            // console.log("Инициализация API сервиса (v0.5.1)"); // Дублируется с логгером ниже
             
-            // Включаем кнопку отправки, если она была отключена
-            if (submitButton) {
-                submitButton.disabled = false;
-            }
-        });
-        
-        // Обработчик удаления изображения
-        document.addEventListener('singleImageRemoved', function() {
-            uploadedImage = null;
-            logger.debug('Изображение удалено из консультации');
-            
-            // Отключаем кнопку отправки, так как изображение обязательно
-            if (submitButton) {
-                submitButton.disabled = true;
-            }
-        });
-        
-        // Обработчик закрытия модального окна для сброса формы
-        document.addEventListener('modalClosed', function(e) {
-            // Проверяем, что закрылось именно модальное окно консультации
-            if (e.detail.modalId === 'consultation-overlay') { 
-                resetConsultationForm();
-            }
-        });
-    }
-    
-    /**
-     * Открытие модального окна консультации
-     * @public
-     */
-    function openConsultationModal() {
-        logger.info('Открытие модального окна консультации');
-        
-        // Сбросим форму перед открытием
-        resetConsultationForm(); // Важно сбросить ДО открытия, чтобы не было видно старых данных
-
-        if (modals && typeof modals.openConsultationModal === 'function') {
-            modals.openConsultationModal();
-        } else {
-            logger.error("Не удалось открыть модальное окно консультации: модуль modals или метод openConsultationModal не найдены.");
-            // Можно показать alert или toast, если uiHelpers доступен
-            if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                uiHelpers.showToast("Ошибка: функция консультации недоступна.");
-            }
-        }
-    }
-    
-    /**
-     * Обработка отправки формы консультации
-     * @private
-     * @param {Event} e - событие отправки формы
-     */
-    function handleConsultationSubmit(e) {
-        e.preventDefault();
-        logger.debug('Попытка отправки формы консультации.');
-
-        if (!uploadedImage) {
-            if (uiHelpers) uiHelpers.showToast('Пожалуйста, загрузите изображение для анализа.');
-            else alert('Пожалуйста, загрузите изображение для анализа.');
-            logger.warn('Отправка формы консультации прервана: изображение не загружено.');
-            return;
-        }
-        
-        // Получаем данные формы
-        const occasion = occasionSelector ? occasionSelector.value : '';
-        const preferences = preferencesInput ? preferencesInput.value : '';
-        
-        // Валидация
-        if (occasion === '') {
-            if (uiHelpers) uiHelpers.showToast('Пожалуйста, выберите повод для консультации.');
-            else alert('Пожалуйста, выберите повод для консультации.');
-            logger.warn('Отправка формы консультации прервана: повод не выбран.');
-            return;
-        }
-        
-        // Формируем данные для отправки
-        const formData = new FormData();
-        formData.append('image', uploadedImage);
-        formData.append('occasion', occasion);
-        formData.append('preferences', preferences);
-        // formData.append('userId', (config && config.userId) ? config.userId : ''); // Если нужно передавать ID пользователя
-
-        logger.info('Отправка запроса на консультацию с данными:', {occasion, preferencesLength: preferences.length, imageName: uploadedImage.name});
-        
-        // Показываем загрузку
-        if (uiHelpers) uiHelpers.showLoading('Мишура анализирует ваш образ...');
-        
-        // Проверяем, что API сервис и нужный метод доступны
-        if (!api || typeof api.processStylistConsultation !== 'function') {
-            logger.error('API сервис или метод processStylistConsultation не найдены.');
-            if (uiHelpers) {
-                uiHelpers.hideLoading();
-                uiHelpers.showToast('Ошибка: сервис анализа временно недоступен.');
+            // Получаем ссылки на другие модули
+            if (window.MishuraApp && window.MishuraApp.config) {
+                config = window.MishuraApp.config;
+                
+                if (config.appSettings && config.appSettings.apiUrl) {
+                    apiBaseUrl = config.appSettings.apiUrl;
+                    // console.log(`API сервис: базовый URL API установлен из config.appSettings: ${apiBaseUrl}`);
+                } else if (config.apiSettings && config.apiSettings.baseUrl) { 
+                    apiBaseUrl = config.apiSettings.baseUrl;
+                    //  console.log(`API сервис: базовый URL API установлен из config.apiSettings: ${apiBaseUrl}`);
+                } else {
+                    //  console.log(`API сервис: используется базовый URL API по умолчанию: ${apiBaseUrl}`);
+                }
             } else {
-                alert('Ошибка: сервис анализа временно недоступен.');
+                // console.warn("API сервис: модуль конфигурации не найден. Используется URL API по умолчанию.");
             }
-            return;
+            
+            if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) {
+                logger = window.MishuraApp.utils.logger;
+            } else {
+                // Резервный логгер, если основной еще не инициализирован
+                logger = {
+                    debug: function(...args) { console.debug('[DEBUG] API_Service:', ...args); },
+                    info: function(...args) { console.info('[INFO] API_Service:', ...args); },
+                    warn: function(...args) { console.warn('[WARN] API_Service:', ...args); },
+                    error: function(...args) { console.error('[ERROR] API_Service:', ...args); }
+                };
+                logger.warn("Основной логгер не найден, используется резервный для API_Service.");
+            }
+            
+            logger.info(`API сервис инициализирован (v0.5.1) с базовым URL: ${apiBaseUrl}`);
+            isInitialized = true;
         }
-
-        // Отправляем запрос на сервер
-        // ИСПРАВЛЕНО: api.sendConsultationRequest -> api.processStylistConsultation
-        api.processStylistConsultation(formData)
-            .then(handleConsultationResponse)
-            .catch(handleConsultationError)
-            .finally(() => {
-                if (uiHelpers) uiHelpers.hideLoading();
+        
+        /**
+         * Отправка запроса на анализ стиля (одиночная консультация)
+         * @param {FormData} formData - данные формы (image, occasion, preferences)
+         * @returns {Promise<Object>} - Promise с результатом запроса
+         */
+        function processStylistConsultation(formData) {
+            if (!isInitialized) init(); 
+            logger.debug('Отправка запроса на консультацию стилиста (одиночный анализ)');
+            return fetchWithTimeout(`${apiBaseUrl}/analyze-outfit`, {
+                method: 'POST',
+                body: formData,
             });
-    }
-    
-    /**
-     * Обработка ответа сервера на запрос консультации
-     * @private
-     * @param {Object} response - ответ от сервера
-     */
-    function handleConsultationResponse(response) {
-        logger.info('Получен ответ от сервера на запрос консультации:', response);
+        }
+
+        /**
+         * Отправка запроса на сравнение образов
+         * @param {FormData} formData - данные формы (images, occasion, preferences)
+         * @returns {Promise<Object>} - Promise с результатом запроса
+         */
+        function processCompareOutfits(formData) {
+            if (!isInitialized) init();
+            logger.debug('Отправка запроса на сравнение образов');
+            return fetchWithTimeout(`${apiBaseUrl}/compare-outfits`, {
+                method: 'POST',
+                body: formData,
+            });
+        }
         
-        // Предполагаем, что ответ содержит { status: "success", advice: "..." }
-        // или { status: "error", message: "..." }
-        if (!response || response.status !== 'success' || !response.advice) {
-            const errorMessage = response && response.message ? response.message : 'Некорректный ответ от сервера.';
-            logger.error('Ошибка в ответе сервера на консультацию:', errorMessage);
-            if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMessage}`);
-            else alert(`Ошибка: ${errorMessage}`);
-            // Не отображаем "пустые" результаты в этом случае
-            if (consultationResults) consultationResults.innerHTML = `<p>Произошла ошибка при получении совета от Мишуры.</p>`;
-            if (consultationResultsContainer && modals && typeof modals.openResultsModal === 'function') {
-                modals.openResultsModal(); // Открываем окно с сообщением об ошибке
+        /**
+         * Отправка запроса на виртуальную примерку
+         * @param {FormData} formData - данные формы (personImage, outfitImage, styleType)
+         * @returns {Promise<Object>} - Promise с результатом запроса
+         */
+        function processTryOn(formData) {
+            if (!isInitialized) init();
+            logger.debug('Отправка запроса на виртуальную примерку');
+            
+            const tryOnEndpoint = (config && config.apiSettings && config.apiSettings.endpoints && config.apiSettings.endpoints.virtualFitting)
+                                ? config.apiSettings.endpoints.virtualFitting
+                                : '/virtual-fitting'; 
+
+            return fetchWithTimeout(`${apiBaseUrl}${tryOnEndpoint}`, { 
+                method: 'POST',
+                body: formData,
+            });
+        }
+        
+        /**
+         * Общий метод для fetch с таймаутом и обработкой ответа как JSON.
+         * @private
+         * @param {string} url - URL запроса
+         * @param {Object} options - опции fetch
+         * @param {number} customTimeout - таймаут в миллисекундах (по умолчанию из config или 30000)
+         * @returns {Promise<Object>} - Promise с результатом запроса (JSON)
+         */
+        function fetchWithTimeout(url, options, customTimeout) {
+            // Гарантируем, что логгер доступен, даже если init() не был вызван явно (например, при самом первом вызове fetchWithTimeout)
+            const currentLogger = logger || { debug: console.debug, info: console.info, warn: console.warn, error: console.error };
+
+            if (!isInitialized && url.indexOf('/debug/info') === -1) { 
+                currentLogger.warn("API сервис вызван до полной инициализации (fetchWithTimeout). Попытка инициализации...");
+                init(); // Убедимся, что logger внутри init теперь будет доступен
             }
-            return;
-        }
-        
-        // Сохраняем результаты
-        currentConsultationData = response.advice; // Сохраняем непосредственно текст совета
-        
-        // Отображаем результаты
-        renderConsultationResults(currentConsultationData); // Передаем текст совета
-        
-        // Закрываем модальное окно консультации и открываем окно результатов
-        if (modals) {
-            if (typeof modals.closeModal === 'function') modals.closeModal('consultation-overlay');
-            if (typeof modals.openResultsModal === 'function') modals.openResultsModal();
-        }
-        
-        logger.info('Консультация успешно получена и отображена.');
-    }
-    
-    /**
-     * Обработка ошибки при запросе консультации
-     * @private
-     * @param {Error} error - объект ошибки
-     */
-    function handleConsultationError(error) {
-        logger.error('Ошибка при запросе консультации:', error.message || error);
-        if (uiHelpers) {
-            uiHelpers.showToast('Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.');
-        } else {
-            alert('Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.');
-        }
-        
-        // Можно также отобразить ошибку в контейнере результатов, если он уже открыт
-        if (consultationResults) {
-            consultationResults.innerHTML = `<p>Не удалось связаться с сервером для получения совета. Попробуйте еще раз.</p>`;
-        }
-        // Не вызываем hideLoading здесь, т.к. он уже в .finally()
-    }
-        
-    /**
-     * Отображение результатов консультации
-     * @private
-     * @param {string} adviceText - текст с советом от ИИ (уже в HTML или Markdown)
-     */
-    function renderConsultationResults(adviceText) {
-        if (!consultationResults) {
-            logger.warn("Элемент для отображения результатов консультации (results-container) не найден.");
-            return;
-        }
-        
-        // Очищаем контейнер результатов
-        consultationResults.innerHTML = '';
-        
-        // Если uiHelpers и parseMarkdownToHtml доступны, используем их
-        // Иначе просто вставляем текст как HTML (предполагая, что сервер может вернуть HTML)
-        if (uiHelpers && typeof uiHelpers.parseMarkdownToHtml === 'function') {
-            consultationResults.innerHTML = uiHelpers.parseMarkdownToHtml(adviceText);
-            logger.debug("Результаты консультации отрендерены с использованием parseMarkdownToHtml.");
-        } else {
-            // Прямая вставка, если парсер Markdown недоступен.
-            // Убедитесь, что сервер экранирует HTML, если adviceText приходит из ненадежного источника!
-            // В данном случае, мы доверяем нашему Gemini AI и промптам.
-            consultationResults.innerHTML = adviceText; 
-            logger.debug("Результаты консультации отрендерены как HTML (парсер Markdown не использовался).");
-        }
-        
-        // Показываем контейнер результатов (модальное окно результатов)
-        if (consultationResultsContainer && modals && typeof modals.openResultsModal === 'function') {
-             // Открытие модального окна результатов теперь обрабатывается в handleConsultationResponse
-        } else {
-            logger.warn("Контейнер результатов (results-overlay) или модуль modals не найден для его показа.");
-        }
-    }
-    
-    /**
-     * Сброс формы консультации
-     * @private
-     */
-    function resetConsultationForm() {
-        logger.debug('Сброс формы консультации');
-        
-        // Сбрасываем поля формы
-        if (consultationForm) {
-            consultationForm.reset();
-        }
-        
-        // Очищаем и скрываем результаты, если они были показаны в этом же окне (маловероятно с текущей логикой)
-        if (consultationResults) {
-            consultationResults.innerHTML = '';
-        }
-        // if (consultationResultsContainer) { // Это модальное окно результатов, его не нужно скрывать отсюда
-        //     consultationResultsContainer.classList.remove('active'); // или add('hidden')
-        // }
-        
-        // Сбрасываем изображение через модуль imageUpload
-        if (imageUpload && typeof imageUpload.resetSingleImageUpload === 'function') {
-            imageUpload.resetSingleImageUpload(); // Это сбросит uploadedImage через событие 'singleImageRemoved'
-        } else {
-            // Ручной сброс, если imageUpload недоступен
-            uploadedImage = null;
-            // Также нужно вручную обновить UI для загрузки фото, если imageUpload.resetSingleImageUpload не отработал
-            const singlePreviewContainer = document.getElementById('single-preview-container');
-            const singleUploadArea = document.getElementById('single-upload-area');
-            if (singlePreviewContainer) singlePreviewContainer.classList.add('hidden');
-            if (singleUploadArea) singleUploadArea.classList.remove('hidden');
-        }
-        
-        // Сбрасываем текущие данные
-        currentConsultationData = null;
-        // uploadedImage уже сброшен выше или через событие
-        
-        // Отключаем кнопку отправки, т.к. изображение обязательно
-        if (submitButton) {
-            submitButton.disabled = true;
-        }
 
-        // Скрываем поля формы, которые появляются после загрузки фото
-        const occasionElement = document.querySelector('.occasion-selector');
-        const inputLabels = document.querySelectorAll('.input-label'); // Может быть несколько
-        const preferencesElement = document.querySelector('.preferences-input');
+            const controller = new AbortController();
+            const signal = controller.signal;
+            
+            const effectiveTimeout = customTimeout || (config && config.apiSettings && config.apiSettings.timeout) || 30000;
+            currentLogger.debug(`Выполнение fetch запроса: ${options.method || 'GET'} ${url} с таймаутом ${effectiveTimeout}мс`);
 
-        if (occasionElement && !occasionElement.classList.contains('hidden')) occasionElement.classList.add('hidden');
-        inputLabels.forEach(label => { if (!label.classList.contains('hidden')) label.classList.add('hidden'); });
-        if (preferencesElement && !preferencesElement.classList.contains('hidden')) preferencesElement.classList.add('hidden');
+            const timeoutId = setTimeout(() => {
+                currentLogger.warn(`Таймаут запроса к ${url} (${effectiveTimeout}мс)`);
+                controller.abort();
+            }, effectiveTimeout);
+            
+            return fetch(url, { ...options, signal })
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    currentLogger.debug(`Ответ от ${url} получен со статусом: ${response.status}`);
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            let errorData = { 
+                                message: `Ошибка HTTP: ${response.status} ${response.statusText}.`,
+                                details: text 
+                            };
+                            try {
+                                const parsedText = JSON.parse(text);
+                                if (parsedText && parsedText.message) errorData.message = parsedText.message;
+                                if (parsedText && parsedText.details) errorData.details = parsedText.details;
+                                else if (parsedText && !parsedText.details) errorData.details = parsedText;
 
-        logger.debug('Форма консультации сброшена в начальное состояние.');
-    }
-    
-    /**
-     * Получение текущих данных консультации
-     * @public
-     * @returns {Object|null} - данные последней консультации
-     */
-    function getCurrentConsultationData() {
-        return currentConsultationData;
-    }
-    
-    // Публичный API
-    return {
-        init,
-        openConsultationModal, // Публичный метод для вызова извне, например, из app.js
-        getCurrentConsultationData,
-        resetConsultationForm // Может быть полезен для сброса извне
-    };
-})();
+                            } catch (e) { /* Оставляем текстовое сообщение в details, если не JSON */ }
+                            currentLogger.error(`Ошибка HTTP при запросе к ${url}: ${response.status}`, errorData);
+                            // throw new Error(errorData.message); // Это приведет к попаданию в .catch ниже, но с простым Error
+                            return Promise.reject(errorData); // Отклоняем Promise с объектом ошибки
+                        });
+                    }
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.includes("application/json")) {
+                        return response.json();
+                    } else {
+                        currentLogger.warn(`Ответ от ${url} не является JSON (Content-Type: ${contentType}). Возвращаем как текст.`);
+                        return response.text().then(text => ({ resultImage: text, status: "success_text_response" })); // Для try-on, API может вернуть URL картинки как text/plain
+                    }
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    // Если error уже наш объект {message, details}, то просто передаем его дальше
+                    if (error && typeof error.message === 'string') {
+                        currentLogger.error(`Ошибка (уже обработанная HTTP или другая) для ${url}:`, error.message, error.details || '');
+                        return Promise.reject(error);
+                    }
+                    // Иначе это AbortError или другая сетевая ошибка
+                    const errorMessage = error.name === 'AbortError' ? 'Превышено время ожидания ответа от сервера.' : (error.message || 'Ошибка сети или выполнения запроса.');
+                    currentLogger.error(`Ошибка сети или выполнения fetch для ${url}:`, errorMessage, error);
+                    return Promise.reject({ 
+                        status: "error", 
+                        message: errorMessage,
+                        details: error.toString()
+                    });
+                });
+        }
+                
+        // Публичный API
+        return {
+            init,
+            isInitialized: () => isInitialized,
+            processStylistConsultation,
+            processCompareOutfits,
+            processTryOn
+        };
+    })();
+}

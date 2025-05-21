@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Загрузка изображений (image-upload.js)
-ВЕРСИЯ: 0.4.4 (Улучшенная обработка событий и управление состоянием)
+ВЕРСИЯ: 0.4.5 (Усилен сброс input.value, рефакторинг обработчиков)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -11,598 +11,399 @@
 ==========================================================================================
 */
 
-// Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
 window.MishuraApp.components = window.MishuraApp.components || {};
 window.MishuraApp.components.imageUpload = (function() {
     'use strict';
     
-    // Локальные ссылки на другие модули
     let config, logger, uiHelpers;
     
-    // Элементы DOM для одиночной загрузки
-    let singleUploadArea, singleFileInput, singlePreviewContainer, singlePreviewImage;
-    
-    // Элементы DOM для сравнения
-    let imageSlotsContainer; // Родительский контейнер для слотов
-    
-    // Элементы DOM для переключения режимов
+    let singleUploadArea, singleFileInput, singlePreviewContainer, singlePreviewImage, singleDeleteButton;
+    let imageSlotsContainer;
     let modeButtons, singleAnalysisMode, compareAnalysisMode;
     
-    // Кнопки удаления (для одиночной загрузки)
-    let singleDeleteButton;
+    let isUploadingActive = false;
+    let uploadedImages = { single: null, compare: [null, null, null, null] };
     
-    // Флаги состояния
-    let isUploadingActive = false; // Общий флаг активности загрузки
-    let uploadedImages = {
-        single: null,
-        compare: [null, null, null, null] // Для 4-х слотов сравнения
-    };
-    
-    /**
-     * Инициализация модуля
-     */
     function init() {
-        console.log("Инициализация модуля загрузки изображений (v0.4.4)");
+        config = window.MishuraApp.config;
+        logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("ImageUploadLogger:",...args), info: (...args)=>console.info("ImageUploadLogger:",...args), warn: (...args)=>console.warn("ImageUploadLogger:",...args), error: (...args)=>console.error("ImageUploadLogger:",...args) };
+        uiHelpers = window.MishuraApp.utils.uiHelpers;
         
-        // Получаем ссылки на другие модули
-        if (window.MishuraApp && window.MishuraApp.config) {
-            config = window.MishuraApp.config;
-        }
-        
-        if (window.MishuraApp && window.MishuraApp.utils) {
-            logger = window.MishuraApp.utils.logger;
-            uiHelpers = window.MishuraApp.utils.uiHelpers;
-        }
-        
-        // Проверка наличия логгера
-        if (!logger && console) {
-            logger = {
-                debug: function(...args) { console.debug('[DEBUG] ImageUpload:', ...args); },
-                info: function(...args) { console.info('[INFO] ImageUpload:', ...args); },
-                warn: function(...args) { console.warn('[WARN] ImageUpload:', ...args); },
-                error: function(...args) { console.error('[ERROR] ImageUpload:', ...args); }
-            };
-        }
-        
-        // Инициализация элементов DOM
+        logger.debug("Инициализация модуля загрузки изображений (v0.4.5)");
         initDOMElements();
-        
-        // Настройка обработчиков событий
-        initModeButtons(); // Должен быть первым, чтобы правильно настроить видимость
+        initModeButtons(); // Важно инициализировать режимы до обработчиков загрузки
         initSingleImageUpload();
-        initCompareImageUpload(); // Инициализирует слоты при их наличии
-        // Кнопки удаления для слотов создаются динамически
-        
-        logger.debug("Модуль загрузки изображений инициализирован (v0.4.4)");
+        initCompareImageUpload();
+        logger.debug("Модуль загрузки изображений инициализирован (v0.4.5)");
     }
     
-    /**
-     * Инициализация элементов DOM
-     * @private
-     */
     function initDOMElements() {
-        logger.debug("Инициализация DOM элементов");
-        
-        // Элементы для одиночной загрузки
+        logger.debug("ImageUpload: Инициализация DOM элементов...");
         singleUploadArea = document.getElementById('single-upload-area');
         singleFileInput = document.getElementById('single-upload-input');
         singlePreviewContainer = document.getElementById('single-preview-container');
         singlePreviewImage = document.getElementById('single-preview-image');
         singleDeleteButton = document.querySelector('#single-preview-container .delete-image[data-target="single"]');
-
-
-        // Элементы для сравнения
+        
         imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
         
-        // Элементы для переключения режимов
-        modeButtons = document.querySelectorAll('.mode-button');
+        modeButtons = document.querySelectorAll('#consultation-overlay .mode-button'); // Ищем кнопки только внутри модалки консультации
         singleAnalysisMode = document.getElementById('single-analysis-mode');
         compareAnalysisMode = document.getElementById('compare-analysis-mode');
-                
-        // Логирование результатов
-        logger.debug("Элементы DOM инициализированы:", {
-            singleUploadArea: !!singleUploadArea,
-            singleFileInput: !!singleFileInput,
-            singlePreviewContainer: !!singlePreviewContainer,
-            singlePreviewImage: !!singlePreviewImage,
-            singleDeleteButton: !!singleDeleteButton,
-            imageSlotsContainer: !!imageSlotsContainer,
-            modeButtons: modeButtons ? modeButtons.length : 0,
-            singleAnalysisMode: !!singleAnalysisMode,
-            compareAnalysisMode: !!compareAnalysisMode
-        });
-        
-        if (!singleUploadArea) logger.warn("Элемент singleUploadArea не найден");
-        if (!singleFileInput) logger.warn("Элемент singleFileInput не найден");
-        if (!singlePreviewContainer) logger.warn("Элемент singlePreviewContainer не найден");
-        if (!singlePreviewImage) logger.warn("Элемент singlePreviewImage не найден");
-        if (!singleDeleteButton) logger.warn("Кнопка удаления для одиночной загрузки не найдена");
-        if (!imageSlotsContainer) logger.warn("Контейнер image-slots для сравнения не найден");
-        if (!singleAnalysisMode) logger.warn("Элемент singleAnalysisMode не найден");
-        if (!compareAnalysisMode) logger.warn("Элемент compareAnalysisMode не найден");
+
+        if (!singleUploadArea) logger.warn("ImageUpload DOM: 'single-upload-area' не найден");
+        if (!singleFileInput) logger.warn("ImageUpload DOM: 'single-upload-input' не найден");
+        if (!singlePreviewContainer) logger.warn("ImageUpload DOM: 'single-preview-container' не найден");
+        if (!singlePreviewImage) logger.warn("ImageUpload DOM: 'single-preview-image' не найден");
+        if (!singleDeleteButton) logger.warn("ImageUpload DOM: кнопка удаления для одиночного фото не найдена");
+        if (!imageSlotsContainer) logger.warn("ImageUpload DOM: контейнер '.image-slots' для сравнения не найден");
+        if (!modeButtons.length) logger.warn("ImageUpload DOM: кнопки переключения режимов '.mode-button' не найдены");
+        if (!singleAnalysisMode) logger.warn("ImageUpload DOM: 'single-analysis-mode' не найден");
+        if (!compareAnalysisMode) logger.warn("ImageUpload DOM: 'compare-analysis-mode' не найден");
     }
     
-    /**
-     * Инициализация переключателей режимов анализа
-     * @private
-     */
     function initModeButtons() {
-        if (!modeButtons || !modeButtons.length) {
-            logger.warn("Переключатели режимов не найдены");
-            return;
-        }
-        
-        logger.debug("Инициализация кнопок режимов");
+        if (!modeButtons || !modeButtons.length) return logger.warn("Переключатели режимов не найдены, инициализация пропущена.");
         
         modeButtons.forEach(button => {
-            // Просто добавляем обработчик, не клонируя, чтобы не потерять уже существующие, если есть
             button.addEventListener('click', function() {
                 const mode = this.getAttribute('data-mode');
                 logger.debug(`Кнопка режима нажата: ${mode}`);
-                
                 modeButtons.forEach(btn => btn.classList.remove('active'));
                 this.classList.add('active');
                 
                 if (singleAnalysisMode) singleAnalysisMode.classList.add('hidden');
                 if (compareAnalysisMode) compareAnalysisMode.classList.add('hidden');
                 
-                if (mode === 'single' && singleAnalysisMode) {
-                    singleAnalysisMode.classList.remove('hidden');
-                } else if (mode === 'compare' && compareAnalysisMode) {
-                    compareAnalysisMode.classList.remove('hidden');
-                }
+                if (mode === 'single' && singleAnalysisMode) singleAnalysisMode.classList.remove('hidden');
+                else if (mode === 'compare' && compareAnalysisMode) compareAnalysisMode.classList.remove('hidden');
                 
                 document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
-                logger.debug(`Переключение на режим: ${mode}`);
             });
         });
-        
-        // Установка начального режима (например, 'single' по умолчанию)
-        const initialModeButton = document.querySelector('.mode-button[data-mode="single"]');
-        if (initialModeButton) {
-            initialModeButton.click(); // Эмулируем клик для установки начального состояния
+        // Установка начального активного режима (например, первый или тот, что с классом active в HTML)
+        const initialActiveButton = document.querySelector('#consultation-overlay .mode-button.active') || 
+                                   (modeButtons.length > 0 ? modeButtons[0] : null);
+        if (initialActiveButton) {
+            logger.debug(`Установка начального режима: ${initialActiveButton.dataset.mode}`);
+            initialActiveButton.click(); // Эмулируем клик для установки состояния
+        } else {
+            logger.warn("Не удалось установить начальный активный режим: кнопки режимов не найдены или нет активной по умолчанию.");
         }
-        logger.debug("Обработчики переключения режимов инициализированы");
     }
-    
-    /**
-     * Инициализация загрузки одиночного изображения
-     * @private
-     */
+
+    function resetFileInput(inputElement) {
+        if (inputElement) {
+            try {
+                inputElement.value = null;
+                logger.debug(`Значение инпута файла '${inputElement.id || 'compare-input'}' сброшено.`);
+            } catch (ex) {
+                logger.warn("Не удалось сбросить input.value напрямую.", ex);
+            }
+        } else {
+            logger.warn("Попытка сбросить несуществующий file input.");
+        }
+    }
+
     function initSingleImageUpload() {
         if (!singleUploadArea || !singleFileInput || !singleDeleteButton) {
-            logger.warn("Невозможно инициализировать загрузку одиночного изображения - ключевые элементы не найдены");
+            logger.warn("Пропуск initSingleImageUpload: один или несколько DOM элементов не найдены.");
             return;
         }
-        
-        logger.debug("Инициализация загрузки одиночного изображения");
 
-        const handleSingleClick = () => {
-            logger.debug("Клик на область загрузки одиночного изображения");
-            if (singleFileInput.value) singleFileInput.value = null; // Сброс для повторного выбора того же файла
+        singleUploadArea.addEventListener('click', () => {
+            logger.debug("Клик на область одиночной загрузки. Сброс инпута singleFileInput.");
+            resetFileInput(singleFileInput); 
             singleFileInput.click();
-        };
-        singleUploadArea.addEventListener('click', handleSingleClick);
+        });
         
-        const handleSingleFileChange = (event) => {
-            logger.debug("Выбран файл для одиночной загрузки");
+        singleFileInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
+                logger.debug(`Файл выбран для одиночной загрузки: ${file.name}`);
                 handleSingleImageSelection(file);
+            } else {
+                logger.debug("Диалог выбора файла для одиночной загрузки отменен пользователем.");
             }
-        };
-        singleFileInput.addEventListener('change', handleSingleFileChange);
+        });
         
-        const commonDragOver = (e, element) => {
+        singleUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); singleUploadArea.classList.add('dragover'); });
+        singleUploadArea.addEventListener('dragleave', () => singleUploadArea.classList.remove('dragover'));
+        singleUploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            e.stopPropagation();
-            element.classList.add('dragover');
-        };
-        const commonDragLeave = (e, element) => {
-            e.preventDefault();
-            e.stopPropagation();
-            element.classList.remove('dragover');
-        };
-
-        singleUploadArea.addEventListener('dragover', (e) => commonDragOver(e, singleUploadArea));
-        singleUploadArea.addEventListener('dragleave', (e) => commonDragLeave(e, singleUploadArea));
-        
-        singleUploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
             singleUploadArea.classList.remove('dragover');
-            logger.debug("Файл перетащен в область загрузки одиночного изображения");
             if (e.dataTransfer.files.length) {
-                const file = e.dataTransfer.files[0];
-                handleSingleImageSelection(file);
+                logger.debug(`Файл перетащен для одиночной загрузки: ${e.dataTransfer.files[0].name}`);
+                handleSingleImageSelection(e.dataTransfer.files[0]);
             }
         });
-
-        singleDeleteButton.addEventListener('click', function() {
-            logger.debug("Кнопка удаления одиночного изображения нажата");
-            resetSingleImageUpload();
-            document.dispatchEvent(new CustomEvent('singleImageRemoved'));
+        singleDeleteButton.addEventListener('click', () => {
+            logger.debug("Нажата кнопка удаления для одиночного изображения.");
+            resetSingleImageUpload(); // Этот метод уже должен вызвать событие singleImageRemoved
         });
-        
-        logger.debug("Обработчики одиночной загрузки инициализированы");
     }
     
-    /**
-     * Обработка выбора одиночного изображения
-     * @private
-     * @param {File} file - выбранный файл изображения
-     */
     function handleSingleImageSelection(file) {
-        logger.debug("Обработка выбора одиночного изображения", file.name);
-        
-        if (!isValidImageFile(file)) {
-            logger.warn("Выбранный файл не является изображением:", file.name, file.type);
-            if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                uiHelpers.showToast('Пожалуйста, выберите изображение (JPG, PNG, WEBP).');
-            } else {
-                alert('Пожалуйста, выберите изображение (JPG, PNG, WEBP).');
-            }
-            return;
-        }
-        
-        isUploadingActive = true; // Устанавливаем флаг
-        
+        logger.debug(`Обработка одиночного изображения: ${file.name}`);
+        if (!isValidImageFile(file)) return; // isValidImageFile покажет toast, если нужно
+
+        isUploadingActive = true;
         const reader = new FileReader();
-        reader.onload = function(e) {
-            logger.debug("Изображение загружено FileReader и готово к отображению");
-            
+        reader.onload = (e) => {
             if (singlePreviewImage && singlePreviewContainer && singleUploadArea) {
                 singlePreviewImage.src = e.target.result;
                 singlePreviewContainer.classList.remove('hidden');
                 singleUploadArea.classList.add('hidden');
-                
                 uploadedImages.single = file;
                 
-                const occasionSelector = document.querySelector('#consultation-overlay .occasion-selector');
-                const inputLabels = document.querySelectorAll('#consultation-overlay .input-label');
-                const preferencesInput = document.querySelector('#consultation-overlay .preferences-input');
+                // Показываем поля формы при загрузке фото
+                const formContainer = document.getElementById('consultation-overlay');
+                if (formContainer) {
+                    const occasionSel = formContainer.querySelector('.occasion-selector');
+                    const labels = formContainer.querySelectorAll('.input-label');
+                    const prefsInput = formContainer.querySelector('.preferences-input');
+                    if (occasionSel) occasionSel.classList.remove('hidden');
+                    labels.forEach(l => l.classList.remove('hidden'));
+                    if (prefsInput) prefsInput.classList.remove('hidden');
+                } else {
+                    logger.warn("Контейнер формы 'consultation-overlay' не найден для показа доп. полей.");
+                }
                 
-                if (occasionSelector) occasionSelector.classList.remove('hidden');
-                inputLabels.forEach(label => label.classList.remove('hidden'));
-                if (preferencesInput) preferencesInput.classList.remove('hidden');
-                
+                logger.info(`Одиночное изображение ${file.name} загружено и отображено.`);
                 document.dispatchEvent(new CustomEvent('singleImageUploaded', { detail: { file: file } }));
             } else {
-                logger.error("Элементы для отображения превью одиночного изображения не найдены");
+                logger.error("DOM элементы для превью одиночного изображения не найдены при попытке отображения.");
             }
-            isUploadingActive = false; // Сбрасываем флаг
+            isUploadingActive = false;
         };
-        
-        reader.onerror = function(error) {
-            logger.error("Ошибка при чтении файла (FileReader):", error);
-            if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                uiHelpers.showToast('Ошибка при чтении файла');
-            } else {
-                alert('Ошибка при чтении файла');
-            }
-            isUploadingActive = false; // Сбрасываем флаг
+        reader.onerror = (error) => {
+            logger.error("Ошибка FileReader (одиночная загрузка):", error);
+            if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла.');
+            isUploadingActive = false;
         };
-        
         reader.readAsDataURL(file);
     }
     
-    /**
-     * Инициализация загрузки изображений для сравнения
-     * @private
-     */
     function initCompareImageUpload() {
-        if (!imageSlotsContainer) {
-            logger.warn("Невозможно инициализировать загрузку изображений для сравнения - контейнер слотов не найден");
-            return;
-        }
-        
-        logger.debug("Инициализация загрузки изображений для сравнения");
+        if (!imageSlotsContainer) return logger.warn("Пропуск initCompareImageUpload: imageSlotsContainer не найден.");
         
         const slots = imageSlotsContainer.querySelectorAll('.image-slot');
-        
+        if (!slots.length) return logger.warn("Слоты для сравнения (.image-slot) не найдены внутри imageSlotsContainer.");
+
         slots.forEach(slot => {
             const slotIndex = parseInt(slot.dataset.slot, 10);
             const input = slot.querySelector('.compare-upload-input');
+            if (!input) return logger.warn(`Инпут для слота ${slotIndex} не найден.`);
 
-            if (!input) {
-                logger.warn(`Инпут для загрузки не найден в слоте ${slotIndex}`);
-                return;
-            }
-
-            // Обработчик клика на слот
             slot.addEventListener('click', function() {
                 if (!this.classList.contains('filled')) {
-                    logger.debug(`Клик на пустой слот сравнения ${slotIndex}`);
-                    if(input.value) input.value = null; // Сброс для выбора того же файла
+                    logger.debug(`Клик на пустой слот сравнения ${slotIndex}. Сброс инпута.`);
+                    resetFileInput(input); 
                     input.click();
                 } else {
-                    logger.debug(`Клик на заполненный слот сравнения ${slotIndex} - действие не требуется`);
+                    logger.debug(`Клик на заполненный слот ${slotIndex}. Действий нет.`);
                 }
             });
-
-            // Обработчики перетаскивания
-            slot.addEventListener('dragover', (e) => {
-                e.preventDefault(); e.stopPropagation();
-                if (!slot.classList.contains('filled')) slot.classList.add('dragover');
-            });
-            slot.addEventListener('dragleave', (e) => {
-                e.preventDefault(); e.stopPropagation();
-                slot.classList.remove('dragover');
-            });
-            slot.addEventListener('drop', (e) => {
-                e.preventDefault(); e.stopPropagation();
-                slot.classList.remove('dragover');
-                logger.debug(`Файл перетащен в слот сравнения ${slotIndex}`);
-                if (!slot.classList.contains('filled') && e.dataTransfer.files.length) {
-                    const file = e.dataTransfer.files[0];
-                    handleCompareImageSelection(file, slotIndex);
-                }
-            });
-
-            // Обработчик изменения файла в инпуте
-            input.addEventListener('change', function(e) {
-                logger.debug(`Выбран файл для слота сравнения ${slotIndex}`);
+            
+            input.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
+                    logger.debug(`Файл выбран для слота сравнения ${slotIndex}: ${file.name}`);
                     handleCompareImageSelection(file, slotIndex);
+                } else {
+                     logger.debug(`Диалог выбора файла для слота ${slotIndex} отменен.`);
+                }
+            });
+
+            slot.addEventListener('dragover', (e) => { e.preventDefault(); if (!slot.classList.contains('filled')) slot.classList.add('dragover'); });
+            slot.addEventListener('dragleave', () => slot.classList.remove('dragover'));
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('dragover');
+                if (!slot.classList.contains('filled') && e.dataTransfer.files.length) {
+                    logger.debug(`Файл перетащен для слота сравнения ${slotIndex}: ${e.dataTransfer.files[0].name}`);
+                    handleCompareImageSelection(e.dataTransfer.files[0], slotIndex);
                 }
             });
         });
-        
-        logger.debug("Обработчики загрузки для сравнения инициализированы для слотов");
     }
     
-    /**
-     * Обработка выбора изображения для сравнения
-     * @private
-     * @param {File} file - выбранный файл изображения
-     * @param {number} slotIndex - индекс слота для изображения
-     */
     function handleCompareImageSelection(file, slotIndex) {
-        logger.debug(`Обработка выбора изображения для слота ${slotIndex}`, file.name);
-        
-        if (!isValidImageFile(file)) {
-            logger.warn("Выбранный файл не является изображением:", file.name, file.type);
-            if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                uiHelpers.showToast('Пожалуйста, выберите изображение (JPG, PNG, WEBP).');
-            } else {
-                alert('Пожалуйста, выберите изображение (JPG, PNG, WEBP).');
-            }
-            return;
-        }
+        logger.debug(`Обработка изображения для слота ${slotIndex}: ${file.name}`);
+        if (!isValidImageFile(file)) return;
         
         const slot = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
-        if (!slot) {
-            logger.error(`Слот ${slotIndex} не найден в DOM`);
-            return;
-        }
+        if (!slot) return logger.error(`Слот ${slotIndex} не найден для handleCompareImageSelection.`);
         
-        isUploadingActive = true; // Устанавливаем флаг
-        
+        isUploadingActive = true;
         const reader = new FileReader();
-        reader.onload = function(e) {
-            logger.debug(`Изображение для слота ${slotIndex} загружено FileReader и готово к отображению`);
-            
-            // Очищаем предыдущее содержимое слота (иконку загрузки)
+        reader.onload = (e) => {
             const uploadIconElement = slot.querySelector('.upload-icon');
-            if (uploadIconElement) uploadIconElement.style.display = 'none'; // Скрываем иконку
+            if (uploadIconElement) uploadIconElement.style.display = 'none';
             
-            // Удаляем старое изображение, если оно было
-            const oldImg = slot.querySelector('.slot-image');
-            if(oldImg) oldImg.remove();
-            const oldRemoveBtn = slot.querySelector('.remove-image');
-            if(oldRemoveBtn) oldRemoveBtn.remove();
-
-            // Добавляем новое изображение
-            const img = document.createElement('img');
+            let img = slot.querySelector('.slot-image');
+            if (!img) {
+                img = document.createElement('img');
+                img.className = 'slot-image';
+                slot.appendChild(img);
+            }
             img.src = e.target.result;
-            img.className = 'slot-image';
-            img.alt = `Изображение ${slotIndex + 1} для сравнения`;
+            img.alt = `Изображение ${slotIndex + 1}`;
             
-            // Добавляем кнопку удаления
-            const removeBtn = document.createElement('div');
-            removeBtn.className = 'remove-image';
-            removeBtn.textContent = '✕';
-            removeBtn.setAttribute('role', 'button');
-            removeBtn.tabIndex = 0;
-            removeBtn.setAttribute('aria-label', 'Удалить изображение из слота');
-            removeBtn.dataset.slot = slotIndex; // Для идентификации слота
-            
-            removeBtn.addEventListener('click', function(ev) {
-                ev.stopPropagation(); // Предотвращаем срабатывание клика на родительском слоте
-                logger.debug(`Нажата кнопка удаления для слота ${slotIndex}`);
-                resetSlot(slotIndex);
-                document.dispatchEvent(new CustomEvent('compareImageRemoved', { detail: { slot: slotIndex } }));
-            });
-            
-            slot.appendChild(img);
-            slot.appendChild(removeBtn);
+            let removeBtn = slot.querySelector('.remove-image');
+            if (!removeBtn) {
+                removeBtn = document.createElement('div');
+                removeBtn.className = 'remove-image';
+                removeBtn.textContent = '✕';
+                removeBtn.setAttribute('role', 'button');
+                removeBtn.tabIndex = 0;
+                removeBtn.dataset.slot = slotIndex;
+                removeBtn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    logger.debug(`Нажата кнопка удаления для слота ${slotIndex} (динамическая).`);
+                    resetSlot(slotIndex); // resetSlot вызовет событие compareImageRemoved
+                });
+                slot.appendChild(removeBtn);
+            }
+            removeBtn.style.display = 'flex';
+
             slot.classList.add('filled');
-            
             uploadedImages.compare[slotIndex] = file;
             
-            // Активация полей формы (если еще не активны и достаточно фото)
-            const filledSlots = document.querySelectorAll('.image-slot.filled').length;
-            if (filledSlots >= 2) {
-                 const occasionSelector = document.querySelector('#consultation-overlay .occasion-selector');
-                 const inputLabels = document.querySelectorAll('#consultation-overlay .input-label');
-                 const preferencesInput = document.querySelector('#consultation-overlay .preferences-input');
-                
-                 if (occasionSelector) occasionSelector.classList.remove('hidden');
-                 inputLabels.forEach(label => label.classList.remove('hidden'));
-                 if (preferencesInput) preferencesInput.classList.remove('hidden');
+            const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
+            logger.debug(`Количество заполненных слотов для сравнения: ${filledSlotsCount}`);
+            if (filledSlotsCount >= 2) {
+                const formContainer = document.getElementById('consultation-overlay');
+                if(formContainer){
+                    const occasionSel = formContainer.querySelector('.occasion-selector');
+                    const labels = formContainer.querySelectorAll('.input-label');
+                    const prefsInput = formContainer.querySelector('.preferences-input');
+                    if (occasionSel) occasionSel.classList.remove('hidden');
+                    labels.forEach(l => l.classList.remove('hidden'));
+                    if (prefsInput) prefsInput.classList.remove('hidden');
+                }
             }
-            
+            logger.info(`Изображение ${file.name} загружено в слот ${slotIndex}.`);
             document.dispatchEvent(new CustomEvent('compareImageUploaded', { detail: { file: file, slot: slotIndex } }));
-            isUploadingActive = false; // Сбрасываем флаг
+            isUploadingActive = false;
         };
-        
-        reader.onerror = function(error) {
-            logger.error(`Ошибка при чтении файла для слота ${slotIndex} (FileReader):`, error);
-            if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-                uiHelpers.showToast('Ошибка при чтении файла');
-            } else {
-                alert('Ошибка при чтении файла');
-            }
-            isUploadingActive = false; // Сбрасываем флаг
+        reader.onerror = (error) => {
+            logger.error(`Ошибка FileReader (слот ${slotIndex}):`, error);
+            if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла.');
+            isUploadingActive = false;
         };
-        
         reader.readAsDataURL(file);
     }
         
-    /**
-     * Проверка типа файла изображения
-     * @private
-     * @param {File} file - файл для проверки
-     * @returns {boolean} - результат проверки
-     */
     function isValidImageFile(file) {
         const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        const maxSize = (config && config.LIMITS && config.LIMITS.MAX_FILE_SIZE) ? config.LIMITS.MAX_FILE_SIZE : 5 * 1024 * 1024; // 5MB по умолчанию
+        const defaultMaxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = (config && config.LIMITS && config.LIMITS.MAX_FILE_SIZE) ? config.LIMITS.MAX_FILE_SIZE : defaultMaxSize;
         
-        if (!file || !file.type) return false;
+        if (!file || !file.type) { logger.warn("isValidImageFile: Файл или тип файла отсутствует."); return false; }
         if (!validTypes.includes(file.type)) {
-            logger.warn(`Недопустимый тип файла: ${file.type}`);
+            logger.warn(`isValidImageFile: Недопустимый тип файла: ${file.type} для файла ${file.name}`);
+            if (uiHelpers) uiHelpers.showToast(`Неверный тип файла: ${file.name}. Допустимы: JPG, PNG, WEBP.`);
             return false;
         }
         if (file.size > maxSize) {
-            logger.warn(`Файл слишком большой: ${file.size} байт, макс: ${maxSize} байт`);
-            if (uiHelpers) uiHelpers.showToast(`Файл слишком большой. Макс. размер: ${maxSize / (1024*1024)} МБ`);
+            const fileSizeMB = (file.size / (1024*1024)).toFixed(1);
+            const maxAllowedMB = (maxSize / (1024*1024)).toFixed(1);
+            logger.warn(`isValidImageFile: Файл ${file.name} слишком большой: ${fileSizeMB}MB, макс: ${maxAllowedMB}MB`);
+            if (uiHelpers) uiHelpers.showToast(`Файл ${file.name} слишком большой (${fileSizeMB} МБ). Макс. ${maxAllowedMB} МБ`);
             return false;
         }
         return true;
     }
     
-    /**
-     * Сброс одиночного изображения
-     */
     function resetSingleImageUpload() {
-        logger.debug('Сброс одиночного изображения');
-        
-        if (singleFileInput) singleFileInput.value = ''; // Очистка инпута
+        logger.debug('Сброс одиночного изображения (resetSingleImageUpload)...');
+        resetFileInput(singleFileInput);
         if (singlePreviewContainer) singlePreviewContainer.classList.add('hidden');
-        if (singlePreviewImage) singlePreviewImage.src = ''; // Очистка src превью
+        if (singlePreviewImage) singlePreviewImage.src = '';
         if (singleUploadArea) singleUploadArea.classList.remove('hidden');
-        
         uploadedImages.single = null;
 
-        // Скрываем поля формы, которые появляются после загрузки
-        const occasionSelector = document.querySelector('#consultation-overlay .occasion-selector');
-        const inputLabels = document.querySelectorAll('#consultation-overlay .input-label');
-        const preferencesInput = document.querySelector('#consultation-overlay .preferences-input');
+        const formContainer = document.getElementById('consultation-overlay');
+        if(formContainer){
+            const occasionSel = formContainer.querySelector('.occasion-selector');
+            const labels = formContainer.querySelectorAll('.input-label');
+            const prefsInput = formContainer.querySelector('.preferences-input');
+            const submitBtn = formContainer.querySelector('#submit-consultation');
 
-        if (occasionSelector) occasionSelector.classList.add('hidden');
-        inputLabels.forEach(label => label.classList.add('hidden'));
-        if (preferencesInput) preferencesInput.classList.add('hidden');
-
-        // Отключаем кнопку отправки в форме консультации, если она есть и изображение обязательно
-        const consultationSubmitButton = document.getElementById('submit-consultation');
-        if (consultationSubmitButton) consultationSubmitButton.disabled = true;
-
+            if (occasionSel) occasionSel.classList.add('hidden');
+            labels.forEach(l => l.classList.add('hidden'));
+            if (prefsInput) prefsInput.classList.add('hidden');
+            if (submitBtn) submitBtn.disabled = true; // Делаем неактивной
+        }
+        document.dispatchEvent(new CustomEvent('singleImageRemoved')); // Важно вызвать событие
         logger.debug('Одиночное изображение сброшено.');
     }
     
-    /**
-     * Сброс слота сравнения
-     * @param {number} slotIndex - индекс слота для сброса
-     */
     function resetSlot(slotIndex) {
-        logger.debug(`Сброс слота сравнения ${slotIndex}`);
+        logger.debug(`Сброс слота сравнения ${slotIndex}...`);
+        const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
+        if (!slot) return logger.error(`Слот ${slotIndex} не найден для сброса.`);
         
-        const slot = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
-        if (!slot) {
-            logger.error(`Слот ${slotIndex} не найден для сброса`);
-            return;
-        }
-        
-        // Удаляем изображение и кнопку удаления
         const img = slot.querySelector('.slot-image');
         if (img) img.remove();
         const removeBtn = slot.querySelector('.remove-image');
-        if (removeBtn) removeBtn.remove(); // Уже должен быть удален, но на всякий случай
+        if (removeBtn) removeBtn.remove();
         
-        // Показываем иконку загрузки обратно
         const uploadIconElement = slot.querySelector('.upload-icon');
-        if (uploadIconElement) uploadIconElement.style.display = 'flex'; // или 'block' в зависимости от CSS
+        if (uploadIconElement) uploadIconElement.style.display = 'flex'; // Восстанавливаем видимость иконки
         
         slot.classList.remove('filled');
-        
-        // Очищаем инпут файла для этого слота
         const input = slot.querySelector('.compare-upload-input');
-        if (input) input.value = '';
-        
+        resetFileInput(input);
         uploadedImages.compare[slotIndex] = null;
         
-        // Проверяем, нужно ли скрывать поля формы, если изображений для сравнения стало меньше 2
-        const filledSlotsCount = document.querySelectorAll('.image-slot.filled').length;
+        // Обновляем состояние кнопки и полей формы, если количество фото < 2
+        const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
+        logger.debug(`Количество заполненных слотов после сброса слота ${slotIndex}: ${filledSlotsCount}`);
         if (filledSlotsCount < 2) {
-            const occasionSelector = document.querySelector('#consultation-overlay .occasion-selector');
-            const inputLabels = document.querySelectorAll('#consultation-overlay .input-label');
-            const preferencesInput = document.querySelector('#consultation-overlay .preferences-input');
+             const formContainer = document.getElementById('consultation-overlay');
+             if(formContainer){
+                const occasionSel = formContainer.querySelector('.occasion-selector');
+                const labels = formContainer.querySelectorAll('.input-label');
+                const prefsInput = formContainer.querySelector('.preferences-input');
+                const submitBtn = formContainer.querySelector('#submit-consultation');
 
-            if (occasionSelector) occasionSelector.classList.add('hidden');
-            inputLabels.forEach(label => label.classList.add('hidden'));
-            if (preferencesInput) preferencesInput.classList.add('hidden');
-
-            // Отключаем кнопку "Проанализировать", если она относится к сравнению
-            const compareSubmitButton = document.getElementById('submit-consultation'); // Если та же кнопка
-            if (compareSubmitButton) compareSubmitButton.disabled = true;
+                if (occasionSel) occasionSel.classList.add('hidden');
+                labels.forEach(l => l.classList.add('hidden'));
+                if (prefsInput) prefsInput.classList.add('hidden');
+                if (submitBtn) submitBtn.disabled = true;
+            }
         }
+        document.dispatchEvent(new CustomEvent('compareImageRemoved', { detail: { slot: slotIndex } })); // Событие для обновления в comparison.js
         logger.debug(`Слот сравнения ${slotIndex} сброшен.`);
     }
     
-    /**
-     * Сброс всех слотов сравнения
-     */
     function resetCompareImageUploads() {
-        logger.debug('Сброс всех слотов сравнения');
+        logger.debug('Сброс всех слотов сравнения (resetCompareImageUploads)...');
         if (imageSlotsContainer) {
             const slots = imageSlotsContainer.querySelectorAll('.image-slot');
-            slots.forEach(slot => {
-                const slotIndex = parseInt(slot.dataset.slot, 10);
-                resetSlot(slotIndex); // resetSlot уже обрабатывает UI и uploadedImages.compare
-            });
+            slots.forEach(slot => resetSlot(parseInt(slot.dataset.slot, 10))); // resetSlot вызовет нужные события
         }
-        
-        // Дополнительно убедимся, что все поля формы скрыты и кнопка выключена
-        const occasionSelector = document.querySelector('#consultation-overlay .occasion-selector');
-        const inputLabels = document.querySelectorAll('#consultation-overlay .input-label');
-        const preferencesInput = document.querySelector('#consultation-overlay .preferences-input');
-        if (occasionSelector) occasionSelector.classList.add('hidden');
-        inputLabels.forEach(label => label.classList.add('hidden'));
-        if (preferencesInput) preferencesInput.classList.add('hidden');
-        
-        const compareSubmitButton = document.getElementById('submit-consultation');
-        if (compareSubmitButton) compareSubmitButton.disabled = true;
-
+        // Дополнительно убедиться, что поля формы скрыты (может быть избыточно, если resetSlot уже все сделал)
+        const formContainer = document.getElementById('consultation-overlay');
+        if(formContainer){
+            const occasionSel = formContainer.querySelector('.occasion-selector');
+            const labels = formContainer.querySelectorAll('.input-label');
+            const prefsInput = formContainer.querySelector('.preferences-input');
+            const submitBtn = formContainer.querySelector('#submit-consultation');
+            if (occasionSel) occasionSel.classList.add('hidden');
+            labels.forEach(l => l.classList.add('hidden'));
+            if (prefsInput) prefsInput.classList.add('hidden');
+            if (submitBtn) submitBtn.disabled = true;
+        }
         document.dispatchEvent(new CustomEvent('allCompareImagesRemoved'));
         logger.debug('Все слоты сравнения сброшены.');
     }
     
-    /**
-     * Проверка, идет ли загрузка изображения
-     * @returns {boolean} - флаг активной загрузки
-     */
-    function isUploading() {
-        return isUploadingActive;
-    }
-        
-    /**
-     * Получение загруженных изображений
-     * @returns {Object} - объект с загруженными изображениями
-     */
-    function getUploadedImages() {
-        return uploadedImages;
-    }
+    function isUploading() { return isUploadingActive; }
+    function getUploadedImages() { return uploadedImages; }
     
-    // Публичный API модуля
-    return {
-        init,
-        resetSingleImageUpload,
-        resetCompareImageUploads,
-        resetSlot, // Оставляем, если нужен сброс конкретного слота извне
-        isUploading,
-        getUploadedImages // Для доступа к файлам из других модулей, если потребуется
-    };
+    return { init, resetSingleImageUpload, resetCompareImageUploads, resetSlot, isUploading, getUploadedImages };
 })();

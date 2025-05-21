@@ -1,13 +1,13 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: API Сервис (api-service.js)
-ВЕРСИЯ: 0.4.0 (Модульная структура)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-20
+КОМПОНЕНТ: API-сервис (api-service.js)
+ВЕРСИЯ: 0.4.1 (Модульная структура)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Обеспечивает коммуникацию с серверным API. Содержит функции для отправки запросов
-на анализ одежды, сравнения предметов и обработки ответов от сервера.
+Обеспечивает взаимодействие с серверным API приложения.
+Реализует методы для отправки запросов и обработки ответов.
 ==========================================================================================
 */
 
@@ -18,153 +18,264 @@ window.MishuraApp.api.service = (function() {
     'use strict';
     
     // Локальные ссылки на другие модули
-    let config, logger, uiHelpers;
+    let config, logger;
     
-    // Базовый URL для API запросов
-    const API_BASE_URL = ''; // На Render это будет относительный путь к тому же домену
-    
-    /**
-     * Отправляет запрос на анализ одного предмета одежды
-     * @param {File} imageFile - Файл изображения для анализа
-     * @param {string} occasion - Повод/случай для одежды
-     * @param {string} preferences - Предпочтения пользователя (опционально)
-     * @returns {Promise<Object>} - Объект с результатами анализа
-     */
-    async function analyzeSingleOutfit(imageFile, occasion, preferences) {
-        logger.info("Отправка запроса на анализ одного предмета");
-        uiHelpers.showLoading("Анализируем вашу одежду...");
-        
-        const formData = new FormData();
-        formData.append('image', imageFile);
-        formData.append('occasion', occasion || 'повседневный');
-        if (preferences && preferences.trim()) {
-            formData.append('preferences', preferences.trim());
-        }
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/analyze-outfit`, { 
-                method: 'POST', 
-                body: formData 
-            });
-            
-            return await handleApiResponse(response, "анализ");
-        } catch (error) {
-            logger.error("Ошибка при analyzeSingleOutfit:", error);
-            uiHelpers.hideLoading();
-            throw error;
-        }
-    }
-
-    /**
-     * Отправляет запрос на сравнение нескольких предметов одежды
-     * @param {Array<File>} imageFiles - Массив файлов изображений для сравнения
-     * @param {string} occasion - Повод/случай для одежды
-     * @param {string} preferences - Предпочтения пользователя (опционально)
-     * @returns {Promise<Object>} - Объект с результатами сравнения
-     */
-    async function compareOutfits(imageFiles, occasion, preferences) {
-        logger.info(`Отправка запроса на сравнение ${imageFiles.length} предметов`);
-        uiHelpers.showLoading("Сравниваем предметы одежды...");
-        
-        const formData = new FormData();
-        imageFiles.forEach(file => {
-            if (file) formData.append('images', file);
-        });
-        formData.append('occasion', occasion || 'повседневный');
-        if (preferences && preferences.trim()) {
-            formData.append('preferences', preferences.trim());
-        }
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/compare-outfits`, { 
-                method: 'POST', 
-                body: formData 
-            });
-            
-            return await handleApiResponse(response, "сравнение");
-        } catch (error) {
-            logger.error("Ошибка при compareOutfits:", error);
-            uiHelpers.hideLoading();
-            throw error;
-        }
-    }
-    
-    /**
-     * Заглушка для будущей функции виртуальной примерки
-     * @param {File} personPhoto - Фото человека
-     * @param {File} outfitPhoto - Фото одежды
-     * @returns {Promise<Object>} - Результат примерки
-     */
-    async function tryOnOutfit(personPhoto, outfitPhoto) {
-        logger.info("Отправка запроса на примерку (заглушка)");
-        uiHelpers.showLoading("Создаем виртуальную примерку...");
-        
-        // Это демо-заглушка, в будущем здесь будет реальный API-запрос
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                uiHelpers.hideLoading();
-                logger.info("Виртуальная примерка (демо) завершена");
-                resolve({
-                    status: 'success',
-                    resultImage: outfitPhoto, // В реальном API здесь будет обработанное изображение
-                    message: 'Примерка завершена (демо)'
-                });
-            }, 2000);
-        });
-    }
-    
-    /**
-     * Обрабатывает ответ от API
-     * @private
-     * @param {Response} response - Ответ fetch
-     * @param {string} operationType - Тип операции (для формирования сообщений об ошибках)
-     * @returns {Promise<Object>} - Обработанные данные ответа
-     */
-    async function handleApiResponse(response, operationType) {
-        uiHelpers.hideLoading();
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            let errorMessage = `HTTP ошибка: ${response.status}`;
-            
-            try {
-                // Пытаемся распарсить JSON, если ответ содержит JSON
-                const errorData = JSON.parse(errorText);
-                errorMessage = errorData.message || errorMessage;
-            } catch (e) {
-                // Если не JSON, используем текст как есть
-                if (errorText) errorMessage = errorText;
-            }
-            
-            throw new Error(errorMessage);
-        }
-        
-        const data = await response.json();
-        if (data.status === 'success') {
-            logger.info(`${operationType} успешно получен от API.`);
-            return data;
-        } else {
-            throw new Error(data.message || `Не удалось выполнить ${operationType} (ответ API).`);
-        }
-    }
+    // Счетчик попыток повторного запроса
+    let retryCounters = {};
     
     /**
      * Инициализация модуля
      */
     function init() {
         // Получаем ссылки на другие модули
-        config = window.MishuraApp.config;
-        logger = window.MishuraApp.utils.logger;
-        uiHelpers = window.MishuraApp.utils.uiHelpers;
+        if (window.MishuraApp.config) {
+            config = window.MishuraApp.config;
+        } else {
+            config = {
+                appSettings: {
+                    apiUrl: 'https://api.mishura-stylist.ru/v1'
+                },
+                apiSettings: {
+                    timeout: 30000,
+                    retryAttempts: 3,
+                    endpoints: {
+                        consultation: '/consultation',
+                        compare: '/compare',
+                        virtualFitting: '/virtual-fitting',
+                        feedback: '/feedback',
+                        user: '/user'
+                    },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept-Language': 'ru'
+                    }
+                },
+                userId: localStorage.getItem('mishura_user_id') || 'anonymous'
+            };
+        }
         
-        logger.debug("API-сервис инициализирован");
+        if (window.MishuraApp.utils && window.MishuraApp.utils.logger) {
+            logger = window.MishuraApp.utils.logger;
+        } else {
+            logger = {
+                debug: function(msg) { console.log('[DEBUG] ' + msg); },
+                info: function(msg) { console.log('[INFO] ' + msg); },
+                warn: function(msg) { console.warn('[WARN] ' + msg); },
+                error: function(msg) { console.error('[ERROR] ' + msg); }
+            };
+        }
+        
+        logger.info('Модуль API-сервис инициализирован');
     }
     
-    // Публичный API модуля
+    /**
+     * Базовый метод для выполнения API-запроса
+     * @private
+     * @param {string} endpoint - конечная точка API
+     * @param {string} method - HTTP-метод
+     * @param {Object|FormData|null} data - данные для отправки
+     * @param {boolean} isFormData - флаг для FormData
+     * @returns {Promise} - промис с результатом запроса
+     */
+    function apiRequest(endpoint, method = 'GET', data = null, isFormData = false) {
+        const url = config.appSettings.apiUrl + endpoint;
+        const requestId = `${method}-${endpoint}-${Date.now()}`;
+        
+        // Инициализация счетчика попыток для этого запроса
+        if (!retryCounters[requestId]) {
+            retryCounters[requestId] = 0;
+        }
+        
+        const options = {
+            method: method,
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            redirect: 'follow',
+            referrerPolicy: 'no-referrer'
+        };
+        
+        // Добавляем заголовки и тело запроса в зависимости от типа данных
+        if (isFormData) {
+            // Для FormData не устанавливаем Content-Type, браузер сделает это сам
+            if (data) {
+                options.body = data;
+            }
+        } else {
+            options.headers = { ...config.apiSettings.headers };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+        }
+        
+        logger.debug(`API запрос: ${method} ${url}`);
+        
+        return new Promise((resolve, reject) => {
+            // Создаем таймаут для запроса
+            const timeoutId = setTimeout(() => {
+                logger.warn(`API запрос истек по таймауту: ${method} ${url}`);
+                handleRetry(requestId, endpoint, method, data, isFormData, resolve, reject);
+            }, config.apiSettings.timeout);
+            
+            fetch(url, options)
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Ошибка HTTP: ${response.status}`);
+                    }
+                    
+                    return response.json();
+                })
+                .then(data => {
+                    logger.debug(`API ответ получен: ${method} ${url}`);
+                    resolve(data);
+                    // Очищаем счетчик попыток после успешного запроса
+                    delete retryCounters[requestId];
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    logger.error(`API ошибка: ${error.message}`);
+                    handleRetry(requestId, endpoint, method, data, isFormData, resolve, reject);
+                });
+        });
+    }
+    
+    /**
+     * Обработка повторных попыток запроса при ошибке
+     * @private
+     */
+    function handleRetry(requestId, endpoint, method, data, isFormData, resolve, reject) {
+        retryCounters[requestId]++;
+        
+        if (retryCounters[requestId] <= config.apiSettings.retryAttempts) {
+            logger.warn(`Повторная попытка запроса (${retryCounters[requestId]}/${config.apiSettings.retryAttempts}): ${method} ${endpoint}`);
+            
+            // Экспоненциальная задержка перед повторной попыткой
+            const delay = Math.pow(2, retryCounters[requestId] - 1) * 1000;
+            
+            setTimeout(() => {
+                apiRequest(endpoint, method, data, isFormData)
+                    .then(resolve)
+                    .catch(reject);
+            }, delay);
+        } else {
+            logger.error(`Исчерпаны все попытки запроса: ${method} ${endpoint}`);
+            delete retryCounters[requestId];
+            reject(new Error('Превышено количество попыток запроса'));
+        }
+    }
+    
+    /**
+     * Отправка запроса на консультацию
+     * @public
+     * @param {FormData} formData - данные формы
+     * @returns {Promise} - промис с результатом запроса
+     */
+    function sendConsultationRequest(formData) {
+        return apiRequest(config.apiSettings.endpoints.consultation, 'POST', formData, true);
+    }
+    
+    /**
+     * Отправка запроса на сравнение
+     * @public
+     * @param {FormData} formData - данные формы
+     * @returns {Promise} - промис с результатом запроса
+     */
+    function sendCompareRequest(formData) {
+        return apiRequest(config.apiSettings.endpoints.compare, 'POST', formData, true);
+    }
+    
+    /**
+     * Отправка запроса на виртуальную примерку
+     * @public
+     * @param {FormData} formData - данные формы
+     * @returns {Promise} - промис с результатом запроса
+     */
+    function sendVirtualFittingRequest(formData) {
+        return apiRequest(config.apiSettings.endpoints.virtualFitting, 'POST', formData, true);
+    }
+    
+    /**
+     * Отправка отзыва
+     * @public
+     * @param {Object} feedbackData - данные отзыва
+     * @returns {Promise} - промис с результатом запроса
+     */
+    function sendFeedback(feedbackData) {
+        return apiRequest(config.apiSettings.endpoints.feedback, 'POST', feedbackData);
+    }
+    
+    /**
+     * Получение информации о пользователе
+     * @public
+     * @returns {Promise} - промис с результатом запроса
+     */
+    function getUserInfo() {
+        return apiRequest(config.apiSettings.endpoints.user, 'GET');
+    }
+    
+    /**
+     * Обновление информации о пользователе
+     * @public
+     * @param {Object} userData - данные пользователя
+     * @returns {Promise} - промис с результатом запроса
+     */
+    function updateUserInfo(userData) {
+        return apiRequest(config.apiSettings.endpoints.user, 'PUT', userData);
+    }
+    
+    // Временный метод для эмуляции работы API в демо-режиме
+    function getDemoResponse(type) {
+        // Эмуляция задержки для реалистичности
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                switch (type) {
+                    case 'consultation':
+                        resolve({
+                            success: true,
+                            data: {
+                                advice: "Ваш образ отлично смотрится для повседневного стиля! Для дополнительной выразительности рекомендую добавить аксессуары в виде минималистичных украшений и подобрать сумку под обувь для гармоничного сочетания.",
+                                recommendations: [
+                                    {
+                                        name: "Кожаная сумка",
+                                        description: "Классическая кожаная сумка подойдет для вашего образа",
+                                        price: "5990",
+                                        imageUrl: "https://via.placeholder.com/150",
+                                        url: "#"
+                                    },
+                                    {
+                                        name: "Серьги-кольца",
+                                        description: "Минималистичные серьги дополнят повседневный образ",
+                                        price: "1990",
+                                        imageUrl: "https://via.placeholder.com/150",
+                                        url: "#"
+                                    }
+                                ]
+                            }
+                        });
+                        break;
+                    default:
+                        resolve({
+                            success: true,
+                            data: {
+                                message: "Демо-ответ сгенерирован успешно"
+                            }
+                        });
+                }
+            }, 1500);
+        });
+    }
+    
+    // Публичный API
     return {
         init,
-        analyzeSingleOutfit,
-        compareOutfits,
-        tryOnOutfit
+        sendConsultationRequest: getDemoResponse.bind(null, 'consultation'), // Используем демо-ответ для тестирования
+        sendCompareRequest,
+        sendVirtualFittingRequest,
+        sendFeedback,
+        getUserInfo,
+        updateUserInfo
     };
 })();

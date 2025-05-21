@@ -2,226 +2,201 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Определение устройства (device-detect.js)
-ВЕРСИЯ: 0.4.0 (Модульная структура)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-20
+ВЕРСИЯ: 0.4.1 (Модульная структура)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Определение типа и характеристик устройства пользователя для адаптации
-поведения приложения под различные платформы (iOS, Android, десктоп).
+Определяет тип устройства пользователя и его характеристики.
+Позволяет адаптировать интерфейс под разные типы устройств.
 ==========================================================================================
 */
 
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
 window.MishuraApp.utils = window.MishuraApp.utils || {};
-window.MishuraApp.utils.deviceDetect = (function() {
+window.MishuraApp.utils.deviceDetector = (function() {
     'use strict';
     
     // Локальные ссылки на другие модули
     let logger;
     
-    // Флаги типов устройств
-    let isIOS = false;
-    let isAndroid = false;
-    let isMobile = false;
-    let isTablet = false;
-    let isDesktop = false;
-    
-    // Характеристики устройства
-    let touchEnabled = false;
-    let screenWidth = 0;
-    let screenHeight = 0;
-    let devicePixelRatio = 1;
-    
-    /**
-     * Определение типа устройства на основе User-Agent и других характеристик
-     */
-    function detectDeviceType() {
-        const ua = navigator.userAgent.toLowerCase();
-        
-        // Определение iOS
-        isIOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
-        
-        // Определение Android
-        isAndroid = /android/.test(ua);
-        
-        // Определение мобильных устройств в целом
-        isMobile = /mobile|iphone|ipod|android.*mobile|windows.*phone|blackberry.*mobile/i.test(ua);
-        
-        // Определение планшетов (грубое приближение)
-        isTablet = /ipad|android(?!.*mobile)/i.test(ua) || 
-                  (window.innerWidth >= 600 && window.innerWidth <= 1200 && 'ontouchstart' in window);
-        
-        // Если не мобильное и не планшет, значит десктоп
-        isDesktop = !(isMobile || isTablet);
-        
-        // Определение поддержки сенсорного экрана
-        touchEnabled = ('ontouchstart' in window) || 
-                       (navigator.maxTouchPoints > 0) || 
-                       (navigator.msMaxTouchPoints > 0);
-        
-        // Размеры экрана
-        screenWidth = window.innerWidth;
-        screenHeight = window.innerHeight;
-        devicePixelRatio = window.devicePixelRatio || 1;
-        
-        logger.info("Определение устройства:", {
-            isIOS, isAndroid, isMobile, isTablet, isDesktop,
-            touchEnabled, screenWidth, screenHeight, devicePixelRatio
-        });
-        
-        // Добавляем CSS-классы к body для стилизации
-        updateBodyClasses();
-    }
-    
-    /**
-     * Добавляет CSS-классы к тегу body на основе типа устройства
-     */
-    function updateBodyClasses() {
-        if (isIOS) document.body.classList.add('ios-device');
-        if (isAndroid) document.body.classList.add('android-device');
-        if (isMobile) document.body.classList.add('mobile-device');
-        if (isTablet) document.body.classList.add('tablet-device');
-        if (isDesktop) document.body.classList.add('desktop-device');
-        if (touchEnabled) document.body.classList.add('touch-enabled');
-    }
-    
-    /**
-     * Инициализация специфичных настроек для разных платформ
-     */
-    function setupPlatformSpecifics() {
-        if (isIOS) {
-            // Исправления для iOS
-            setupIOSFixes();
-        }
-        
-        if (isAndroid) {
-            // Исправления для Android
-            setupAndroidFixes();
-        }
-        
-        if (touchEnabled) {
-            // Настройка для сенсорных устройств
-            setupTouchHandling();
-        }
-    }
-    
-    /**
-     * Применяет специфичные исправления для iOS
-     */
-    function setupIOSFixes() {
-        // Исправление для скролла на iOS
-        document.addEventListener('touchmove', function(e) {
-            // Предотвращаем скролл только для определенных элементов
-            if (e.target.closest('.no-scroll-ios')) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        
-        // Фикс для 100vh на iOS (проблема с адресной строкой браузера)
-        const setIOSViewportHeight = () => {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        };
-        
-        window.addEventListener('resize', setIOSViewportHeight);
-        setIOSViewportHeight(); // Вызов при инициализации
-        
-        logger.debug("Применены исправления для iOS");
-    }
-    
-    /**
-     * Применяет специфичные исправления для Android
-     */
-    function setupAndroidFixes() {
-        // Исправления для разных версий Android при необходимости
-        logger.debug("Применены исправления для Android");
-    }
-    
-    /**
-     * Устанавливает обработку сенсорных событий
-     */
-    function setupTouchHandling() {
-        // Предотвращаем масштабирование двойным тапом на сенсорных устройствах
-        document.addEventListener('touchend', function(e) {
-            const now = Date.now();
-            const DOUBLE_TAP_DELAY = 300;
-            
-            if (this.lastClick && (now - this.lastClick) < DOUBLE_TAP_DELAY) {
-                e.preventDefault();
-            }
-            
-            this.lastClick = now;
-        }, { passive: false });
-        
-        logger.debug("Настроена обработка сенсорных событий");
-    }
-    
-    /**
-     * Определяет, поддерживает ли браузер определенную возможность
-     * @param {string} feature - название возможности для проверки
-     * @returns {boolean} - поддерживается ли возможность
-     */
-    function supportsFeature(feature) {
-        switch (feature.toLowerCase()) {
-            case 'touch':
-                return touchEnabled;
-            case 'webp':
-                // Проверка поддержки WebP (упрощенная)
-                const canvas = document.createElement('canvas');
-                if (canvas.getContext && canvas.getContext('2d')) {
-                    return canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
-                }
-                return false;
-            case 'webgl':
-                try {
-                    const canvas = document.createElement('canvas');
-                    return !!(window.WebGLRenderingContext && 
-                             (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
-                } catch (e) {
-                    return false;
-                }
-            // Добавьте другие проверки по необходимости
-            default:
-                return false;
-        }
-    }
+    // Информация об устройстве
+    let deviceInfo = {
+        isMobile: false,
+        isTablet: false,
+        isDesktop: true,
+        isTouchDevice: false,
+        screenWidth: window.innerWidth,
+        screenHeight: window.innerHeight,
+        pixelRatio: window.devicePixelRatio || 1,
+        orientation: window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
+    };
     
     /**
      * Инициализация модуля
      */
     function init() {
-        // Получаем ссылку на логгер
-        logger = window.MishuraApp.utils.logger;
+        // Получаем ссылки на другие модули
+        if (window.MishuraApp.utils.logger) {
+            logger = window.MishuraApp.utils.logger;
+        } else {
+            logger = {
+                debug: function(msg) { console.log('[DEBUG] ' + msg); },
+                info: function(msg) { console.log('[INFO] ' + msg); },
+                warn: function(msg) { console.warn('[WARN] ' + msg); },
+                error: function(msg) { console.error('[ERROR] ' + msg); }
+            };
+        }
         
-        // Определяем характеристики устройства
+        // Определяем тип устройства
         detectDeviceType();
         
-        // Настраиваем специфики платформ
-        setupPlatformSpecifics();
+        // Настраиваем обработчики событий изменения размера
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleOrientationChange);
         
-        // Обработка изменения размера окна
-        window.addEventListener('resize', function() {
-            screenWidth = window.innerWidth;
-            screenHeight = window.innerHeight;
-            logger.debug("Изменение размера окна:", {width: screenWidth, height: screenHeight});
-        });
+        // Добавляем классы для устройства в body
+        updateBodyClasses();
         
-        logger.debug("Модуль определения устройства инициализирован");
+        logger.info('Модуль Определение устройства инициализирован', deviceInfo);
     }
     
-    // Публичный API модуля
+    /**
+     * Определение типа устройства
+     * @private
+     */
+    function detectDeviceType() {
+        // Получаем текущую ширину экрана
+        deviceInfo.screenWidth = window.innerWidth;
+        deviceInfo.screenHeight = window.innerHeight;
+        deviceInfo.pixelRatio = window.devicePixelRatio || 1;
+        
+        // Определяем ориентацию
+        deviceInfo.orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+        
+        // Определяем тип устройства по ширине экрана
+        deviceInfo.isMobile = deviceInfo.screenWidth < 768;
+        deviceInfo.isTablet = deviceInfo.screenWidth >= 768 && deviceInfo.screenWidth < 1024;
+        deviceInfo.isDesktop = deviceInfo.screenWidth >= 1024;
+        
+        // Проверяем наличие сенсорного экрана
+        deviceInfo.isTouchDevice = 'ontouchstart' in window || 
+                                   navigator.maxTouchPoints > 0 || 
+                                   navigator.msMaxTouchPoints > 0;
+    }
+    
+    /**
+     * Обработчик изменения размера окна
+     * @private
+     */
+    function handleResize() {
+        // Обновляем информацию об устройстве
+        detectDeviceType();
+        
+        // Обновляем классы
+        updateBodyClasses();
+        
+        // Отправляем событие изменения размера
+        document.dispatchEvent(new CustomEvent('deviceResize', {
+            detail: { deviceInfo: deviceInfo }
+        }));
+    }
+    
+    /**
+     * Обработчик изменения ориентации устройства
+     * @private
+     */
+    function handleOrientationChange() {
+        // Обновляем информацию об устройстве
+        detectDeviceType();
+        
+        // Обновляем классы
+        updateBodyClasses();
+        
+        // Отправляем событие изменения ориентации
+        document.dispatchEvent(new CustomEvent('deviceOrientationChange', {
+            detail: { deviceInfo: deviceInfo }
+        }));
+    }
+    
+    /**
+     * Обновление классов в body в зависимости от устройства
+     * @private
+     */
+    function updateBodyClasses() {
+        const bodyClasses = document.body.classList;
+        
+        // Удаляем все классы устройств
+        bodyClasses.remove('device-mobile', 'device-tablet', 'device-desktop');
+        bodyClasses.remove('touch-device', 'no-touch-device');
+        bodyClasses.remove('orientation-portrait', 'orientation-landscape');
+        
+        // Добавляем новые классы
+        if (deviceInfo.isMobile) bodyClasses.add('device-mobile');
+        if (deviceInfo.isTablet) bodyClasses.add('device-tablet');
+        if (deviceInfo.isDesktop) bodyClasses.add('device-desktop');
+        
+        if (deviceInfo.isTouchDevice) {
+            bodyClasses.add('touch-device');
+        } else {
+            bodyClasses.add('no-touch-device');
+        }
+        
+        bodyClasses.add('orientation-' + deviceInfo.orientation);
+    }
+    
+    /**
+     * Получение информации об устройстве
+     * @public
+     * @returns {Object} - информация об устройстве
+     */
+    function getDeviceInfo() {
+        return { ...deviceInfo };
+    }
+    
+    /**
+     * Проверка, является ли устройство мобильным
+     * @public
+     * @returns {boolean} - результат проверки
+     */
+    function isMobileDevice() {
+        return deviceInfo.isMobile;
+    }
+    
+    /**
+     * Проверка, является ли устройство планшетом
+     * @public
+     * @returns {boolean} - результат проверки
+     */
+    function isTabletDevice() {
+        return deviceInfo.isTablet;
+    }
+    
+    /**
+     * Проверка, является ли устройство десктопом
+     * @public
+     * @returns {boolean} - результат проверки
+     */
+    function isDesktopDevice() {
+        return deviceInfo.isDesktop;
+    }
+    
+    /**
+     * Проверка, имеет ли устройство сенсорный экран
+     * @public
+     * @returns {boolean} - результат проверки
+     */
+    function isTouchEnabled() {
+        return deviceInfo.isTouchDevice;
+    }
+    
+    // Публичный API
     return {
         init,
-        get isIOS() { return isIOS; },
-        get isAndroid() { return isAndroid; },
-        get isMobile() { return isMobile; },
-        get isTablet() { return isTablet; },
-        get isDesktop() { return isDesktop; },
-        get touchEnabled() { return touchEnabled; },
-        get screenWidth() { return screenWidth; },
-        get screenHeight() { return screenHeight; },
-        get devicePixelRatio() { return devicePixelRatio; },
-        supportsFeature
+        getDeviceInfo,
+        isMobileDevice,
+        isTabletDevice,
+        isDesktopDevice,
+        isTouchEnabled
     };
 })();

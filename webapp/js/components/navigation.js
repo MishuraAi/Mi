@@ -2,168 +2,186 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Навигация (navigation.js)
-ВЕРСИЯ: 0.4.0 (Модульная структура)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-20
+ВЕРСИЯ: 0.4.1 (Модульная структура)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Управление навигацией приложения. Контролирует переключение между разделами,
-обработку кнопок меню и общую навигацию по вкладкам.
+Обеспечивает навигацию по разделам приложения.
+Обрабатывает переключение между страницами и вкладками.
 ==========================================================================================
 */
 
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.components = window.MishuraApp.components || {};
-window.MishuraApp.components.navigation = (function() {
+window.MishuraApp.utils = window.MishuraApp.utils || {};
+window.MishuraApp.utils.navigation = (function() {
     'use strict';
     
     // Локальные ссылки на другие модули
-    let logger, uiHelpers;
+    let logger;
     
-    // Элементы DOM для навигации
-    let menuButton, homeButton, searchButton, navItems;
+    // Текущая страница
+    let currentPage = '';
     
-    // Текущее состояние навигации
-    let currentTab = 'home';
+    // Элементы DOM
+    let navLinks, contentSections;
     
     /**
      * Инициализация модуля
      */
     function init() {
         // Получаем ссылки на другие модули
-        logger = window.MishuraApp.utils.logger;
-        uiHelpers = window.MishuraApp.utils.uiHelpers;
-        
-        // Получаем ссылки на DOM элементы
-        menuButton = document.getElementById('menu-button');
-        homeButton = document.getElementById('home-button');
-        searchButton = document.getElementById('search-button');
-        navItems = document.querySelectorAll('.nav-item');
-        
-        // Проверяем наличие элементов
-        if (!menuButton || !homeButton || !searchButton) {
-            logger.warn("Не все элементы навигации найдены в DOM");
+        if (window.MishuraApp.utils.logger) {
+            logger = window.MishuraApp.utils.logger;
+        } else {
+            logger = {
+                debug: function(msg) { console.log('[DEBUG] ' + msg); },
+                info: function(msg) { console.log('[INFO] ' + msg); },
+                warn: function(msg) { console.warn('[WARN] ' + msg); },
+                error: function(msg) { console.error('[ERROR] ' + msg); }
+            };
         }
         
-        // Настраиваем обработчики событий
-        setupEventListeners();
+        // Инициализация элементов DOM
+        navLinks = document.querySelectorAll('.nav-link');
+        contentSections = document.querySelectorAll('.content-section');
         
-        // Устанавливаем активную вкладку
-        setActiveTab(currentTab);
+        // Настройка обработчиков событий
+        initEventListeners();
         
-        logger.debug("Модуль навигации инициализирован");
+        // Установка начальной страницы на основе URL
+        setInitialPage();
+        
+        logger.info('Модуль Навигация инициализирован');
     }
     
     /**
-     * Настраивает обработчики событий для элементов навигации
+     * Инициализация обработчиков событий
      * @private
      */
-    function setupEventListeners() {
-        if (menuButton) {
-            menuButton.addEventListener('click', handleMenuClick);
-        }
-        
-        if (homeButton) {
-            homeButton.addEventListener('click', handleHomeClick);
-        }
-        
-        if (searchButton) {
-            searchButton.addEventListener('click', handleSearchClick);
-        }
-        
-        // Настраиваем обработчики для вкладок нижней навигации
-        navItems.forEach(item => {
-            item.addEventListener('click', (event) => {
-                handleNavClick(event.currentTarget);
+    function initEventListeners() {
+        // Обработчики для ссылок навигации
+        if (navLinks) {
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetPage = this.getAttribute('data-page');
+                    navigateTo(targetPage);
+                });
             });
-        });
+        }
+        
+        // Обработчик изменения хэша URL
+        window.addEventListener('hashchange', handleHashChange);
     }
     
     /**
-     * Обработчик клика по кнопке меню
+     * Установка начальной страницы на основе URL
      * @private
      */
-    function handleMenuClick() {
-        logger.info("Клик по кнопке меню");
-        uiHelpers.showToast("Меню в разработке");
-        // В будущих версиях здесь может быть открытие бокового меню
+    function setInitialPage() {
+        // Получаем хэш из URL
+        const hash = window.location.hash;
+        
+        if (hash) {
+            // Удаляем символ # из хэша
+            const page = hash.substring(1);
+            navigateTo(page);
+        } else {
+            // Если хэш не указан, переходим на домашнюю страницу
+            navigateTo('home');
+        }
     }
     
     /**
-     * Обработчик клика по заголовку/логотипу
+     * Обработчик изменения хэша URL
      * @private
      */
-    function handleHomeClick() {
-        logger.info("Клик по заголовку/логотипу");
-        setActiveTab('home');
+    function handleHashChange() {
+        const hash = window.location.hash;
+        
+        if (hash) {
+            // Удаляем символ # из хэша
+            const page = hash.substring(1);
+            navigateTo(page, false); // Не обновляем URL, так как он уже изменен
+        }
     }
     
     /**
-     * Обработчик клика по кнопке поиска
-     * @private
+     * Навигация к указанной странице
+     * @public
+     * @param {string} page - идентификатор страницы
+     * @param {boolean} updateUrl - обновлять ли URL (по умолчанию true)
      */
-    function handleSearchClick() {
-        logger.info("Клик по кнопке поиска");
-        uiHelpers.showToast("Поиск в разработке");
-        // В будущих версиях здесь может быть открытие поиска
-    }
-    
-    /**
-     * Обработчик клика по вкладке нижней навигации
-     * @private
-     * @param {HTMLElement} tabElement - Элемент вкладки
-     */
-    function handleNavClick(tabElement) {
-        if (!tabElement || !tabElement.dataset.tab) {
-            logger.warn("Некорректный элемент вкладки или отсутствует data-tab");
+    function navigateTo(page, updateUrl = true) {
+        // Проверяем существование страницы
+        const targetSection = document.getElementById(`${page}-section`);
+        
+        if (!targetSection) {
+            logger.warn(`Страница '${page}' не найдена`);
             return;
         }
         
-        const tabName = tabElement.dataset.tab;
-        logger.info(`Переключение на вкладку: ${tabName}`);
-        
-        setActiveTab(tabName);
-        
-        // Показываем уведомление для разделов в разработке
-        if (tabName !== 'home') {
-            const tabText = tabElement.querySelector('.nav-text')?.textContent || tabName;
-            uiHelpers.showToast(`Раздел "${tabText}" в разработке`);
+        // Если мы уже на этой странице, ничего не делаем
+        if (currentPage === page) {
+            return;
         }
+        
+        // Обновляем текущую страницу
+        currentPage = page;
+        
+        // Скрываем все разделы
+        if (contentSections) {
+            contentSections.forEach(section => {
+                section.classList.add('hidden');
+            });
+        }
+        
+        // Показываем целевой раздел
+        targetSection.classList.remove('hidden');
+        
+        // Обновляем активные ссылки в навигации
+        if (navLinks) {
+            navLinks.forEach(link => {
+                const linkPage = link.getAttribute('data-page');
+                
+                if (linkPage === page) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        }
+        
+        // Обновляем URL, если необходимо
+        if (updateUrl) {
+            window.location.hash = page;
+        }
+        
+        // Прокрутка страницы вверх
+        window.scrollTo(0, 0);
+        
+        // Отправляем событие изменения страницы
+        document.dispatchEvent(new CustomEvent('pageChanged', {
+            detail: { page: page }
+        }));
+        
+        logger.debug(`Навигация на страницу: ${page}`);
     }
     
     /**
-     * Устанавливает активную вкладку
-     * @param {string} tabName - Имя вкладки
+     * Получение текущей страницы
+     * @public
+     * @returns {string} - идентификатор текущей страницы
      */
-    function setActiveTab(tabName) {
-        if (!tabName) return;
-        
-        currentTab = tabName;
-        
-        // Обновляем класс активной вкладки
-        navItems.forEach(item => {
-            item.classList.toggle('active', item.dataset.tab === currentTab);
-        });
-        
-        // Здесь можно добавить логику для изменения содержимого в зависимости от вкладки
-        
-        // Вызываем событие изменения вкладки, чтобы другие модули могли реагировать
-        const event = new CustomEvent('tabChanged', { detail: { tab: currentTab } });
-        document.dispatchEvent(event);
+    function getCurrentPage() {
+        return currentPage;
     }
     
-    /**
-     * Возвращает текущую активную вкладку
-     * @returns {string} - Имя активной вкладки
-     */
-    function getActiveTab() {
-        return currentTab;
-    }
-    
-    // Публичный API модуля
+    // Публичный API
     return {
         init,
-        setActiveTab,
-        getActiveTab
+        navigateTo,
+        getCurrentPage
     };
 })();

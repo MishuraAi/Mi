@@ -1,9 +1,13 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-ФАЙЛ: Основной файл приложения (app.js)
+ФАЙЛ: Загрузчик приложения (app.js)
 ВЕРСИЯ: 0.4.1
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
+
+НАЗНАЧЕНИЕ ФАЙЛА:
+Загрузчик приложения, который инициализирует все модули в правильном порядке.
+Заменяет старый script.js, но с минимальным содержимым.
 ==========================================================================================
 */
 
@@ -11,11 +15,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
     
-    // Создаем глобальный объект приложения и его структуру
+    // Создаем глобальный объект приложения, если он еще не создан
     window.MishuraApp = window.MishuraApp || {};
     window.MishuraApp.utils = window.MishuraApp.utils || {};
-    window.MishuraApp.services = window.MishuraApp.services || {};
+    window.MishuraApp.api = window.MishuraApp.api || {};
     window.MishuraApp.components = window.MishuraApp.components || {};
+    window.MishuraApp.features = window.MishuraApp.features || {};
     
     try {
         console.log("Инициализация приложения...");
@@ -23,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Инициализация конфигурации
         if (window.MishuraApp.config && typeof window.MishuraApp.config.init === 'function') {
             window.MishuraApp.config.init();
-            console.log("Инициализация конфигурации завершена");
+            console.log("Конфигурация инициализирована");
         } else {
             console.warn("Модуль конфигурации не найден");
         }
@@ -33,19 +38,19 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Базовые утилиты инициализированы");
         
         // Инициализация API-сервиса
-        if (window.MishuraApp.services.api && typeof window.MishuraApp.services.api.init === 'function') {
-            window.MishuraApp.services.api.init();
+        if (window.MishuraApp.api.service && typeof window.MishuraApp.api.service.init === 'function') {
+            window.MishuraApp.api.service.init();
             console.log("API-сервис инициализирован");
         } else {
             console.warn("Модуль API-сервиса не найден");
         }
         
         // Инициализация компонентов интерфейса
-        initializeUIComponents();
+        initializeComponents();
         console.log("Компоненты интерфейса инициализированы");
         
         // Инициализация функциональных модулей
-        initializeFunctionalModules();
+        initializeFeatures();
         console.log("Функциональные модули инициализированы");
         
         // Инициализация основного модуля
@@ -58,6 +63,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
     } catch (error) {
         console.error("Ошибка при инициализации приложения:", error);
+        
+        // Отображаем сообщение об ошибке пользователю
+        if (window.MishuraApp.utils.uiHelpers && typeof window.MishuraApp.utils.uiHelpers.showToast === 'function') {
+            window.MishuraApp.utils.uiHelpers.showToast('Произошла ошибка при запуске приложения. Пожалуйста, обновите страницу.');
+        } else {
+            alert('Произошла ошибка при запуске приложения. Пожалуйста, обновите страницу.');
+        }
     }
 });
 
@@ -97,124 +109,44 @@ function initializeUtilities() {
     if (window.MishuraApp.utils.modals && typeof window.MishuraApp.utils.modals.init === 'function') {
         window.MishuraApp.utils.modals.init();
     } else {
-        console.warn("Модуль модальных окон не найден или не определен. Создаём временную реализацию.");
-        
-        // Создаем временную реализацию модуля модальных окон
-        window.MishuraApp.utils.modals = {
-            init: function() {
-                console.log("Модальные окна инициализированы (временная реализация)");
-            },
-            openModal: function(modalId) {
-                console.log("Открытие модального окна:", modalId);
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.add('active');
-                    document.body.classList.add('modal-open');
-                }
-            },
-            closeModal: function(modalId) {
-                console.log("Закрытие модального окна:", modalId);
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.remove('active');
-                    document.body.classList.remove('modal-open');
-                }
-            },
-            openConsultationModal: function() {
-                this.openModal('consultation-modal');
-            }
-        };
-        window.MishuraApp.utils.modals.init();
+        console.warn("Модуль модальных окон не найден");
     }
 }
 
 /**
  * Инициализация компонентов интерфейса
  */
-function initializeUIComponents() {
+function initializeComponents() {
     // Инициализация компонента загрузки изображений
     if (window.MishuraApp.components.imageUpload && typeof window.MishuraApp.components.imageUpload.init === 'function') {
         window.MishuraApp.components.imageUpload.init();
     } else {
         console.warn("Компонент загрузки изображений не найден");
-        
-        // Создаем временную реализацию компонента загрузки изображений
-        window.MishuraApp.components.imageUpload = {
-            init: function() {
-                console.log("Компонент загрузки изображений инициализирован (временная реализация)");
-            },
-            resetSingleImageUpload: function() {
-                console.log("Сброс изображения (временная реализация)");
-                const singlePreviewContainer = document.getElementById('single-preview-container');
-                const singleUploadArea = document.getElementById('single-upload-area');
-                
-                if (singlePreviewContainer) singlePreviewContainer.classList.add('hidden');
-                if (singleUploadArea) singleUploadArea.classList.remove('hidden');
-            }
-        };
-        window.MishuraApp.components.imageUpload.init();
     }
 }
 
 /**
  * Инициализация функциональных модулей
  */
-function initializeFunctionalModules() {
+function initializeFeatures() {
     // Инициализация модуля консультации
-    if (window.MishuraApp.components.consultation && typeof window.MishuraApp.components.consultation.init === 'function') {
-        window.MishuraApp.components.consultation.init();
+    if (window.MishuraApp.features.consultation && typeof window.MishuraApp.features.consultation.init === 'function') {
+        window.MishuraApp.features.consultation.init();
     } else {
         console.warn("Модуль консультации не найден");
-        
-        // Создаем временную реализацию модуля консультации
-        window.MishuraApp.components.consultation = {
-            init: function() {
-                console.log("Модуль консультации инициализирован (временная реализация)");
-                
-                // Привязываем обработчики к кнопкам консультации
-                const consultationTriggers = document.querySelectorAll('.consultation-trigger');
-                if (consultationTriggers) {
-                    consultationTriggers.forEach(trigger => {
-                        trigger.addEventListener('click', function() {
-                            window.MishuraApp.utils.modals.openConsultationModal();
-                        });
-                    });
-                }
-            },
-            openConsultationModal: function() {
-                window.MishuraApp.utils.modals.openConsultationModal();
-            }
-        };
-        window.MishuraApp.components.consultation.init();
     }
     
     // Инициализация модуля сравнения
-    if (window.MishuraApp.components.compare && typeof window.MishuraApp.components.compare.init === 'function') {
-        window.MishuraApp.components.compare.init();
+    if (window.MishuraApp.features.comparison && typeof window.MishuraApp.features.comparison.init === 'function') {
+        window.MishuraApp.features.comparison.init();
     } else {
         console.warn("Модуль сравнения не найден");
-        
-        // Можно добавить временную реализацию по мере необходимости
-        window.MishuraApp.components.compare = {
-            init: function() {
-                console.log("Модуль сравнения инициализирован (временная реализация)");
-            }
-        };
-        window.MishuraApp.components.compare.init();
     }
     
     // Инициализация модуля виртуальной примерки
-    if (window.MishuraApp.components.virtualFitting && typeof window.MishuraApp.components.virtualFitting.init === 'function') {
-        window.MishuraApp.components.virtualFitting.init();
+    if (window.MishuraApp.features.tryOn && typeof window.MishuraApp.features.tryOn.init === 'function') {
+        window.MishuraApp.features.tryOn.init();
     } else {
         console.warn("Модуль виртуальной примерки не найден");
-        
-        // Можно добавить временную реализацию по мере необходимости
-        window.MishuraApp.components.virtualFitting = {
-            init: function() {
-                console.log("Модуль виртуальной примерки инициализирован (временная реализация)");
-            }
-        };
-        window.MishuraApp.components.virtualFitting.init();
     }
 }

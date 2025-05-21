@@ -21,7 +21,6 @@ window.MishuraApp.utils.modals = (function() {
     let logger;
     
     // Объекты для модальных окон
-    let modalContainers = {}; 
     let activeModal = null;
     
     /**
@@ -29,7 +28,7 @@ window.MishuraApp.utils.modals = (function() {
      */
     function init() {
         // Получаем ссылки на другие модули
-        if (window.MishuraApp.utils.logger) {
+        if (window.MishuraApp.utils && window.MishuraApp.utils.logger) {
             logger = window.MishuraApp.utils.logger;
         } else {
             // Используем временный логгер, если основной недоступен
@@ -41,36 +40,72 @@ window.MishuraApp.utils.modals = (function() {
             };
         }
         
-        // Находим все модальные окна
-        const modals = document.querySelectorAll('.modal-container');
-        modals.forEach(modal => {
-            const modalId = modal.id;
-            modalContainers[modalId] = modal;
-            
-            // Настройка кнопок закрытия
-            const closeButtons = modal.querySelectorAll('.modal-close');
-            closeButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    closeModal(modalId);
-                });
-            });
-            
-            // Закрытие по клику на оверлей
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    closeModal(modalId);
-                }
-            });
-        });
+        // Настройка обработчиков событий для кнопок закрытия модальных окон
+        setupCloseButtons();
         
-        // Закрытие по Escape
+        // Настройка закрытия по Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && activeModal) {
                 closeModal(activeModal);
             }
         });
         
+        // Настройка закрытия по клику на фон
+        setupOverlayClicks();
+        
         logger.info('Модуль Модальные окна инициализирован');
+    }
+    
+    /**
+     * Настройка обработчиков закрытия для кнопок отмены в модальных окнах
+     */
+    function setupCloseButtons() {
+        // Настройка кнопок закрытия консультации
+        const consultationCancel = document.getElementById('consultation-cancel');
+        if (consultationCancel) {
+            consultationCancel.addEventListener('click', function() {
+                closeModal('consultation-overlay');
+            });
+        }
+        
+        // Настройка кнопок закрытия результатов
+        const resultsClose = document.getElementById('results-close');
+        if (resultsClose) {
+            resultsClose.addEventListener('click', function() {
+                closeModal('results-overlay');
+            });
+        }
+        
+        // Настройка кнопок закрытия примерки
+        const tryOnCancel = document.getElementById('try-on-cancel');
+        if (tryOnCancel) {
+            tryOnCancel.addEventListener('click', function() {
+                closeModal('try-on-overlay');
+            });
+        }
+        
+        // Настройка кнопок закрытия результатов примерки
+        const tryOnResultClose = document.getElementById('try-on-result-close');
+        if (tryOnResultClose) {
+            tryOnResultClose.addEventListener('click', function() {
+                closeModal('try-on-result-overlay');
+            });
+        }
+    }
+    
+    /**
+     * Настройка закрытия по клику на фон модального окна
+     */
+    function setupOverlayClicks() {
+        const overlays = document.querySelectorAll('.overlay');
+        overlays.forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                // Закрываем только если клик был именно на фоне (overlay), а не на его содержимом
+                if (e.target === overlay) {
+                    closeModal(overlay.id);
+                }
+            });
+        });
     }
     
     /**
@@ -78,39 +113,21 @@ window.MishuraApp.utils.modals = (function() {
      * @param {string} modalId - идентификатор модального окна
      */
     function openModal(modalId) {
-        if (!modalContainers[modalId]) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                // Если нашли модальное окно в DOM, но его нет в списке - добавляем
-                modalContainers[modalId] = modal;
-                
-                // Настройка кнопок закрытия
-                const closeButtons = modal.querySelectorAll('.modal-close');
-                closeButtons.forEach(button => {
-                    button.addEventListener('click', function() {
-                        closeModal(modalId);
-                    });
-                });
-                
-                // Закрытие по клику на оверлей
-                modal.addEventListener('click', function(e) {
-                    if (e.target === modal) {
-                        closeModal(modalId);
-                    }
-                });
-            } else {
+        const modal = document.getElementById(modalId);
+        
+        if (!modal) {
+            if (logger) {
                 logger.error(`Модальное окно с ID ${modalId} не найдено`);
-                return;
             }
+            return;
         }
         
-        // Закрываем текущее активное модальное окно
+        // Закрываем текущее активное модальное окно если есть
         if (activeModal) {
             closeModal(activeModal);
         }
         
-        // Открываем новое
-        const modal = modalContainers[modalId];
+        // Открываем новое окно
         modal.classList.add('active');
         document.body.classList.add('modal-open');
         activeModal = modalId;
@@ -123,12 +140,14 @@ window.MishuraApp.utils.modals = (function() {
             }
         }, 100);
         
-        // Событие открытия
+        // Отправляем событие открытия
         document.dispatchEvent(new CustomEvent('modalOpened', {
             detail: { modalId: modalId }
         }));
         
-        logger.debug(`Открыто модальное окно: ${modalId}`);
+        if (logger) {
+            logger.debug(`Открыто модальное окно: ${modalId}`);
+        }
     }
     
     /**
@@ -136,57 +155,52 @@ window.MishuraApp.utils.modals = (function() {
      * @param {string} modalId - идентификатор модального окна
      */
     function closeModal(modalId) {
-        if (!modalContainers[modalId]) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                // Если нашли модальное окно в DOM, но его нет в списке - добавляем
-                modalContainers[modalId] = modal;
-            } else {
+        const modal = document.getElementById(modalId);
+        
+        if (!modal) {
+            if (logger) {
                 logger.error(`Модальное окно с ID ${modalId} не найдено`);
-                return;
             }
+            return;
         }
         
-        const modal = modalContainers[modalId];
         modal.classList.remove('active');
         document.body.classList.remove('modal-open');
-        activeModal = null;
         
-        // Событие закрытия
+        // Сбрасываем активное окно, только если закрываем текущее активное
+        if (activeModal === modalId) {
+            activeModal = null;
+        }
+        
+        // Отправляем событие закрытия
         document.dispatchEvent(new CustomEvent('modalClosed', {
             detail: { modalId: modalId }
         }));
         
-        logger.debug(`Закрыто модальное окно: ${modalId}`);
+        if (logger) {
+            logger.debug(`Закрыто модальное окно: ${modalId}`);
+        }
     }
     
     /**
      * Открытие модального окна консультации
      */
     function openConsultationModal() {
-        logger.debug('Вызвана функция openConsultationModal');
-        openModal('consultation-modal');
+        openModal('consultation-overlay');
     }
     
     /**
-     * Открытие модального окна выбора одежды
+     * Открытие модального окна для примерки
      */
-    function openClothesModal() {
-        openModal('clothes-modal');
+    function openTryOnModal() {
+        openModal('try-on-overlay');
     }
     
     /**
-     * Открытие модального окна сравнения
+     * Открытие модального окна результатов
      */
-    function openCompareModal() {
-        openModal('compare-modal');
-    }
-    
-    /**
-     * Открытие модального окна настроек
-     */
-    function openSettingsModal() {
-        openModal('settings-modal');
+    function openResultsModal() {
+        openModal('results-overlay');
     }
     
     /**
@@ -212,9 +226,8 @@ window.MishuraApp.utils.modals = (function() {
         openModal,
         closeModal,
         openConsultationModal,
-        openClothesModal,
-        openCompareModal,
-        openSettingsModal,
+        openTryOnModal,
+        openResultsModal,
         isModalOpen,
         getActiveModal
     };

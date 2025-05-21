@@ -1,7 +1,7 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-ФАЙЛ: Загрузчик приложения (app.js)
+КОМПОНЕНТ: Загрузчик приложения (app.js)
 ВЕРСИЯ: 0.4.1
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
@@ -61,6 +61,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.warn("Основной модуль не найден");
         }
         
+        // Добавляем обработчики событий для кнопок
+        setupButtonHandlers();
+        
     } catch (error) {
         console.error("Ошибка при инициализации приложения:", error);
         
@@ -97,9 +100,16 @@ function initializeUtilities() {
     } else {
         console.warn("Модуль UI-хелперов не найден");
     }
-    
+}
+
+/**
+ * Инициализация компонентов интерфейса
+ */
+function initializeComponents() {
     // Инициализация навигации
-    if (window.MishuraApp.utils.navigation && typeof window.MishuraApp.utils.navigation.init === 'function') {
+    if (window.MishuraApp.components.navigation && typeof window.MishuraApp.components.navigation.init === 'function') {
+        window.MishuraApp.components.navigation.init();
+    } else if (window.MishuraApp.utils.navigation && typeof window.MishuraApp.utils.navigation.init === 'function') {
         window.MishuraApp.utils.navigation.init();
     } else {
         console.warn("Модуль навигации не найден");
@@ -111,12 +121,7 @@ function initializeUtilities() {
     } else {
         console.warn("Модуль модальных окон не найден");
     }
-}
-
-/**
- * Инициализация компонентов интерфейса
- */
-function initializeComponents() {
+    
     // Инициализация компонента загрузки изображений
     if (window.MishuraApp.components.imageUpload && typeof window.MishuraApp.components.imageUpload.init === 'function') {
         window.MishuraApp.components.imageUpload.init();
@@ -149,4 +154,75 @@ function initializeFeatures() {
     } else {
         console.warn("Модуль виртуальной примерки не найден");
     }
+}
+
+/**
+ * Настройка обработчиков для кнопок приложения
+ */
+function setupButtonHandlers() {
+    console.log("Настройка обработчиков кнопок...");
+    
+    // Получаем ссылки на модули для обработки событий
+    const modals = window.MishuraApp.utils.modals;
+    const uiHelpers = window.MishuraApp.utils.uiHelpers;
+    
+    // Кнопка "Получить консультацию"
+    const consultationButton = document.getElementById('consultation-button');
+    if (consultationButton) {
+        consultationButton.addEventListener('click', function() {
+            console.log("Нажата кнопка 'Получить консультацию'");
+            if (modals && typeof modals.openConsultationModal === 'function') {
+                modals.openConsultationModal();
+            } else {
+                console.error("Невозможно открыть модальное окно консультации: модуль не найден или метод недоступен");
+                if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+                    uiHelpers.showToast('Функция временно недоступна');
+                }
+            }
+        });
+    } else {
+        console.warn("Кнопка 'Получить консультацию' не найдена в DOM");
+    }
+    
+    // Кнопка "Примерить"
+    const tryOnButton = document.getElementById('try-on-button');
+    if (tryOnButton) {
+        tryOnButton.addEventListener('click', function() {
+            console.log("Нажата кнопка 'Примерить'");
+            if (modals && typeof modals.openTryOnModal === 'function') {
+                modals.openTryOnModal();
+            } else if (modals && typeof modals.openModal === 'function') {
+                modals.openModal('try-on-overlay');
+            } else {
+                console.error("Невозможно открыть модальное окно примерки: модуль не найден или метод недоступен");
+                if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+                    uiHelpers.showToast('Функция временно недоступна');
+                }
+            }
+        });
+    } else {
+        console.warn("Кнопка 'Примерить' не найдена в DOM");
+    }
+    
+    // Плавающая кнопка (FAB)
+    const fabButton = document.getElementById('fab-button');
+    if (fabButton) {
+        fabButton.addEventListener('click', function() {
+            console.log("Нажата плавающая кнопка (FAB)");
+            if (modals && typeof modals.openConsultationModal === 'function') {
+                modals.openConsultationModal();
+            } else if (modals && typeof modals.openModal === 'function') {
+                modals.openModal('consultation-overlay');
+            } else {
+                console.error("Невозможно открыть модальное окно консультации: модуль не найден или метод недоступен");
+                if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+                    uiHelpers.showToast('Функция временно недоступна');
+                }
+            }
+        });
+    } else {
+        console.warn("Плавающая кнопка (FAB) не найдена в DOM");
+    }
+    
+    console.log("Настройка обработчиков кнопок завершена");
 }

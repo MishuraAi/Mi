@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Управление модальными окнами (modals.js)
-ВЕРСИЯ: 0.3.0 (Модульная структура)
+ВЕРСИЯ: 0.4.1 (Модульная структура)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -29,7 +29,17 @@ window.MishuraApp.utils.modals = (function() {
      */
     function init() {
         // Получаем ссылки на другие модули
-        logger = window.MishuraApp.utils.logger;
+        if (window.MishuraApp.utils.logger) {
+            logger = window.MishuraApp.utils.logger;
+        } else {
+            // Используем временный логгер, если основной недоступен
+            logger = {
+                debug: function(msg) { console.log('[DEBUG] ' + msg); },
+                info: function(msg) { console.log('[INFO] ' + msg); },
+                warn: function(msg) { console.warn('[WARN] ' + msg); },
+                error: function(msg) { console.error('[ERROR] ' + msg); }
+            };
+        }
         
         // Находим все модальные окна
         const modals = document.querySelectorAll('.modal-container');
@@ -60,7 +70,7 @@ window.MishuraApp.utils.modals = (function() {
             }
         });
         
-        logger.debug("Модуль модальных окон инициализирован");
+        logger.info('Модуль Модальные окна инициализирован');
     }
     
     /**
@@ -69,8 +79,29 @@ window.MishuraApp.utils.modals = (function() {
      */
     function openModal(modalId) {
         if (!modalContainers[modalId]) {
-            logger.error(`Модальное окно с ID ${modalId} не найдено`);
-            return;
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                // Если нашли модальное окно в DOM, но его нет в списке - добавляем
+                modalContainers[modalId] = modal;
+                
+                // Настройка кнопок закрытия
+                const closeButtons = modal.querySelectorAll('.modal-close');
+                closeButtons.forEach(button => {
+                    button.addEventListener('click', function() {
+                        closeModal(modalId);
+                    });
+                });
+                
+                // Закрытие по клику на оверлей
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeModal(modalId);
+                    }
+                });
+            } else {
+                logger.error(`Модальное окно с ID ${modalId} не найдено`);
+                return;
+            }
         }
         
         // Закрываем текущее активное модальное окно
@@ -106,8 +137,14 @@ window.MishuraApp.utils.modals = (function() {
      */
     function closeModal(modalId) {
         if (!modalContainers[modalId]) {
-            logger.error(`Модальное окно с ID ${modalId} не найдено`);
-            return;
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                // Если нашли модальное окно в DOM, но его нет в списке - добавляем
+                modalContainers[modalId] = modal;
+            } else {
+                logger.error(`Модальное окно с ID ${modalId} не найдено`);
+                return;
+            }
         }
         
         const modal = modalContainers[modalId];

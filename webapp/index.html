@@ -7,7 +7,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>МИШУРА - ИИ Стилист</title>
-    <link rel="stylesheet" href="/webapp/styles.css">
+    <!-- Обновленные пути к стилям -->
+    <link rel="stylesheet" href="/webapp/css/styles.css">
     <style>
         /* Предотвращение FOUC (Flash Of Unstyled Content) */
         body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }
@@ -223,13 +224,41 @@
         </symbol>
     </svg>
 
-    <script src="/webapp/script.js" defer></script>
-    <script src="/webapp/cursor-effect.js" defer></script>
+    <!-- Загрузка модулей в правильном порядке -->
+    <script src="/webapp/js/config.js"></script>
+    
+    <!-- Утилиты -->
+    <script src="/webapp/js/utils/logger.js"></script>
+    <script src="/webapp/js/utils/device-detect.js"></script>
+    <script src="/webapp/js/utils/ui-helpers.js"></script>
+    
+    <!-- API сервисы -->
+    <script src="/webapp/js/api/api-service.js"></script>
+    
+    <!-- Компоненты -->
+    <script src="/webapp/js/components/navigation.js"></script>
+    <script src="/webapp/js/components/modals.js"></script>
+    <script src="/webapp/js/components/image-upload.js"></script>
+    
+    <!-- Функциональные модули -->
+    <script src="/webapp/js/features/consultation.js"></script>
+    <script src="/webapp/js/features/comparison.js"></script>
+    <script src="/webapp/js/features/try-on.js"></script>
+    
+    <!-- Основной модуль -->
+    <script src="/webapp/js/main.js"></script>
+    
+    <!-- Внешние библиотеки -->
+    <script src="/webapp/vendor/cursor-effect.js" defer></script>
+    
+    <!-- Загрузчик приложения -->
+    <script src="/webapp/app.js" defer></script>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const body = document.body;
-            // ИЗМЕНЕН ПУТЬ: ссылка на /webapp/styles.css
-            const mainStyles = document.querySelector('link[href="/webapp/styles.css"]');
+            // ИЗМЕНЕН ПУТЬ: ссылка на /webapp/css/styles.css
+            const mainStyles = document.querySelector('link[href="/webapp/css/styles.css"]');
             let stylesLoaded = false;
 
             function showBody() {
@@ -243,17 +272,17 @@
                 } else {
                     mainStyles.onload = showBody;
                     mainStyles.onerror = function() {
-                        console.error("[FOUC Guard] Error loading /webapp/styles.css. Showing body anyway.");
+                        console.error("[FOUC Guard] Error loading /webapp/css/styles.css. Showing body anyway.");
                         showBody(); 
                     };
                 }
             } else {
-                 console.error("[FOUC Guard] Main stylesheet /webapp/styles.css link not found in head! Showing body.");
+                 console.error("[FOUC Guard] Main stylesheet /webapp/css/styles.css link not found in head! Showing body.");
                  showBody();
             }
             setTimeout(function() {
                 if (!body.classList.contains('loaded')) {
-                    console.warn("[FOUC Guard] Fallback: Showing body due to timeout. CSS onload/onerror for /webapp/styles.css might not have fired.");
+                    console.warn("[FOUC Guard] Fallback: Showing body due to timeout. CSS onload/onerror for /webapp/css/styles.css might not have fired.");
                     showBody();
                 }
             }, 750);

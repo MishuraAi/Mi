@@ -37,7 +37,7 @@ window.MishuraApp.features.consultation = (function() {
         config = window.MishuraApp.config;
         logger = window.MishuraApp.utils.logger;
         uiHelpers = window.MishuraApp.utils.uiHelpers;
-        modals = window.MishuraApp.utils.modals;
+        modals = window.MishuraApp.components.modals;
         imageUpload = window.MishuraApp.components.imageUpload;
         api = window.MishuraApp.api.service;
         
@@ -131,7 +131,7 @@ window.MishuraApp.features.consultation = (function() {
         logger.info('Открытие модального окна консультации');
         
         // Используем полный путь к модулю модальных окон
-        window.MishuraApp.utils.modals.openConsultationModal();
+        window.MishuraApp.components.modals.openConsultationModal();
         
         // Сбросим форму перед открытием
         resetConsultationForm();

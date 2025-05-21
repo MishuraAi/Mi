@@ -38,10 +38,10 @@ window.MishuraApp.features.comparison = (function() {
         if (window.MishuraApp.utils) {
             logger = window.MishuraApp.utils.logger;
             uiHelpers = window.MishuraApp.utils.uiHelpers;
-            modals = window.MishuraApp.utils.modals;
         }
         
         if (window.MishuraApp.components) {
+            modals = window.MishuraApp.components.modals;
             imageUpload = window.MishuraApp.components.imageUpload;
         }
         

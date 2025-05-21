@@ -78,11 +78,11 @@ window.MishuraApp = window.MishuraApp || {};
             Logger = app.utils.logger;
             DeviceDetect = app.utils.deviceDetect;
             UIHelpers = app.utils.uiHelpers;
-            Modals = app.utils.modals;
-            Navigation = app.components.navigation;
         }
         
         if (app.components) {
+            Modals = app.components.modals;
+            Navigation = app.components.navigation;
             ImageUpload = app.components.imageUpload;
         }
         

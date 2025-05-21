@@ -148,8 +148,8 @@ window.MishuraApp.features.tryOn = (function() {
             
             tryOnButton.addEventListener('click', function() {
                 console.log("Кнопка примерки в меню нажата");
-                if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.modals) {
-                    window.MishuraApp.utils.modals.openTryOnModal();
+                if (window.MishuraApp && window.MishuraApp.components && window.MishuraApp.components.modals) {
+                    window.MishuraApp.components.modals.openTryOnModal();
                 } else {
                     const tryOnOverlay = document.getElementById('try-on-overlay');
                     if (tryOnOverlay) {
@@ -621,8 +621,8 @@ window.MishuraApp.features.tryOn = (function() {
         }
         
         // Открываем модальное окно с результатом
-        if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.modals) {
-            window.MishuraApp.utils.modals.openTryOnResultModal();
+        if (window.MishuraApp && window.MishuraApp.components && window.MishuraApp.components.modals) {
+            window.MishuraApp.components.modals.openTryOnResultModal();
             console.log("Модальное окно результатов примерки открыто");
         } else {
             const tryOnResultOverlay = document.getElementById('try-on-result-overlay');

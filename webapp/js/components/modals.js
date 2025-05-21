@@ -13,8 +13,8 @@
 
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.utils = window.MishuraApp.utils || {};
-window.MishuraApp.utils.modals = (function() {
+window.MishuraApp.components = window.MishuraApp.components || {};
+window.MishuraApp.components.modals = (function() {
     'use strict';
     
     // Локальные ссылки на другие модули

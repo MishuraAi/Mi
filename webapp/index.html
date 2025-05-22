@@ -166,7 +166,7 @@
                         <div class="section-title">1. Ваше фото (в полный рост)</div>
                         <div class="upload-area tryon-upload-area" id="your-photo-upload-area" role="button" tabindex="0" aria-label="Загрузить ваше фото">
                             <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
-                            <div class="upload-text">Нажмите для выбора вашего фото</div>
+                            <div class="upload-text">Нажмите для выбора вашего фото<br>или перетащите файл сюда</div>
                             <input type="file" id="your-photo-input" class="upload-input" accept="image/*">
                         </div>
                         <div class="image-preview-container" id="your-photo-container">
@@ -178,7 +178,7 @@
                         <div class="section-title">2. Фото предмета одежды/образа</div>
                         <div class="upload-area tryon-upload-area" id="outfit-photo-upload-area" role="button" tabindex="0" aria-label="Загрузить фото одежды">
                             <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
-                            <div class="upload-text">Нажмите для выбора фото одежды</div>
+                            <div class="upload-text">Нажмите для выбора фото одежды<br>или перетащите файл сюда</div>
                             <input type="file" id="outfit-photo-input" class="upload-input" accept="image/*">
                         </div>
                         <div class="image-preview-container" id="outfit-photo-container">
@@ -186,14 +186,19 @@
                             <div class="delete-image" data-target="outfit-photo" role="button" tabindex="0" aria-label="Удалить фото одежды">✕</div>
                         </div>
                     </div>
-                    <label for="try-on-style-selector" class="input-label hidden">Стиль примерки:</label>
-                    <select class="occasion-selector" id="try-on-style-selector" aria-label="Выберите стиль примерки (в разработке)">
-                        <option value="default">Стандартный (в разработке)</option>
-                    </select>
+                    <div class="upload-section">
+                        <label for="try-on-style-selector" class="input-label">Стиль примерки:</label>
+                        <select class="occasion-selector" id="try-on-style-selector" aria-label="Выберите стиль примерки">
+                            <option value="default">Стандартный</option>
+                            <option value="casual">Повседневный</option>
+                            <option value="business">Деловой</option>
+                            <option value="evening">Вечерний</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="dialog-footer">
-                <button class="btn btn-primary" id="try-on-button-submit" role="button">Примерить (в разработке)</button>
+                <button class="btn btn-primary" id="try-on-button-submit" role="button">Примерить</button>
                 <button class="btn btn-secondary" id="try-on-cancel" role="button">Отмена</button>
             </div>
         </div>

@@ -932,32 +932,131 @@ body {
 .try-on-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 24px;
+    padding: 20px;
 }
 
-.upload-section {
-    margin-bottom: 10px;
+.try-on-container .upload-section {
+    background: var(--background-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.section-title {
-    font-size: 14px;
+.try-on-container .section-title {
+    font-size: 16px;
     font-weight: 600;
-    margin-bottom: 8px;
     color: var(--text-primary);
+    margin-bottom: 16px;
 }
 
 .tryon-upload-area {
-    min-height: 120px;
+    min-height: 200px;
+    border: 2px dashed var(--primary-color);
+    background: rgba(0, 194, 255, 0.05);
+    transition: all 0.3s ease;
 }
 
-.try-on-result-container {
-    text-align: center;
+.tryon-upload-area:hover {
+    background: rgba(0, 194, 255, 0.1);
+    border-color: var(--primary-color);
 }
 
-.result-description {
-    margin-top: 16px;
+.tryon-upload-area.dragover {
+    background: rgba(0, 194, 255, 0.15);
+    border-color: var(--primary-color);
+    transform: scale(1.02);
+}
+
+.try-on-container .image-preview-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--background-color);
+}
+
+.try-on-container .image-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--background-color);
+}
+
+.try-on-container .delete-image {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.try-on-container .delete-image:hover {
+    background: rgba(0, 0, 0, 0.7);
+    transform: scale(1.1);
+}
+
+.try-on-container .occasion-selector {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-color);
+    color: var(--text-primary);
     font-size: 14px;
-    color: var(--text-secondary);
+    margin-top: 8px;
+}
+
+.try-on-container .occasion-selector:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+.try-on-container .btn-primary {
+    margin-top: 16px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.try-on-container .btn-primary:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Стили для результата примерки */
+.try-on-result-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+}
+
+.try-on-result-image {
+    max-width: 100%;
+    max-height: 500px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.try-on-result-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.try-on-result-actions .btn {
+    min-width: 120px;
 }
 
 /* ==================

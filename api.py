@@ -24,7 +24,7 @@ import logging
 import platform
 import sys
 from datetime import datetime
-from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi import FastAPI, File, UploadFile, Form, Request, APIRouter
 from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -81,6 +81,9 @@ app.add_middleware(
 )
 logger.info("CORS middleware настроен с allow_origins=['*'].")
 
+# Создаем подгруппу API v1
+api_v1 = APIRouter(prefix="/api/v1")
+
 MIME_TYPES = {
     ".html": "text/html", ".css": "text/css", ".js": "application/javascript",
     ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg",
@@ -96,9 +99,9 @@ def get_mime_type(file_path: str) -> str:
         logger.error(f"Ошибка при определении MIME-типа для '{file_path}': {e}")
         return "application/octet-stream"
 
-@app.get("/", summary="Корневой эндпоинт API", tags=["General"])
+@api_v1.get("/", summary="Корневой эндпоинт API", tags=["General"])
 async def root():
-    logger.info("Обращение к корневому эндпоинту API (/).")
+    logger.info("Обращение к корневому эндпоинту API (/api/v1/).")
     return {
         "project": "МИШУРА - ИИ Стилист",
         "message": "API сервера 'МИШУРА' успешно запущен и готов к работе!",
@@ -155,61 +158,84 @@ async def serve_webapp_root_redirect():
         logger.critical(f"КРИТИЧЕСКАЯ ОШИБКА: Основной файл webapp/index.html не найден по пути: {index_html_path}")
         return HTMLResponse(content="Ошибка сервера: основной файл веб-приложения не найден.", status_code=500)
 
-@app.post("/analyze-outfit", summary="Анализ одного предмета одежды", tags=["AI Analysis"])
-async def analyze_outfit_endpoint( # Переименовал, чтобы не конфликтовать с импортированной функцией если бы она не была обернута в try-except
+@api_v1.post("/analyze-outfit", summary="Анализ одного предмета одежды", tags=["AI Analysis"])
+async def analyze_outfit_endpoint(
     image: UploadFile = File(..., description="Фотография предмета одежды для анализа."),
     occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
     preferences: str = Form(None, description="Дополнительные предпочтения пользователя (опционально).")
 ):
-    logger.info(f"Получен запрос на /analyze-outfit. Повод: '{occasion}', Предпочтения: '{preferences}', Имя файла: '{image.filename}'")
+    logger.info(f"Получен запрос на /api/v1/analyze-outfit. Повод: '{occasion}', Предпочтения: '{preferences}', Имя файла: '{image.filename}'")
     try:
         image_data = await image.read()
         if not image_data:
-            logger.error("Ошибка в /analyze-outfit: получены пустые данные изображения.")
+            logger.error("Ошибка в /api/v1/analyze-outfit: получены пустые данные изображения.")
             return JSONResponse(status_code=400, content={"status": "error", "message": "Файл изображения не может быть пустым."})
 
-        logger.info(f"Изображение для /analyze-outfit прочитано, размер: {len(image_data)} байт. Вызов Gemini AI...")
+        logger.info(f"Изображение для /api/v1/analyze-outfit прочитано, размер: {len(image_data)} байт. Вызов Gemini AI...")
         advice = await analyze_clothing_image(image_data, occasion, preferences)
-        if "Ошибка сервера" in advice: # Проверка, если AI модуль не загрузился
-             logger.error(f"Ошибка вызова ИИ-модуля для /analyze-outfit: {advice}")
-             return JSONResponse(status_code=503, content={"status": "error", "message": advice}) # Service Unavailable
-        logger.info("Анализ от Gemini AI для /analyze-outfit успешно получен.")
+        if "Ошибка сервера" in advice:
+             logger.error(f"Ошибка вызова ИИ-модуля для /api/v1/analyze-outfit: {advice}")
+             return JSONResponse(status_code=503, content={"status": "error", "message": advice})
+        logger.info("Анализ от Gemini AI для /api/v1/analyze-outfit успешно получен.")
         return {"status": "success", "advice": advice}
     except Exception as e:
-        logger.error(f"Критическая ошибка при обработке /analyze-outfit: {e}", exc_info=True)
+        logger.error(f"Критическая ошибка при обработке /api/v1/analyze-outfit: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"status": "error", "message": f"Внутренняя ошибка сервера при анализе одежды: {str(e)}"})
 
-@app.post("/compare-outfits", summary="Сравнение нескольких предметов одежды", tags=["AI Analysis"])
-async def compare_outfits_endpoint( # Переименовал
+@api_v1.post("/compare-outfits", summary="Сравнение нескольких предметов одежды", tags=["AI Analysis"])
+async def compare_outfits_endpoint(
     images: list[UploadFile] = File(..., description="Список из 2-5 фотографий предметов одежды для сравнения."),
     occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
     preferences: str = Form(None, description="Дополнительные предпочтения пользователя (опционально).")
 ):
-    logger.info(f"Получен запрос на /compare-outfits. Количество изображений: {len(images)}, Повод: '{occasion}', Предпочтения: '{preferences}'")
+    logger.info(f"Получен запрос на /api/v1/compare-outfits. Количество изображений: {len(images)}, Повод: '{occasion}', Предпочтения: '{preferences}'")
     try:
         if not (2 <= len(images) <= 5):
-            logger.warning(f"Некорректное количество изображений для /compare-outfits: {len(images)}")
+            logger.warning(f"Некорректное количество изображений для /api/v1/compare-outfits: {len(images)}")
             return JSONResponse(status_code=400, content={"status": "error", "message": "Необходимо загрузить от 2 до 5 изображений для сравнения."})
         
         image_data_list = []
         for i, img_file in enumerate(images):
             image_data = await img_file.read()
             if not image_data:
-                logger.error(f"Ошибка в /compare-outfits: изображение #{i+1} ('{img_file.filename}') содержит пустые данные.")
+                logger.error(f"Ошибка в /api/v1/compare-outfits: изображение #{i+1} ('{img_file.filename}') содержит пустые данные.")
                 return JSONResponse(status_code=400, content={"status": "error", "message": f"Файл изображения '{img_file.filename}' не может быть пустым."})
             image_data_list.append(image_data)
-            logger.debug(f"Изображение #{i+1} для /compare-outfits ('{img_file.filename}') прочитано, размер: {len(image_data)} байт.")
+            logger.debug(f"Изображение #{i+1} для /api/v1/compare-outfits ('{img_file.filename}') прочитано, размер: {len(image_data)} байт.")
         
-        logger.info("Все изображения для /compare-outfits прочитаны. Вызов Gemini AI...")
+        logger.info("Все изображения для /api/v1/compare-outfits прочитаны. Вызов Gemini AI...")
         advice = await compare_clothing_images(image_data_list, occasion, preferences)
-        if "Ошибка сервера" in advice: # Проверка, если AI модуль не загрузился
-             logger.error(f"Ошибка вызова ИИ-модуля для /compare-outfits: {advice}")
-             return JSONResponse(status_code=503, content={"status": "error", "message": advice}) # Service Unavailable
-        logger.info("Сравнительный анализ от Gemini AI для /compare-outfits успешно получен.")
+        if "Ошибка сервера" in advice:
+             logger.error(f"Ошибка вызова ИИ-модуля для /api/v1/compare-outfits: {advice}")
+             return JSONResponse(status_code=503, content={"status": "error", "message": advice})
+        logger.info("Сравнительный анализ от Gemini AI для /api/v1/compare-outfits успешно получен.")
         return {"status": "success", "advice": advice}
     except Exception as e:
-        logger.error(f"Критическая ошибка при обработке /compare-outfits: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Внутренняя ошибка сервера при сравнении одежды: {str(e)}"})
+        logger.error(f"Критическая ошибка при обработке /api/v1/compare-outfits: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Внутренняя ошибка сервера при сравнении образов: {str(e)}"})
+
+@api_v1.get("/test", summary="Тестовый эндпоинт API", tags=["Debug"])
+async def test_endpoint():
+    logger.info("Обращение к тестовому эндпоинту API (/api/v1/test).")
+    return {
+        "status": "success",
+        "message": "API v1 работает корректно",
+        "timestamp": datetime.now().isoformat()
+    }
+
+# Подключаем роутер API v1 к основному приложению
+app.include_router(api_v1)
+
+# Оставляем старый корневой маршрут для обратной совместимости
+@app.get("/", summary="Корневой эндпоинт API (устаревший)", tags=["General"])
+async def root_legacy():
+    logger.info("Обращение к устаревшему корневому эндпоинту API (/).")
+    return {
+        "project": "МИШУРА - ИИ Стилист",
+        "message": "Этот эндпоинт устарел. Используйте /api/v1/",
+        "version": app.version,
+        "docs_url": "/docs", "redoc_url": "/redoc"
+    }
 
 @app.get("/debug/info", summary="Отладочная информация о файлах и окружении", tags=["Debug"])
 async def debug_info():

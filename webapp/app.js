@@ -140,6 +140,20 @@ function setupGlobalButtonHandlers(loggerInstance) {
         return;
     }
 
+    // Проверяем инициализацию модуля консультаций
+    if (!consultationFeature) {
+        logger.error("App.js: Модуль consultation не найден! Функция консультаций недоступна.");
+        if (uiHelpers) uiHelpers.showToast("Ошибка: функция консультаций недоступна (A04).");
+        return;
+    }
+
+    // Проверяем инициализацию API сервиса
+    if (!window.MishuraApp.api || !window.MishuraApp.api.service) {
+        logger.error("App.js: API сервис не найден! Запросы не будут работать.");
+        if (uiHelpers) uiHelpers.showToast("Ошибка: API сервис недоступен (A05).");
+        return;
+    }
+
     // Кнопка "Получить консультацию" (ID: consultation-button)
     const consultationButton = document.getElementById('consultation-button');
     if (consultationButton) {
@@ -150,7 +164,7 @@ function setupGlobalButtonHandlers(loggerInstance) {
         newConsultationButton.addEventListener('click', function() {
             logger.debug("App.js: Кнопка 'consultation-button' нажата.");
             if (consultationFeature && typeof consultationFeature.openConsultationModal === 'function') {
-                 consultationFeature.openConsultationModal(); // Делегируем открытие модулю consultation
+                consultationFeature.openConsultationModal(); // Делегируем открытие модулю consultation
             } else if (typeof modals.openConsultationModal === 'function') { // Фоллбэк на прямое открытие через modals
                 logger.warn("App.js: consultationFeature.openConsultationModal не найден, используем modals.openConsultationModal().");
                 modals.openConsultationModal();

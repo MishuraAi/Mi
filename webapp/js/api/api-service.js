@@ -66,7 +66,13 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
                              : '/analyze-outfit';
             const url = `${apiBaseUrl}${endpoint}`;
             currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
-            return fetchWithTimeout(url, { method: 'POST', body: formData });
+            return fetchWithTimeout(url, { 
+                method: 'POST', 
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
         }
 
         function processCompareOutfits(formData) {
@@ -78,7 +84,13 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
                              : '/compare-outfits';
             const url = `${apiBaseUrl}${endpoint}`;
             currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
-            return fetchWithTimeout(url, { method: 'POST', body: formData });
+            return fetchWithTimeout(url, { 
+                method: 'POST', 
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
         }
         
         function processTryOn(formData) {

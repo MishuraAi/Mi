@@ -28,12 +28,15 @@ window.MishuraApp.features.consultation = (function() {
         modals = window.MishuraApp.components.modals;
         imageUpload = window.MishuraApp.components.imageUpload;
         
+        // Инициализация API сервиса
         if (window.MishuraApp.api && window.MishuraApp.api.service) {
             apiService = window.MishuraApp.api.service;
-            if (typeof apiService.isInitialized === 'function' && !apiService.isInitialized()) {
-                logger.warn("Consultation: API сервис найден, но isInitialized()=false. Принудительный вызов apiService.init().");
-                if (typeof apiService.init === 'function') apiService.init();
-                else logger.error("Consultation: apiService.init() не функция!");
+            if (typeof apiService.init === 'function') {
+                apiService.init();
+                logger.info("Consultation: API сервис успешно инициализирован");
+            } else {
+                logger.error("Consultation: apiService.init не является функцией");
+                if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис API не инициализирован (C01).", 5000);
             }
         } else {
             logger.error("Consultation: API сервис НЕ НАЙДЕН! Запросы не будут работать.");
@@ -169,11 +172,16 @@ window.MishuraApp.features.consultation = (function() {
             return;
         }
 
+        // Отключаем кнопку на время запроса
+        if (submitButton) submitButton.disabled = true;
+
         apiService.processStylistConsultation(formData)
             .then(handleConsultationResponse)
             .catch(handleConsultationError)
             .finally(() => {
                 if (uiHelpers) uiHelpers.hideLoading();
+                // Восстанавливаем состояние кнопки
+                if (submitButton) submitButton.disabled = false;
             });
     }
     

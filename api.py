@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: API Сервер (api.py)
-ВЕРСИЯ: 0.3.3 (Улучшенное логирование, /debug/info, структура путей)
+ВЕРСИЯ: 0.4.0 (Добавлены мониторинг, валидация и rate limiting)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-20
 
 МЕТОДОЛОГИЯ РАБОТЫ И ОБНОВЛЕНИЯ КОДА:
@@ -29,6 +29,11 @@ from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
+
+# Импорт новых модулей
+from monitoring import monitor_request, start_metrics_server
+from validators import ImageAnalysisRequest, ImageComparisonRequest, UserFeedback, PaymentRequest
+from rate_limiter import default_rate_limit_middleware
 
 # Попытка импорта модулей проекта
 try:
@@ -69,7 +74,7 @@ logger.info(f"Определена директория веб-приложен�
 app = FastAPI(
     title="МИШУРА - API ИИ-Стилиста",
     description="API для поддержки Telegram Mini App 'МИШУРА', предоставляющего консультации по стилю с использованием Gemini AI.",
-    version="0.3.3"
+    version="0.4.0"
 )
 
 # Настройка CORS
@@ -101,6 +106,7 @@ def get_mime_type(file_path: str) -> str:
         return "application/octet-stream"
 
 @api_v1.get("/", summary="Корневой эндпоинт API", tags=["General"])
+@monitor_request()
 async def root():
     logger.info("Обращение к корневому эндпоинту API (/api/v1/).")
     return {
@@ -112,6 +118,7 @@ async def root():
     }
 
 @app.get("/webapp/{file_path:path}", summary="Обслуживание статических файлов веб-приложения", tags=["WebApp"])
+@monitor_request()
 async def serve_static_file(request: Request, file_path: str):
     # Формируем полный путь к запрашиваемому файлу внутри WEBAPP_DIR
     # Проверяем, что WEBAPP_DIR существует
@@ -147,6 +154,7 @@ async def serve_static_file(request: Request, file_path: str):
 
 @app.get("/webapp", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/webapp/", response_class=HTMLResponse, include_in_schema=False)
+@monitor_request()
 async def serve_webapp_root_redirect():
     index_html_path = os.path.join(WEBAPP_DIR, "index.html")
     logger.info(f"Запрос к /webapp/ или /webapp, попытка отдать: {index_html_path}")
@@ -160,68 +168,95 @@ async def serve_webapp_root_redirect():
         return HTMLResponse(content="Ошибка сервера: основной файл веб-приложения не найден.", status_code=500)
 
 @api_v1.post("/analyze-outfit", summary="Анализ одного предмета одежды", tags=["AI Analysis"])
+@monitor_request()
 async def analyze_outfit_endpoint(
     image: UploadFile = File(..., description="Фотография предмета одежды для анализа."),
     occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
     preferences: str = Form(None, description="Дополнительные предпочтения пользователя (опционально).")
 ):
+    # Валидация входных данных
+    request_data = ImageAnalysisRequest(occasion=occasion, preferences=preferences)
+    
     logger.info(f"Получен запрос на /api/v1/analyze-outfit. Повод: '{occasion}', Предпочтения: '{preferences}', Имя файла: '{image.filename}'")
     try:
         image_data = await image.read()
         if not image_data:
             logger.error("Ошибка в /api/v1/analyze-outfit: получены пустые данные изображения.")
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Файл изображения не может быть пустым."})
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Файл изображения не может быть пустым."}
+            )
 
         logger.info(f"Изображение для /api/v1/analyze-outfit прочитано, размер: {len(image_data)} байт. Вызов Gemini AI...")
-        advice = await analyze_clothing_image(image_data, occasion, preferences)
+        advice = await analyze_clothing_image(image_data, request_data.occasion, request_data.preferences)
         if "Ошибка сервера" in advice:
-             logger.error(f"Ошибка вызова ИИ-модуля для /api/v1/analyze-outfit: {advice}")
-             return JSONResponse(status_code=503, content={"status": "error", "message": advice})
+            logger.error(f"Ошибка вызова ИИ-модуля для /api/v1/analyze-outfit: {advice}")
+            return JSONResponse(status_code=503, content={"status": "error", "message": advice})
+        
         logger.info("Анализ от Gemini AI для /api/v1/analyze-outfit успешно получен.")
         return {"status": "success", "advice": advice}
     except Exception as e:
         logger.error(f"Критическая ошибка при обработке /api/v1/analyze-outfit: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Внутренняя ошибка сервера при анализе одежды: {str(e)}"})
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"Внутренняя ошибка сервера при анализе одежды: {str(e)}"}
+        )
 
 @api_v1.post("/compare-outfits", summary="Сравнение нескольких предметов одежды", tags=["AI Analysis"])
+@monitor_request()
 async def compare_outfits_endpoint(
     images: list[UploadFile] = File(..., description="Список из 2-5 фотографий предметов одежды для сравнения."),
     occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
     preferences: str = Form(None, description="Дополнительные предпочтения пользователя (опционально).")
 ):
+    # Валидация входных данных
+    request_data = ImageComparisonRequest(
+        occasion=occasion,
+        preferences=preferences,
+        image_count=len(images)
+    )
+    
     logger.info(f"Получен запрос на /api/v1/compare-outfits. Количество изображений: {len(images)}, Повод: '{occasion}', Предпочтения: '{preferences}'")
     try:
-        if not (2 <= len(images) <= 5):
-            logger.warning(f"Некорректное количество изображений для /api/v1/compare-outfits: {len(images)}")
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Необходимо загрузить от 2 до 5 изображений для сравнения."})
-        
         image_data_list = []
-        for i, img_file in enumerate(images):
+        for img_file in images:
             image_data = await img_file.read()
             if not image_data:
-                logger.error(f"Ошибка в /api/v1/compare-outfits: изображение #{i+1} ('{img_file.filename}') содержит пустые данные.")
-                return JSONResponse(status_code=400, content={"status": "error", "message": f"Файл изображения '{img_file.filename}' не может быть пустым."})
+                logger.error(f"Ошибка в /api/v1/compare-outfits: получены пустые данные для изображения {img_file.filename}")
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "message": f"Файл изображения {img_file.filename} не может быть пустым."}
+                )
             image_data_list.append(image_data)
-            logger.debug(f"Изображение #{i+1} для /api/v1/compare-outfits ('{img_file.filename}') прочитано, размер: {len(image_data)} байт.")
         
-        logger.info("Все изображения для /api/v1/compare-outfits прочитаны. Вызов Gemini AI...")
-        advice = await compare_clothing_images(image_data_list, occasion, preferences)
+        logger.info(f"Все изображения для /api/v1/compare-outfits прочитаны. Вызов Gemini AI...")
+        advice = await compare_clothing_images(image_data_list, request_data.occasion, request_data.preferences)
         if "Ошибка сервера" in advice:
-             logger.error(f"Ошибка вызова ИИ-модуля для /api/v1/compare-outfits: {advice}")
-             return JSONResponse(status_code=503, content={"status": "error", "message": advice})
-        logger.info("Сравнительный анализ от Gemini AI для /api/v1/compare-outfits успешно получен.")
+            logger.error(f"Ошибка вызова ИИ-модуля для /api/v1/compare-outfits: {advice}")
+            return JSONResponse(status_code=503, content={"status": "error", "message": advice})
+        
+        logger.info("Сравнение от Gemini AI для /api/v1/compare-outfits успешно получено.")
         return {"status": "success", "advice": advice}
     except Exception as e:
         logger.error(f"Критическая ошибка при обработке /api/v1/compare-outfits: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Внутренняя ошибка сервера при сравнении образов: {str(e)}"})
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"Внутренняя ошибка сервера при сравнении одежды: {str(e)}"}
+        )
 
-@api_v1.get("/test", summary="Тестовый эндпоинт API", tags=["Debug"])
-async def test_endpoint():
-    logger.info("Обращение к тестовому эндпоинту API (/api/v1/test).")
+@app.get("/health", summary="Проверка состояния сервера", tags=["System"])
+@monitor_request()
+async def health_check():
+    """Эндпоинт для проверки состояния сервера"""
     return {
-        "status": "success",
-        "message": "API v1 работает корректно",
-        "timestamp": datetime.now().isoformat()
+        "status": "healthy",
+        "version": app.version,
+        "timestamp": datetime.now().isoformat(),
+        "system": {
+            "platform": platform.platform(),
+            "python_version": sys.version,
+            "memory_usage": "N/A"  # Можно добавить реальные метрики
+        }
     }
 
 # Подключаем роутер API v1 к основному приложению
@@ -328,15 +363,14 @@ async def debug_info():
         return JSONResponse(status_code=500, content={"error_message": f"Ошибка при сборе отладочной информации: {str(e)}"})
 
 if __name__ == "__main__":
-    PORT = int(os.getenv("PORT", 8000))
-    HOST = os.getenv("HOST", "0.0.0.0") # Позволяет изменять хост через переменную окружения
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "info").lower() # Позволяет изменять уровень логирования
-
-    logger.info(f"Запуск Uvicorn сервера напрямую из __main__ (api.py) на {HOST}:{PORT}, LOG_LEVEL: {LOG_LEVEL}")
+    # Запускаем сервер метрик на порту 8000
+    start_metrics_server(8000)
+    
+    # Запускаем основной сервер
     uvicorn.run(
-        "api:app", # Важно использовать строку, чтобы --reload работал корректно
-        host=HOST,
-        port=PORT,
-        log_level=LOG_LEVEL,
-        reload=True # Включаем reload по умолчанию для удобства разработки при запуске python api.py
+        "api:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=True,
+        log_level="info"
     )

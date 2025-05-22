@@ -1,49 +1,34 @@
 @echo off
-echo ===================================
-echo    МИШУРА - ИИ Стилист - Сервер
-echo ===================================
-echo.
+echo Starting MISHURA API Server...
 
-echo Проверка установленных компонентов...
-py -3 -c "import uvicorn" 2>nul
-if errorlevel 1 (
-    echo [ОШИБКА] uvicorn не установлен!
-    echo Установка необходимых компонентов...
-    py -3 -m pip install -r requirements.txt
-    if errorlevel 1 (
-        echo [ОШИБКА] Не удалось установить зависимости!
-        pause
-        exit /b 1
-    )
+REM Проверка наличия виртуального окружения
+if not exist .venv (
+    echo Creating virtual environment...
+    python -m venv .venv
+    call .venv\Scripts\activate
+    echo Installing dependencies...
+    pip install -r requirements.txt
+) else (
+    call .venv\Scripts\activate
 )
 
-echo Проверка порта 8000...
-netstat -ano | findstr :8000 >nul
-if not errorlevel 1 (
-    echo [ОШИБКА] Порт 8000 уже занят!
-    echo Возможно, сервер уже запущен или порт используется другой программой.
-    echo Закройте другие программы, использующие порт 8000, и попробуйте снова.
+REM Проверка наличия .env файла
+if not exist .env (
+    echo Warning: .env file not found!
+    echo Please create .env file with required environment variables:
+    echo TELEGRAM_TOKEN=your_telegram_bot_token
+    echo GEMINI_API_KEY=your_gemini_api_key
+    echo WEBAPP_URL=your_webapp_url
     pause
     exit /b 1
 )
 
-echo.
-echo Запуск сервера...
-echo Сервер будет доступен по адресу: http://localhost:8000
-echo.
-echo Для остановки сервера нажмите Ctrl+C
-echo.
+REM Запуск сервера метрик в отдельном окне
+start "MISHURA Metrics Server" cmd /c "call .venv\Scripts\activate && python -c "from monitoring import start_metrics_server; start_metrics_server(8000)""
 
-py -3 -m uvicorn api:app --reload --host 0.0.0.0 --port 8000
-if errorlevel 1 (
-    echo.
-    echo [ОШИБКА] Не удалось запустить сервер!
-    echo Проверьте:
-    echo 1. Все ли зависимости установлены
-    echo 2. Нет ли ошибок в коде
-    echo 3. Доступен ли порт 8000
-    echo.
-    echo Для установки всех зависимостей выполните:
-    echo py -3 -m pip install -r requirements.txt
-)
+REM Запуск основного API сервера
+echo Starting main API server...
+python api.py
+
+REM Если сервер упал, ждем ввода перед закрытием окна
 pause 

@@ -82,7 +82,16 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
                                 : '/virtual-fitting'; 
             const url = `${apiBaseUrl}${endpoint}`;
             currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
-            return fetchWithTimeout(url, { method: 'POST', body: formData });
+            
+            // Проверяем, что formData содержит необходимые файлы
+            if (!formData.get('person_image') || !formData.get('outfit_image')) {
+                throw new Error('Необходимо предоставить оба изображения');
+            }
+            
+            return fetchWithTimeout(url, { 
+                method: 'POST', 
+                body: formData
+            }, 60000); // Увеличиваем таймаут до 60 секунд для обработки изображений
         }
         
         async function fetchWithTimeout(url, options, timeout = 30000) {

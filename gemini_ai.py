@@ -2,8 +2,8 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Интеграция с Gemini AI (gemini_ai.py)
-ВЕРСИЯ: 0.3.1.5 (Улучшенная типизация и документация)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-20
+ВЕРСИЯ: 0.3.2 (Добавлена функция виртуальной примерки)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-22
 
 МЕТОДОЛОГИЯ РАБОТЫ И ОБНОВЛЕНИЯ КОДА:
 1.  Целостность Обновлений: Любые изменения файлов предоставляются целиком.
@@ -15,8 +15,8 @@
 
 НАЗНАЧЕНИЕ ФАЙЛА:
 Модуль для взаимодействия с Google Gemini AI. Включает функции для анализа
-одежды по фотографиям, сравнения образов и генерации стилистических рекомендаций.
-Использует кэширование для оптимизации запросов.
+одежды по фотографиям, сравнения образов, генерации стилистических рекомендаций
+и виртуальной примерки одежды. Использует кэширование для оптимизации запросов.
 ==========================================================================================
 """
 import os
@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 from PIL import Image, ImageOps, ImageDraw # ImageDraw для тестового блока
 from io import BytesIO
 from typing import Optional, List, Tuple, Union, Dict, Any
+from fastapi import UploadFile  # Добавлен импорт UploadFile
 from cache_manager import AnalysisCacheManager # Предполагаем, что он есть и работает
 
 # Настройка логирования
@@ -485,6 +486,230 @@ async def analyze_clothing_file(file_path: str, occasion: str, preferences: Opti
         error_msg = handle_gemini_error(e, f"анализ файла {file_path}")
         logger_gemini.error(error_msg, exc_info=True)
         raise RuntimeError(error_msg)
+
+def create_virtual_fitting_prompt(style_type: str = "default") -> str:
+    """
+    Создает промпт для виртуальной примерки одежды на фотографию человека.
+    
+    Args:
+        style_type (str): Тип стиля примерки (default, casual, business, evening)
+        
+    Returns:
+        str: Сформированный промпт для Gemini API
+    """
+    base_prompt = f"""
+    Ты - профессиональный эксперт по цифровой моде и виртуальной примерке одежды.
+    
+    Задача: Создать реалистичную виртуальную примерку, где одежда со второго изображения будет наложена на фигуру человека с первого изображения.
+
+    Пошаговая инструкция:
+    1. Проанализируй антропометрические данные человека на первом изображении:
+       - Рост и пропорции тела
+       - Положение рук и ног
+       - Осанку и позу
+       - Особенности фигуры
+    
+    2. Проанализируй одежду на втором изображении:
+       - Тип и стиль одежды
+       - Ткань и текстуру
+       - Цвет и узор
+       - Особенности кроя
+    
+    3. Выполни виртуальную примерку:
+       - Удали существующую одежду с человека на первом изображении
+       - Подгони новую одежду под пропорции человека
+       - Сохрани естественные складки и посадку
+       - Учти освещение и тени с первого изображения
+       - Сохрани позу и фон человека неизменными
+    
+    4. Создай финальное изображение:
+       - Одежда должна выглядеть естественно на человеке
+       - Сохрани все детали и текстуры оригинальной одежды
+       - Учти тип стиля: {style_type}
+       - Результат должен быть фотореалистичным
+    
+    Важно:
+    - Сохрани оригинальную позу и фон человека
+    - Одежда должна быть идеально подогнана под фигуру
+    - Естественные складки и тени должны соответствовать позе
+    - Результат должен выглядеть как реальная фотография
+    
+    Формат ответа:
+    1. Сначала верни изображение с результатом примерки в формате base64
+    2. После изображения добавь краткое описание выполненной примерки
+    3. Изображение должно быть в формате JPEG с хорошим качеством
+    4. Размер изображения должен быть не менее 512x512 пикселей
+    
+    Пример формата ответа:
+    ```
+    data:image/jpeg;base64,/9j/4AAQSkZJRg...
+    
+    Описание примерки:
+    Успешно выполнена виртуальная примерка делового костюма. Одежда идеально подогнана под фигуру, сохранены все детали и текстуры.
+    ```
+    """
+    
+    return base_prompt
+
+
+async def virtual_fitting_with_gemini(
+    person_image_data: Union[bytes, UploadFile], 
+    outfit_image_data: Union[bytes, UploadFile], 
+    style_type: str = "default"
+) -> Dict[str, Any]:
+    """
+    Генерирует виртуальную примерку одежды на фотографию человека с помощью Gemini AI.
+    
+    Args:
+        person_image_data: Фотография человека в полный рост (байты или UploadFile)
+        outfit_image_data: Фотография одежды для примерки (байты или UploadFile)
+        style_type: Тип стиля примерки (default, casual, business, evening)
+        
+    Returns:
+        Dict[str, Any]: Словарь с результатами примерки:
+            - resultImage (str): Base64 изображение с результатом примерки
+            - advice (str): Рекомендации по стилю (опционально)
+            - status (str): Статус операции ('ok' или 'error')
+            - message (str): Сообщение об ошибке (если status=='error')
+    """
+    logger_gemini.info(f"Начало обработки виртуальной примерки. Тип стиля: {style_type}")
+    
+    start_time = time.time()
+    
+    try:
+        # Обработка входных данных в зависимости от типа
+        if isinstance(person_image_data, UploadFile):
+            person_image_bytes = await person_image_data.read()
+        else:
+            person_image_bytes = person_image_data
+            
+        if isinstance(outfit_image_data, UploadFile):
+            outfit_image_bytes = await outfit_image_data.read()
+        else:
+            outfit_image_bytes = outfit_image_data
+        
+        if not person_image_bytes or not outfit_image_bytes:
+            error_message = "Пустые данные изображений для виртуальной примерки."
+            logger_gemini.error(error_message)
+            return {"status": "error", "message": error_message}
+        
+        # Проверка формата и оптимизация изображений для API
+        try:
+            # Преобразуем байты в PIL Image для оптимизации
+            person_img = Image.open(BytesIO(person_image_bytes))
+            outfit_img = Image.open(BytesIO(outfit_image_bytes))
+            
+            # Проверка соотношения сторон изображения человека
+            person_width, person_height = person_img.size
+            aspect_ratio = person_width / person_height
+            
+            # Более гибкая проверка соотношения сторон
+            if aspect_ratio > 1.5 or aspect_ratio < 0.5:  # Допускаем более широкий диапазон
+                logger_gemini.warning(f"Соотношение сторон изображения человека ({aspect_ratio:.2f}) может быть не оптимальным для примерки.")
+            
+            # Оптимизируем изображения
+            optimized_person_img = optimize_image(person_img, max_size=1024)  # Увеличиваем максимальный размер
+            optimized_outfit_img = optimize_image(outfit_img, max_size=1024)
+            
+            logger_gemini.info(f"Изображения оптимизированы: человек - {len(optimized_person_img)} байт, одежда - {len(optimized_outfit_img)} байт")
+        except Exception as e_img:
+            error_message = f"Ошибка при обработке изображений для виртуальной примерки: {str(e_img)}"
+            logger_gemini.error(error_message, exc_info=True)
+            return {"status": "error", "message": error_message}
+        
+        # Генерация промпта для Gemini
+        prompt = create_virtual_fitting_prompt(style_type)
+        
+        # Подготовка запроса для Gemini
+        model = genai.GenerativeModel(VISION_MODEL)
+        person_img_part = {"mime_type": "image/jpeg", "data": optimized_person_img}
+        outfit_img_part = {"mime_type": "image/jpeg", "data": optimized_outfit_img}
+        parts = [prompt, person_img_part, outfit_img_part]
+        
+        # Отправка запроса с повторными попытками
+        context_for_log = f"virtual_fitting ({style_type})"
+        try:
+            response = await _send_to_gemini_with_retries(parts, context_for_log)
+            logger_gemini.debug(f"Получен ответ от Gemini: {response[:200]}...")
+            
+            # Проверка на ошибки в ответе
+            if _is_error_message(response):
+                logger_gemini.error(f"Gemini вернул сообщение об ошибке: {response}")
+                return {"status": "error", "message": response}
+            
+            # Извлечение base64 изображения из ответа
+            import re
+            
+            # Расширенный шаблон для поиска base64 данных изображения
+            img_patterns = [
+                r"data:image\/[^;]+;base64,[A-Za-z0-9+/=]+",  # Просто base64
+                r"!\[.*?\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)\)",  # Markdown формат
+                r"<img[^>]+src=[\"'](data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)[\"']"  # HTML формат
+            ]
+            
+            image_base64 = None
+            for pattern in img_patterns:
+                matches = re.findall(pattern, response)
+                if matches:
+                    image_base64 = matches[0]
+                    logger_gemini.debug(f"Найдено изображение в формате {pattern}")
+                    break
+            
+            if image_base64:
+                # Извлекаем текст рекомендаций, удаляя все возможные форматы изображений
+                advice_text = response
+                for pattern in img_patterns:
+                    advice_text = re.sub(pattern, "", advice_text)
+                advice_text = advice_text.strip()
+                
+                # Проверяем, что base64 строка действительно содержит изображение
+                try:
+                    import base64
+                    # Проверяем, что строка начинается с правильного префикса
+                    if not image_base64.startswith('data:image/'):
+                        image_base64 = f"data:image/jpeg;base64,{image_base64}"
+                    
+                    # Пробуем декодировать base64
+                    image_data = base64.b64decode(image_base64.split(',')[1])
+                    # Проверяем, что это действительно изображение
+                    result_img = Image.open(BytesIO(image_data))
+                    
+                    # Проверяем размер изображения
+                    width, height = result_img.size
+                    if width < 512 or height < 512:
+                        logger_gemini.warning(f"Размер полученного изображения ({width}x{height}) меньше минимального (512x512)")
+                    
+                    processing_time = time.time() - start_time
+                    logger_gemini.info(f"Виртуальная примерка успешно выполнена за {processing_time:.2f} секунд. Размер изображения: {width}x{height}")
+                    
+                    return {
+                        "status": "ok",
+                        "resultImage": image_base64,
+                        "advice": advice_text if advice_text else "Виртуальная примерка выполнена успешно!"
+                    }
+                except Exception as e_base64:
+                    logger_gemini.error(f"Ошибка при проверке base64 изображения: {str(e_base64)}", exc_info=True)
+                    return {
+                        "status": "error",
+                        "message": "Получено некорректное изображение от Gemini AI. Попробуйте другие изображения."
+                    }
+            else:
+                # Если изображение не найдено, проверим, есть ли в ответе текст с ошибкой
+                logger_gemini.warning(f"В ответе Gemini не найдено изображение с результатом примерки. Ответ: {response[:200]}...")
+                return {
+                    "status": "error", 
+                    "message": "Не удалось сгенерировать результат примерки. Попробуйте другие изображения."
+                }
+        
+        except Exception as e_api:
+            error_message = handle_gemini_error(e_api, context_for_log)
+            logger_gemini.error(f"Ошибка при обращении к Gemini API: {str(e_api)}", exc_info=True)
+            return {"status": "error", "message": error_message}
+    
+    except Exception as e:
+        error_message = f"Внутренняя ошибка при обработке виртуальной примерки: {str(e)}"
+        logger_gemini.error(error_message, exc_info=True)
+        return {"status": "error", "message": error_message}
 
 # Тестовый блок
 if __name__ == "__main__":

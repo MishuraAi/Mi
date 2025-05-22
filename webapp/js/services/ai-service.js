@@ -20,13 +20,21 @@ window.MishuraApp.services.aiService = (function() {
         logger.info('AI Service: Инициализация сервиса ИИ для примерки одежды');
     }
     
-    async function processTryOn(personImage, outfitImage, styleType = 'default') {
+    async function processTryOn(formData) {
         if (!logger) {
             console.error('AI Service: Логгер не инициализирован');
             return;
         }
         
         logger.info('AI Service: Начало обработки примерки одежды');
+        
+        if (!formData || !(formData instanceof FormData)) {
+            throw new Error('Необходимо предоставить FormData с изображениями');
+        }
+        
+        const personImage = formData.get('person_image');
+        const outfitImage = formData.get('outfit_image');
+        const styleType = formData.get('style_type') || 'default';
         
         if (!personImage || !outfitImage) {
             throw new Error('Необходимо предоставить оба изображения');
@@ -38,11 +46,6 @@ window.MishuraApp.services.aiService = (function() {
             if (!personImageValid) {
                 throw new Error('Пожалуйста, загрузите фотографию в полный рост');
             }
-
-            const formData = new FormData();
-            formData.append('personImage', personImage);
-            formData.append('outfitImage', outfitImage);
-            formData.append('styleType', styleType);
             
             if (!apiService) {
                 throw new Error('API сервис не инициализирован');
@@ -50,14 +53,26 @@ window.MishuraApp.services.aiService = (function() {
             
             const response = await apiService.processTryOn(formData);
             
-            if (!response || !response.resultImage) {
-                throw new Error('Неверный формат ответа от сервера');
+            // Проверяем структуру ответа
+            if (!response || typeof response !== 'object') {
+                throw new Error('Неверный формат ответа от API сервиса');
+            }
+
+            // Проверяем успешность операции
+            if (response.status !== 'ok') {
+                throw new Error(response.message || 'Ошибка при обработке примерки');
+            }
+
+            // Проверяем наличие результата
+            if (!response.resultImage) {
+                throw new Error('В ответе отсутствует изображение результата');
             }
             
             return {
-                success: true,
+                status: 'ok',
                 resultImage: response.resultImage,
-                advice: response.advice || null
+                advice: response.advice || null,
+                metadata: response.metadata || {}
             };
         } catch (error) {
             logger.error('AI Service: Ошибка при обработке примерки:', error);
@@ -65,44 +80,39 @@ window.MishuraApp.services.aiService = (function() {
         }
     }
 
-    async function validatePersonImage(imageFile) {
+    function validatePersonImage(file) {
         return new Promise((resolve) => {
             const img = new Image();
             img.onload = function() {
-                // Проверяем соотношение сторон
                 const aspectRatio = img.width / img.height;
-                const minRatio = 0.2;  // Минимальное соотношение (ширина/высота)
-                const maxRatio = 1.0;  // Максимальное соотношение (ширина/высота)
-                
-                logger.info(`AI Service: Проверка фото - размеры: ${img.width}x${img.height}, соотношение: ${aspectRatio.toFixed(2)}`);
+                logger.info(`AI Service: Размеры изображения: ${img.width}x${img.height}, соотношение сторон: ${aspectRatio.toFixed(2)}`);
                 
                 // Проверяем минимальные размеры
                 const minWidth = 300;
                 const minHeight = 400;
-                const sizeValid = img.width >= minWidth && img.height >= minHeight;
                 
-                if (!sizeValid) {
-                    logger.warn(`AI Service: Фото слишком маленькое: ${img.width}x${img.height}, минимум: ${minWidth}x${minHeight}`);
+                if (img.width < minWidth || img.height < minHeight) {
+                    logger.warn(`AI Service: Изображение слишком маленькое: ${img.width}x${img.height}`);
                     resolve(false);
                     return;
                 }
                 
-                // Проверяем соотношение сторон
-                const ratioValid = aspectRatio >= minRatio && aspectRatio <= maxRatio;
-                
-                if (!ratioValid) {
-                    logger.warn(`AI Service: Неверное соотношение сторон: ${aspectRatio.toFixed(2)}, допустимый диапазон: ${minRatio}-${maxRatio}`);
-                } else {
-                    logger.info(`AI Service: Фото прошло проверку - соотношение сторон: ${aspectRatio.toFixed(2)}`);
+                // Более гибкая проверка соотношения сторон
+                // Для фото в полный рост обычно соотношение от 0.2 до 1.0
+                if (aspectRatio < 0.2 || aspectRatio > 1.0) {
+                    logger.warn(`AI Service: Неподходящее соотношение сторон: ${aspectRatio.toFixed(2)}`);
+                    resolve(false);
+                    return;
                 }
                 
-                resolve(ratioValid);
+                logger.info(`AI Service: Изображение прошло валидацию: ${img.width}x${img.height}, соотношение ${aspectRatio.toFixed(2)}`);
+                resolve(true);
             };
             img.onerror = function() {
-                logger.error('AI Service: Ошибка при проверке изображения');
+                logger.error("AI Service: Ошибка загрузки изображения для проверки");
                 resolve(false);
             };
-            img.src = URL.createObjectURL(imageFile);
+            img.src = URL.createObjectURL(file);
         });
     }
     

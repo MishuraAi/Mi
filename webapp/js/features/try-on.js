@@ -47,6 +47,20 @@ window.MishuraApp.features.tryOn = (function() {
             if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис API не загружен (T00).", 5000);
         }
 
+        // Инициализация AI сервиса
+        if (window.MishuraApp.services && window.MishuraApp.services.aiService) {
+            const aiService = window.MishuraApp.services.aiService;
+            if (typeof aiService.init === 'function') {
+                aiService.init();
+                logger.info('TryOn: AI сервис инициализирован');
+            } else {
+                logger.error("TryOn: AI сервис найден, но не имеет метода init");
+            }
+        } else {
+            logger.error("TryOn: AI сервис НЕ НАЙДЕН!");
+            if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис AI не загружен (T01).", 5000);
+        }
+
         logger.debug("Инициализация модуля виртуальной примерки (v0.5.3)");
         initDOMElements();
         initEventListeners();
@@ -135,29 +149,51 @@ window.MishuraApp.features.tryOn = (function() {
 
     function setupUploadArea(uploadArea, fileInput, type) {
         if (!uploadArea || !fileInput) {
-            logger.warn(`TryOn: Элементы для загрузки типа '${type}' не найдены (uploadArea или fileInput).`);
+            logger.error(`TryOn: Не удалось настроить область загрузки для ${type}: элементы не найдены`);
             return;
         }
-        uploadArea.addEventListener('click', () => {
-            logger.debug(`TryOn: Клик на область загрузки '${type}'. Сброс инпута.`);
-            resetFileInputLocal(fileInput); // Используем локальный сброс
-            fileInput.click();
-        });
-        fileInput.addEventListener('change', (e) => {
-            logger.debug(`TryOn: Файл выбран для типа '${type}'.`);
-            handlePhotoUpload(e, type);
+
+        // Добавляем подсказку о требованиях к фото
+        const hintText = type === 'yourPhoto' 
+            ? 'Загрузите фото в полный рост на нейтральном фоне'
+            : 'Загрузите фото одежды или образа';
+        
+        const hintElement = document.createElement('div');
+        hintElement.className = 'upload-hint';
+        hintElement.textContent = hintText;
+        uploadArea.appendChild(hintElement);
+
+        // Настройка drag & drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
         });
 
-        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                logger.debug(`TryOn: Файл перетащен для типа '${type}'.`);
-                handlePhotoUpload({ target: { files: [e.dataTransfer.files[0]] } }, type);
+            
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                fileInput.files = e.dataTransfer.files;
+                handlePhotoUpload({ target: fileInput }, type);
             }
         });
+
+        // Клик по области загрузки
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Обработка выбора файла
+        fileInput.addEventListener('change', (e) => {
+            handlePhotoUpload(e, type);
+        });
+
+        logger.debug(`TryOn: Область загрузки для ${type} настроена`);
     }
     
     function isValidImageFileLocal(file) {
@@ -212,60 +248,71 @@ window.MishuraApp.features.tryOn = (function() {
         });
     }
     
-    async function handlePhotoUpload(e, type) {
-        if (!e.target.files || !e.target.files[0]) {
-            logger.warn(`TryOn: Нет файлов для загрузки (тип: ${type})`);
+    async function handlePhotoUpload(event, type) {
+        const file = event.target.files[0];
+        if (!file) {
+            logger.warn('TryOn: Файл не выбран');
             return;
         }
+
+        // Проверяем тип файла
+        if (!file.type.startsWith('image/')) {
+            logger.error('TryOn: Выбранный файл не является изображением');
+            showError('Пожалуйста, выберите изображение');
+            return;
+        }
+
+        // Показываем индикатор загрузки
+        const loadingIndicator = document.getElementById('try-on-loading');
+        const loadingText = document.getElementById('try-on-loading-text');
         
-        const file = e.target.files[0];
-        logger.debug(`TryOn: Обработка загрузки фото типа ${type}: ${file.name}`);
+        if (loadingIndicator && loadingText) {
+            loadingIndicator.style.display = 'flex';
+            loadingText.textContent = 'Проверка фото...';
+        } else {
+            logger.warn('TryOn: Элементы индикатора загрузки не найдены');
+        }
 
         try {
-            const isValid = await isValidImageFileLocal(file);
-            if (!isValid) {
-                resetFileInputLocal(e.target);
-                return;
+            if (type === 'person') {
+                // Проверяем фото в полный рост
+                const isValid = await aiService.validatePersonImage(file);
+                if (!isValid) {
+                    showError('Пожалуйста, загрузите фотографию в полный рост на нейтральном фоне. Фото должно быть вертикальным и содержать фигуру человека целиком.');
+                    event.target.value = ''; // Сбрасываем выбор файла
+                    return;
+                }
             }
-            
-            uploadedImages[type] = file;
-            
+
+            // Создаем превью
             const reader = new FileReader();
-            reader.onload = function(event) {
-                let previewEl, containerEl, uploadAreaEl;
-                if (type === 'yourPhoto') {
-                    previewEl = yourPhotoPreview; 
-                    containerEl = yourPhotoContainer; 
-                    uploadAreaEl = yourPhotoUploadArea;
+            reader.onload = function(e) {
+                const preview = document.getElementById(`${type}-preview`);
+                if (preview) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    
+                    // Обновляем текст кнопки
+                    const button = document.getElementById(`${type}-upload-button`);
+                    if (button) {
+                        button.textContent = 'Изменить фото';
+                    }
+                    
+                    logger.info(`TryOn: Фото ${type} успешно загружено и отображено`);
                 } else {
-                    previewEl = outfitPhotoPreview; 
-                    containerEl = outfitPhotoContainer; 
-                    uploadAreaEl = outfitPhotoUploadArea;
+                    logger.error(`TryOn: Элемент превью для ${type} не найден`);
                 }
-                
-                if (previewEl && containerEl && uploadAreaEl) {
-                    previewEl.src = event.target.result;
-                    previewEl.style.display = 'block'; 
-                    containerEl.classList.remove('hidden');
-                    uploadAreaEl.classList.add('hidden');
-                    logger.debug(`TryOn: Превью для ${type} установлено.`);
-                } else {
-                    logger.error(`TryOn: DOM элементы для превью (тип: ${type}) не найдены!`);
-                }
-                updateTryOnButtonState();
             };
-            
-            reader.onerror = (error) => {
-                logger.error(`TryOn: Ошибка FileReader (тип: ${type}):`, error);
-                if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла.');
-                resetFileInputLocal(e.target);
-            };
-            
             reader.readAsDataURL(file);
         } catch (error) {
-            logger.error(`TryOn: Ошибка при обработке фото (тип: ${type}):`, error);
-            if (uiHelpers) uiHelpers.showToast('Произошла ошибка при обработке фото');
-            resetFileInputLocal(e.target);
+            logger.error('TryOn: Ошибка при обработке фото:', error);
+            showError('Ошибка при обработке фото. Пожалуйста, попробуйте еще раз.');
+            event.target.value = ''; // Сбрасываем выбор файла
+        } finally {
+            // Скрываем индикатор загрузки в любом случае
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
         }
     }
     
@@ -298,59 +345,49 @@ window.MishuraApp.features.tryOn = (function() {
         }
     }
     
-    function handleTryOnSubmit() {
-        logger.info("TryOn: Обработка запроса на примерку...");
+    async function handleTryOnSubmit() {
+        logger.info('TryOn: Обработка запроса на примерку...');
         
         if (!uploadedImages.yourPhoto || !uploadedImages.outfitPhoto) {
-            if (uiHelpers) uiHelpers.showToast('Загрузите оба изображения для примерки.');
-            logger.warn("TryOn: Запрос отклонен: не все изображения загружены.");
-            return;
-        }
-        
-        const styleType = tryOnStyleSelector ? tryOnStyleSelector.value : "default";
-        logger.debug(`TryOn: Выбранный стиль примерки: ${styleType}`);
-        
-        if (uiHelpers) uiHelpers.showLoading('Мишура создает ваш новый образ...');
-        
-        const aiService = window.MishuraApp.services.aiService;
-        if (!aiService || typeof aiService.processTryOn !== 'function') {
-            logger.error('TryOn: КРИТИЧЕСКАЯ ОШИБКА - aiService или processTryOn недоступен!');
-            if (uiHelpers) { 
-                uiHelpers.hideLoading(); 
-                uiHelpers.showToast('Ошибка: Сервис ИИ недоступен (T01/T02).');
-            }
+            logger.warn('TryOn: Не все изображения загружены');
+            if (uiHelpers) uiHelpers.showToast('Пожалуйста, загрузите оба изображения');
             return;
         }
 
-        aiService.processTryOn(uploadedImages.yourPhoto, uploadedImages.outfitPhoto, styleType)
-            .then(result => {
-                logger.info("TryOn: Результат примерки получен:", result);
-                
-                if (result.success && result.resultImage) {
-                    currentTryOnResultDataUrl = result.resultImage;
-                    showTryOnResult(currentTryOnResultDataUrl);
-                    
-                    if (result.advice) {
-                        if (uiHelpers) uiHelpers.showToast(result.advice);
-                    }
-                } else {
-                    throw new Error('Неверный формат результата примерки');
+        try {
+            const styleType = tryOnStyleSelector ? tryOnStyleSelector.value : 'default';
+            
+            // Получаем экземпляр aiService
+            const aiService = window.MishuraApp.services.aiService;
+            if (!aiService) {
+                throw new Error('AI сервис не инициализирован');
+            }
+
+            // Показываем индикатор загрузки
+            if (uiHelpers) uiHelpers.showLoading('Обработка примерки...');
+            
+            // Вызываем метод processTryOn
+            const result = await aiService.processTryOn(
+                uploadedImages.yourPhoto,
+                uploadedImages.outfitPhoto,
+                styleType
+            );
+            
+            if (result && result.success) {
+                showTryOnResult(result.resultImage);
+                if (result.advice) {
+                    logger.info('TryOn: Получен совет:', result.advice);
                 }
-            })
-            .catch(error => {
-                const errorMsg = error && error.message ? error.message : "Ошибка при обработке примерки.";
-                logger.error("TryOn: Ошибка при примерке:", errorMsg, error);
-                if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMsg}`);
-                if (tryOnResultImage) {
-                    tryOnResultImage.src = '';
-                    tryOnResultImage.alt = errorMsg;
-                    tryOnResultImage.style.display = 'block';
-                }
-                if (modals) modals.openTryOnResultModal();
-            })
-            .finally(() => {
-                if (uiHelpers) uiHelpers.hideLoading();
-            });
+            } else {
+                throw new Error('Неверный формат ответа от сервера');
+            }
+        } catch (error) {
+            logger.error('TryOn: Ошибка при обработке примерки:', error);
+            if (uiHelpers) {
+                uiHelpers.hideLoading();
+                uiHelpers.showToast(error.message || 'Произошла ошибка при обработке примерки');
+            }
+        }
     }
     
     function showTryOnResult(imageDataUrl) {
@@ -399,5 +436,11 @@ window.MishuraApp.features.tryOn = (function() {
         logger.debug('TryOn: Форма примерки полностью сброшена.');
     }
     
-    return { init, resetFittingForm };
+    return { 
+        init, 
+        resetFittingForm,
+        handleTryOnSubmit,
+        handlePhotoUpload,
+        resetPhoto
+    };
 })();

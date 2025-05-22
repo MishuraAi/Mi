@@ -162,6 +162,11 @@
                 <div class="dialog-subtitle">Эта функция находится в разработке</div>
             </div>
             <div class="dialog-content">
+                <!-- Добавляем индикатор загрузки -->
+                <div id="try-on-loading" class="loading-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <div id="try-on-loading-text" class="loading-text">Проверка фото...</div>
+                </div>
                 <div class="try-on-container">
                     <div class="upload-section">
                         <div class="section-title">1. Ваше фото (в полный рост)</div>
@@ -261,6 +266,9 @@
     
     <!-- API сервисы -->
     <script src="/webapp/js/api/api-service.js"></script>
+    
+    <!-- Сервисы -->
+    <script src="/webapp/js/services/ai-service.js"></script>
     
     <!-- Компоненты -->
     <script src="/webapp/js/components/navigation.js"></script>

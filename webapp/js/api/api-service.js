@@ -44,23 +44,17 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
             
             if (window.MishuraApp && window.MishuraApp.config) {
                 configModule = window.MishuraApp.config;
-                // Убедимся, что сам config.init() был вызван
-                if (typeof configModule.init === 'function' && (typeof configModule.appSettings === 'undefined')) { // Проверяем, если appSettings еще нет
-                    // currentLogger.debug("API_Service: Вызов config.init(), так как он мог быть не вызван ранее.");
-                    // configModule.init(); // Вызывать init другого модуля здесь может быть рискованно. Предполагаем, что app.js это сделал.
-                }
-
                 if (configModule.appSettings && configModule.appSettings.apiUrl) {
                     apiBaseUrl = configModule.appSettings.apiUrl;
                 } else if (configModule.apiSettings && configModule.apiSettings.baseUrl) { 
                     apiBaseUrl = configModule.apiSettings.baseUrl;
                 }
+                currentLogger.info(`API сервис инициализирован с базовым URL: ${apiBaseUrl}`);
             } else {
                 currentLogger.warn("API сервис: модуль конфигурации не найден. Используется URL API по умолчанию:", apiBaseUrl);
             }
             
-            isInitializedLocal = true; // Устанавливаем флаг в конце, после всех проверок
-            currentLogger.info(`API сервис инициализирован (v0.5.2) с базовым URL: ${apiBaseUrl}`);
+            isInitializedLocal = true;
         }
         
         function processStylistConsultation(formData) {
@@ -70,7 +64,9 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
             const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.consultation)
                              ? configModule.apiSettings.endpoints.consultation
                              : '/analyze-outfit';
-            return fetchWithTimeout(`${apiBaseUrl}${endpoint}`, { method: 'POST', body: formData });
+            const url = `${apiBaseUrl}${endpoint}`;
+            currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
+            return fetchWithTimeout(url, { method: 'POST', body: formData });
         }
 
         function processCompareOutfits(formData) {
@@ -80,7 +76,9 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
             const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.compare)
                              ? configModule.apiSettings.endpoints.compare
                              : '/compare-outfits';
-            return fetchWithTimeout(`${apiBaseUrl}${endpoint}`, { method: 'POST', body: formData });
+            const url = `${apiBaseUrl}${endpoint}`;
+            currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
+            return fetchWithTimeout(url, { method: 'POST', body: formData });
         }
         
         function processTryOn(formData) {
@@ -90,7 +88,9 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
             const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.virtualFitting)
                                 ? configModule.apiSettings.endpoints.virtualFitting
                                 : '/virtual-fitting'; 
-            return fetchWithTimeout(`${apiBaseUrl}${endpoint}`, { method: 'POST', body: formData });
+            const url = `${apiBaseUrl}${endpoint}`;
+            currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
+            return fetchWithTimeout(url, { method: 'POST', body: formData });
         }
         
         function fetchWithTimeout(url, options, customTimeout) {
@@ -178,9 +178,11 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
         return {
             init,
             isInitialized: () => isInitializedLocal,
+            getBaseUrl: () => apiBaseUrl,
             processStylistConsultation,
             processCompareOutfits,
-            processTryOn
+            processTryOn,
+            fetchWithTimeout
         };
     })();
 }

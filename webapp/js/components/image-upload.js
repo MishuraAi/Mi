@@ -199,7 +199,7 @@ window.MishuraApp.components.imageUpload = (function() {
         });
     }
     
-    function handleSingleImageSelection(file) { /* ... как в версии 0.4.6 ... */ 
+    function handleSingleImageSelection(file) {
         logger.debug(`ImageUpload (Single): Обработка изображения: ${file.name}`);
         if (!isValidImageFile(file)) return;
 
@@ -208,6 +208,7 @@ window.MishuraApp.components.imageUpload = (function() {
         reader.onload = (e) => {
             if (singlePreviewImage && singlePreviewContainer && singleUploadArea) {
                 singlePreviewImage.src = e.target.result;
+                singlePreviewImage.style.display = 'block'; // Добавляем явное отображение
                 singlePreviewContainer.classList.remove('hidden');
                 singleUploadArea.classList.add('hidden');
                 uploadedImages.single = file;
@@ -217,9 +218,11 @@ window.MishuraApp.components.imageUpload = (function() {
                     const occasionSel = formContainer.querySelector('.occasion-selector');
                     const labels = formContainer.querySelectorAll('.input-label');
                     const prefsInput = formContainer.querySelector('.preferences-input');
+                    const submitBtn = formContainer.querySelector('#submit-consultation');
                     if (occasionSel) occasionSel.classList.remove('hidden');
                     labels.forEach(l => l.classList.remove('hidden'));
                     if (prefsInput) prefsInput.classList.remove('hidden');
+                    if (submitBtn) submitBtn.disabled = false; // Активируем кнопку отправки
                 }
                 logger.info(`ImageUpload (Single): Изображение ${file.name} загружено и отображено.`);
                 document.dispatchEvent(new CustomEvent('singleImageUploaded', { detail: { file: file } }));
@@ -284,7 +287,7 @@ window.MishuraApp.components.imageUpload = (function() {
         });
     }
     
-    function handleCompareImageSelection(file, slotIndex) { /* ... как в версии 0.4.6 ... */ 
+    function handleCompareImageSelection(file, slotIndex) {
         logger.debug(`ImageUpload (Compare): Обработка изображения для слота ${slotIndex}: ${file.name}`);
         if (!isValidImageFile(file)) return;
         
@@ -299,17 +302,25 @@ window.MishuraApp.components.imageUpload = (function() {
             if (uploadIconElement) uploadIconElement.style.display = 'none';
             
             let img = slot.querySelector('.slot-image');
-            if (!img) { img = document.createElement('img'); img.className = 'slot-image'; slot.appendChild(img); }
+            if (!img) { 
+                img = document.createElement('img'); 
+                img.className = 'slot-image'; 
+                slot.appendChild(img); 
+            }
             img.src = e.target.result;
+            img.style.display = 'block'; // Добавляем явное отображение
             img.alt = `Изображение ${slotIndex + 1}`;
             
             let removeBtn = slot.querySelector('.remove-image');
             if (removeBtn) removeBtn.removeEventListener('click', resetSlotHandler); // Удаляем старый, если был
             else removeBtn = document.createElement('div');
 
-            removeBtn.className = 'remove-image'; removeBtn.textContent = '✕';
-            removeBtn.setAttribute('role', 'button'); removeBtn.tabIndex = 0;
+            removeBtn.className = 'remove-image'; 
+            removeBtn.textContent = '✕';
+            removeBtn.setAttribute('role', 'button'); 
+            removeBtn.tabIndex = 0;
             removeBtn.dataset.slot = slotIndex; // Убедимся, что data-slot есть
+            removeBtn.style.display = 'flex'; // Добавляем явное отображение
             
             // Обертка для обработчика, чтобы передать slotIndex
             const currentSlotIndex = slotIndex; 
@@ -319,28 +330,29 @@ window.MishuraApp.components.imageUpload = (function() {
                 resetSlot(currentSlotIndex); // Вызываем resetSlot с правильным индексом
             });
             if (!slot.contains(removeBtn)) slot.appendChild(removeBtn); // Добавляем, если еще не там
-            removeBtn.style.display = 'flex';
 
             slot.classList.add('filled');
             uploadedImages.compare[slotIndex] = file;
             
             const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
-            if (filledSlotsCount >= 2) { /* ... показать поля формы ... */ 
+            if (filledSlotsCount >= 2) {
                 const formContainer = document.getElementById('consultation-overlay');
                 if(formContainer){
                     const occasionSel = formContainer.querySelector('.occasion-selector');
                     const labels = formContainer.querySelectorAll('.input-label');
                     const prefsInput = formContainer.querySelector('.preferences-input');
+                    const submitBtn = formContainer.querySelector('#submit-consultation');
                     if (occasionSel) occasionSel.classList.remove('hidden');
                     labels.forEach(l => l.classList.remove('hidden'));
                     if (prefsInput) prefsInput.classList.remove('hidden');
+                    if (submitBtn) submitBtn.disabled = false; // Активируем кнопку отправки
                 }
             }
             logger.info(`ImageUpload (Compare): Изображение ${file.name} загружено в слот ${slotIndex}.`);
             document.dispatchEvent(new CustomEvent('compareImageUploaded', { detail: { file: file, slot: slotIndex } }));
             isUploadingActive = false;
         };
-        reader.onerror = (error) => { /* ... как было ... */ 
+        reader.onerror = (error) => {
             logger.error(`ImageUpload (Compare): Ошибка FileReader для слота ${slotIndex}:`, error);
             if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла.');
             isUploadingActive = false;

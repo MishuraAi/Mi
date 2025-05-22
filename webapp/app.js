@@ -70,11 +70,32 @@ document.addEventListener('DOMContentLoaded', function() {
                         ? window.MishuraApp.utils.logger 
                         : appLoaderLogger;
 
+        // Проверяем конфигурацию API после инициализации
+        if (window.MishuraApp.config) {
+            logger.info("Проверка конфигурации API:", {
+                apiUrl: window.MishuraApp.config.appSettings.apiUrl,
+                baseUrl: window.MishuraApp.config.apiSettings.baseUrl,
+                endpoints: window.MishuraApp.config.apiSettings.endpoints
+            });
+        } else {
+            logger.error("Конфигурация не найдена после инициализации!");
+        }
+
         tryInitModule('MishuraApp.utils.deviceDetector', 'Определение устройства');
         tryInitModule('MishuraApp.utils.uiHelpers', 'UI-хелперы');
         
         tryInitModule('MishuraApp.api.service', 'API-сервис'); 
         
+        // Проверяем инициализацию API сервиса
+        if (window.MishuraApp.api && window.MishuraApp.api.service) {
+            logger.info("API сервис инициализирован:", {
+                isInitialized: window.MishuraApp.api.service.isInitialized ? window.MishuraApp.api.service.isInitialized() : 'метод не найден',
+                baseUrl: window.MishuraApp.api.service.getBaseUrl ? window.MishuraApp.api.service.getBaseUrl() : 'метод не найден'
+            });
+        } else {
+            logger.error("API сервис не найден после инициализации!");
+        }
+
         tryInitModule('MishuraApp.components.navigation', 'Навигация');
         tryInitModule('MishuraApp.components.modals', 'Модальные окна'); 
         tryInitModule('MishuraApp.components.imageUpload', 'Загрузка изображений');

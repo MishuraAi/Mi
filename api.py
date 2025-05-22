@@ -30,6 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
 from pydantic import BaseModel
+from typing import Dict, Any, Optional
 
 # Попытка импорта модулей проекта
 try:
@@ -282,11 +283,17 @@ async def virtual_fitting_endpoint(
         # Выполняем виртуальную примерку
         result = await virtual_fitting_with_gemini(person_data, outfit_data, style_type)
         
+        if not result or not isinstance(result, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Некорректный ответ от сервиса виртуальной примерки"
+            )
+            
         if result.get("status") == "error":
-            logger.error(f"Ошибка при выполнении виртуальной примерки: {result.get('message', 'Неизвестная ошибка')}")
+            logger.error(f"Ошибка при выполнении виртуальной примерки: {result.get('advice', 'Неизвестная ошибка')}")
             raise HTTPException(
                 status_code=422,
-                detail=result.get("message", "Неизвестная ошибка при выполнении виртуальной примерки")
+                detail=result.get("advice", "Неизвестная ошибка при выполнении виртуальной примерки")
             )
         
         return VirtualFittingResponse(

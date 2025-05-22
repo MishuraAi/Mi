@@ -30,7 +30,7 @@ window.MishuraApp.config = (function() {
         //   apiUrl: 'https://ВАШ_РЕАЛЬНЫЙ_ДОМЕН_API/api/v1',
         //
         // ТЕКУЩЕЕ ЗНАЧЕНИЕ (ЗАМЕНИТЕ ПРИ НЕОБХОДИМОСТИ):
-        apiUrl: 'https://api.mishura-stylist.ru/v1', 
+        apiUrl: '/api/v1', // Используем относительный путь для локальной разработки
         // ================================================================================
         defaultLanguage: 'ru',
         debugMode: true, 

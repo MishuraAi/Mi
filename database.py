@@ -23,6 +23,7 @@ import sqlite3
 import os
 from datetime import datetime
 import logging
+from typing import Optional, Dict, Any, List, Union
 
 # Настройка логирования для этого модуля
 logger = logging.getLogger("MishuraDB")
@@ -48,6 +49,12 @@ def get_connection() -> sqlite3.Connection:
     """
     Устанавливает и возвращает соединение с базой данных SQLite.
     Включает поддержку внешних ключей.
+
+    Returns:
+        sqlite3.Connection: Объект соединения с базой данных.
+
+    Raises:
+        sqlite3.Error: Если не удалось установить соединение с базой данных.
     """
     logger.debug(f"Запрос на соединение с БД: {DB_PATH}")
     try:
@@ -68,6 +75,10 @@ def init_db(schema_file_path: str = SCHEMA_FILE) -> bool:
 
     Returns:
         bool: True, если инициализация прошла успешно, иначе False.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+        FileNotFoundError: Если файл схемы не найден.
     """
     logger.info(f"Начало инициализации/проверки базы данных '{DB_PATH}' со схемой '{schema_file_path}'")
     
@@ -106,7 +117,21 @@ def init_db(schema_file_path: str = SCHEMA_FILE) -> bool:
 
 # --- ФУНКЦИИ ДЛЯ РАБОТЫ С ПОЛЬЗОВАТЕЛЯМИ ---
 def save_user(telegram_id: int, username: Optional[str], first_name: Optional[str], last_name: Optional[str]) -> bool:
-    """Сохраняет или обновляет (по telegram_id) информацию о пользователе."""
+    """
+    Сохраняет или обновляет (по telegram_id) информацию о пользователе.
+
+    Args:
+        telegram_id (int): Telegram ID пользователя.
+        username (Optional[str]): Имя пользователя в Telegram.
+        first_name (Optional[str]): Имя пользователя.
+        last_name (Optional[str]): Фамилия пользователя.
+
+    Returns:
+        bool: True, если операция выполнена успешно, иначе False.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+    """
     logger.debug(f"Сохранение/обновление пользователя: telegram_id={telegram_id}, username={username}")
     sql = '''
     INSERT INTO users (telegram_id, username, first_name, last_name, balance, created_at)
@@ -132,7 +157,18 @@ def save_user(telegram_id: int, username: Optional[str], first_name: Optional[st
     return False
 
 def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
-    """Получает информацию о пользователе по его telegram_id."""
+    """
+    Получает информацию о пользователе по его telegram_id.
+
+    Args:
+        telegram_id (int): Telegram ID пользователя.
+
+    Returns:
+        Optional[Dict[str, Any]]: Словарь с информацией о пользователе или None, если пользователь не найден.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+    """
     logger.debug(f"Запрос информации о пользователе: telegram_id={telegram_id}")
     sql = 'SELECT id, telegram_id, username, first_name, last_name, balance, created_at FROM users WHERE telegram_id = ?'
     try:
@@ -156,7 +192,18 @@ def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
     return None
     
 def get_user_balance(telegram_id: int) -> int:
-    """Получает текущий баланс консультаций пользователя."""
+    """
+    Получает текущий баланс консультаций пользователя.
+
+    Args:
+        telegram_id (int): Telegram ID пользователя.
+
+    Returns:
+        int: Текущий баланс пользователя. Возвращает 0, если пользователь не найден или произошла ошибка.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+    """
     logger.debug(f"Запрос баланса для пользователя: telegram_id={telegram_id}")
     sql = 'SELECT balance FROM users WHERE telegram_id = ?'
     try:
@@ -184,6 +231,16 @@ def update_user_balance(telegram_id: int, amount_change: int) -> bool:
     """
     Обновляет баланс пользователя на указанную величину (может быть положительной или отрицательной).
     Не позволяет балансу стать отрицательным.
+
+    Args:
+        telegram_id (int): Telegram ID пользователя.
+        amount_change (int): Изменение баланса (может быть положительным или отрицательным).
+
+    Returns:
+        bool: True, если операция выполнена успешно, иначе False.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
     """
     logger.info(f"Обновление баланса для telegram_id={telegram_id}, изменение: {amount_change}")
     # Сначала получаем текущий баланс, чтобы не допустить отрицательного значения
@@ -219,7 +276,23 @@ def update_user_balance(telegram_id: int, amount_change: int) -> bool:
 
 # --- ФУНКЦИИ ДЛЯ РАБОТЫ С КОНСУЛЬТАЦИЯМИ ---
 def save_consultation(user_id: int, occasion: Optional[str], preferences: Optional[str], image_path: Optional[str], advice: Optional[str]) -> Optional[int]:
-    """Сохраняет новую консультацию в базу данных."""
+    """
+    Сохраняет новую консультацию в базу данных.
+
+    Args:
+        user_id (int): Telegram ID пользователя.
+        occasion (Optional[str]): Повод/ситуация для консультации.
+        preferences (Optional[str]): Предпочтения пользователя.
+        image_path (Optional[str]): Путь к изображению.
+        advice (Optional[str]): Текст консультации/совета.
+
+    Returns:
+        Optional[int]: ID сохраненной консультации или None в случае ошибки.
+
+    Raises:
+        sqlite3.IntegrityError: При нарушении ограничений целостности БД.
+        sqlite3.Error: При других ошибках SQL.
+    """
     logger.info(f"Сохранение консультации для user_id={user_id}, повод: {occasion}")
     sql = '''
     INSERT INTO consultations (user_id, occasion, preferences, image_path, advice, created_at)
@@ -266,6 +339,16 @@ def get_consultation(consultation_id: int, user_id: Optional[int] = None) -> Opt
     """
     Получает информацию о консультации.
     Если user_id указан, проверяет, что консультация принадлежит этому пользователю.
+
+    Args:
+        consultation_id (int): ID консультации.
+        user_id (Optional[int]): Telegram ID пользователя для проверки принадлежности.
+
+    Returns:
+        Optional[Dict[str, Any]]: Словарь с информацией о консультации или None, если не найдена.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
     """
     logger.debug(f"Запрос консультации ID={consultation_id}" + (f" для user_id={user_id}" if user_id else ""))
     
@@ -296,8 +379,20 @@ def get_consultation(consultation_id: int, user_id: Optional[int] = None) -> Opt
         logger.error(f"Непредвиденная ошибка при получении консультации ID={consultation_id}: {e_gen}", exc_info=True)
     return None
 
-def get_user_consultations(user_id: int, limit: int = 5) -> list[Dict[str, Any]]:
-    """Получает последние N консультаций для указанного пользователя."""
+def get_user_consultations(user_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+    """
+    Получает последние N консультаций для указанного пользователя.
+
+    Args:
+        user_id (int): Telegram ID пользователя.
+        limit (int): Максимальное количество консультаций для получения.
+
+    Returns:
+        List[Dict[str, Any]]: Список словарей с информацией о консультациях.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+    """
     logger.debug(f"Запрос последних {limit} консультаций для user_id={user_id}")
     sql = '''
     SELECT id, occasion, preferences, image_path, advice, created_at 
@@ -325,7 +420,21 @@ def get_user_consultations(user_id: int, limit: int = 5) -> list[Dict[str, Any]]
 
 # --- ФУНКЦИИ ДЛЯ РАБОТЫ С ПЛАТЕЖАМИ ---
 def record_payment(user_id: int, amount_rub: int, status: str = "pending", payment_provider_id: Optional[str] = None) -> Optional[int]:
-    """Записывает информацию о платеже в базу данных."""
+    """
+    Записывает информацию о платеже в базу данных.
+
+    Args:
+        user_id (int): Telegram ID пользователя.
+        amount_rub (int): Сумма платежа в рублях.
+        status (str): Статус платежа (по умолчанию "pending").
+        payment_provider_id (Optional[str]): ID платежа в платежной системе.
+
+    Returns:
+        Optional[int]: ID сохраненного платежа или None в случае ошибки.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+    """
     logger.info(f"Запись платежа для user_id={user_id}, сумма: {amount_rub} RUB, статус: {status}")
     sql = '''
     INSERT INTO payments (user_id, amount, status, created_at, payment_provider_id) 
@@ -346,7 +455,19 @@ def record_payment(user_id: int, amount_rub: int, status: str = "pending", payme
     return None
 
 def update_payment_status(payment_id: int, new_status: str) -> bool:
-    """Обновляет статус указанного платежа."""
+    """
+    Обновляет статус указанного платежа.
+
+    Args:
+        payment_id (int): ID платежа.
+        new_status (str): Новый статус платежа.
+
+    Returns:
+        bool: True, если операция выполнена успешно, иначе False.
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+    """
     logger.info(f"Обновление статуса платежа ID={payment_id} на '{new_status}'")
     sql = 'UPDATE payments SET status = ? WHERE id = ?'
     try:
@@ -368,7 +489,19 @@ def update_payment_status(payment_id: int, new_status: str) -> bool:
 
 # --- ФУНКЦИИ ДЛЯ СТАТИСТИКИ ---
 def get_stats() -> Dict[str, int]:
-    """Получает общую статистику сервиса МИШУРА."""
+    """
+    Получает общую статистику сервиса МИШУРА.
+
+    Returns:
+        Dict[str, int]: Словарь со статистикой:
+            - total_users: общее количество пользователей
+            - total_consultations: общее количество консультаций
+            - daily_consultations: количество консультаций за последние 24 часа
+            - total_payments_completed: количество завершенных платежей
+
+    Raises:
+        sqlite3.Error: При ошибках выполнения SQL-запросов.
+    """
     logger.debug("Запрос общей статистики сервиса.")
     stats = {
         'total_users': 0,

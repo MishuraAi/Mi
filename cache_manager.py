@@ -55,6 +55,9 @@ class AnalysisCacheManager:
             cache_dir (str): Директория для хранения файлов кэша.
             ttl_days (int): Время жизни записи кэша в днях.
             max_cache_size (int): Максимальное количество записей в кэше (старые удаляются).
+
+        Raises:
+            RuntimeError: Если не удалось создать директорию кэша или она недоступна.
         """
         self.cache_dir = os.path.abspath(cache_dir) # Используем абсолютный путь для надежности
         self.ttl_days = ttl_days
@@ -66,11 +69,12 @@ class AnalysisCacheManager:
             if not os.path.exists(self.cache_dir):
                 os.makedirs(self.cache_dir, exist_ok=True) # exist_ok=True для избежания ошибок, если папка уже создана
                 logger.info(f"Создана директория кэша: {self.cache_dir}")
+            elif not os.access(self.cache_dir, os.W_OK):
+                raise RuntimeError(f"Директория кэша '{self.cache_dir}' существует, но нет прав на запись.")
         except OSError as e_mkdir:
-            logger.error(f"Не удалось создать директорию кэша '{self.cache_dir}': {e_mkdir}. Кэширование может не работать.", exc_info=True)
-            # В случае ошибки создания директории, кэширование фактически не будет работать,
-            # но объект будет создан, чтобы не прерывать работу приложения.
-            # Методы get/save будут тихо завершаться.
+            error_msg = f"Не удалось создать или получить доступ к директории кэша '{self.cache_dir}': {e_mkdir}"
+            logger.critical(error_msg)
+            raise RuntimeError(error_msg)
         
         self.cache_index_file = os.path.join(self.cache_dir, "cache_index.json")
         self.cache_index = self._load_cache_index()

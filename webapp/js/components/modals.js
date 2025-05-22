@@ -2,233 +2,200 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Управление модальными окнами (modals.js)
-ВЕРСИЯ: 0.4.1 (Модульная структура)
+ВЕРСИЯ: 0.4.7 (Надежная привязка обработчиков отмены, логирование ID)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-21
 
 НАЗНАЧЕНИЕ ФАЙЛА:
 Обеспечивает функциональность открытия и закрытия модальных окон приложения.
-Включает общие методы работы с модальными окнами и специфические для консультации.
 ==========================================================================================
 */
 
-// Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.utils = window.MishuraApp.utils || {};
-window.MishuraApp.utils.modals = (function() {
+window.MishuraApp.components = window.MishuraApp.components || {};
+window.MishuraApp.components.modals = (function() {
     'use strict';
     
-    // Локальные ссылки на другие модули
     let logger;
+    let activeModalId = null; 
+    let isModalsInitialized = false;
     
-    // Объекты для модальных окон
-    let activeModal = null;
-    
-    /**
-     * Инициализация модуля
-     */
     function init() {
-        // Получаем ссылки на другие модули
-        if (window.MishuraApp.utils && window.MishuraApp.utils.logger) {
-            logger = window.MishuraApp.utils.logger;
-        } else {
-            // Используем временный логгер, если основной недоступен
-            logger = {
-                debug: function(msg) { console.log('[DEBUG] ' + msg); },
-                info: function(msg) { console.log('[INFO] ' + msg); },
-                warn: function(msg) { console.warn('[WARN] ' + msg); },
-                error: function(msg) { console.error('[ERROR] ' + msg); }
-            };
+        if (isModalsInitialized) {
+            // console.warn("Modals: Повторная инициализация модуля модальных окон пропущена.");
+            return;
         }
+        logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("Modals(f):", ...args), info: (...args)=>console.info("Modals(f):", ...args), warn: (...args)=>console.warn("Modals(f):", ...args), error: (...args)=>console.error("Modals(f):", ...args) };
+        logger.debug("Инициализация модуля модальных окон (v0.4.7)");
         
-        // Настройка обработчиков событий для кнопок закрытия модальных окон
-        setupCloseButtons();
-        
-        // Настройка закрытия по Escape
+        setupGlobalCloseListeners();
+        setupStandardCancelButtons();
+
+        isModalsInitialized = true;
+        logger.info('Модуль Модальные окна инициализирован (v0.4.7)');
+    }
+
+    function setupStandardCancelButtons() {
+        logger.debug("Modals: Настройка стандартных кнопок отмены...");
+        const cancelButtonsMap = {
+            'consultation-cancel': 'consultation-overlay', 
+            'results-close': 'results-overlay',            
+            'try-on-cancel': 'try-on-overlay',             
+            'try-on-result-close': 'try-on-result-overlay' 
+        };
+
+        for (const buttonId in cancelButtonsMap) {
+            const buttonElement = document.getElementById(buttonId);
+            const modalIdToClose = cancelButtonsMap[buttonId];
+            if (buttonElement) {
+                // Просто назначаем обработчик. Если cloneNode нужен для других целей - вернуть.
+                // Для простоты и избежания потери контекста, если кнопки не пересоздаются динамически.
+                // Если кнопки пересоздаются, cloneNode нужен или делегирование.
+                // Пока предполагаем, что кнопки статичны после загрузки DOM.
+                buttonElement.removeEventListener('click', closeModalHandler); // Удаляем старый, если был
+                buttonElement.addEventListener('click', closeModalHandler.bind(null, modalIdToClose, buttonId)); // Привязываем modalId
+                logger.debug(`Modals: Обработчик для кнопки отмены '${buttonId}' (закрывает '${modalIdToClose}') назначен.`);
+            } else {
+                logger.warn(`Modals: Стандартная кнопка отмены с ID '${buttonId}' не найдена в DOM.`);
+            }
+        }
+    }
+    
+    // Вспомогательная функция для обработчика, чтобы можно было легко удалять
+    function closeModalHandler(modalIdToClose, buttonId, event) {
+        event.preventDefault(); 
+        event.stopPropagation();
+        logger.debug(`Modals: Кнопка отмены '${buttonId}' нажата (через closeModalHandler), закрытие '${modalIdToClose}'`);
+        closeModal(modalIdToClose);
+    }
+
+    function setupGlobalCloseListeners() { /* ... как в версии 0.4.6 ... */ 
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && activeModal) {
-                closeModal(activeModal);
+            if (e.key === 'Escape' && activeModalId) {
+                logger.debug(`Modals: Нажата Escape, закрытие активного модального окна: ${activeModalId}`);
+                closeModal(activeModalId);
             }
         });
-        
-        // Настройка закрытия по клику на фон
-        setupOverlayClicks();
-        
-        logger.info('Модуль Модальные окна инициализирован');
-    }
-    
-    /**
-     * Настройка обработчиков закрытия для кнопок отмены в модальных окнах
-     */
-    function setupCloseButtons() {
-        // Настройка кнопок закрытия консультации
-        const consultationCancel = document.getElementById('consultation-cancel');
-        if (consultationCancel) {
-            consultationCancel.addEventListener('click', function() {
-                closeModal('consultation-overlay');
-            });
-        }
-        
-        // Настройка кнопок закрытия результатов
-        const resultsClose = document.getElementById('results-close');
-        if (resultsClose) {
-            resultsClose.addEventListener('click', function() {
-                closeModal('results-overlay');
-            });
-        }
-        
-        // Настройка кнопок закрытия примерки
-        const tryOnCancel = document.getElementById('try-on-cancel');
-        if (tryOnCancel) {
-            tryOnCancel.addEventListener('click', function() {
-                closeModal('try-on-overlay');
-            });
-        }
-        
-        // Настройка кнопок закрытия результатов примерки
-        const tryOnResultClose = document.getElementById('try-on-result-close');
-        if (tryOnResultClose) {
-            tryOnResultClose.addEventListener('click', function() {
-                closeModal('try-on-result-overlay');
-            });
-        }
-    }
-    
-    /**
-     * Настройка закрытия по клику на фон модального окна
-     */
-    function setupOverlayClicks() {
-        const overlays = document.querySelectorAll('.overlay');
-        overlays.forEach(overlay => {
-            overlay.addEventListener('click', function(e) {
-                // Закрываем только если клик был именно на фоне (overlay), а не на его содержимом
-                if (e.target === overlay) {
-                    closeModal(overlay.id);
+
+        document.body.addEventListener('click', function(e) {
+            const target = e.target;
+            if (target.classList.contains('overlay') && target.classList.contains('active')) {
+                if (target.id === activeModalId || !activeModalId) { 
+                    logger.debug(`Modals: Клик на фон оверлея '${target.id}', закрытие.`);
+                    closeModal(target.id);
                 }
-            });
+            }
         });
     }
-    
-    /**
-     * Открытие модального окна
-     * @param {string} modalId - идентификатор модального окна
-     */
-    function openModal(modalId) {
-        const modal = document.getElementById(modalId);
         
-        if (!modal) {
-            if (logger) {
-                logger.error(`Модальное окно с ID ${modalId} не найдено`);
-            }
+    function openModal(modalId) {
+        if (!isModalsInitialized) {
+            logger.warn("Modals: Попытка открыть модальное окно до полной инициализации модуля modals. Вызов init().");
+            init(); // Попытка инициализации, если еще не было
+        }
+        logger.debug(`Modals: Попытка открытия модального окна: '${modalId}'`);
+        const modalElement = document.getElementById(modalId);
+        
+        if (!modalElement) {
+            logger.error(`Modals: Модальное окно с ID '${modalId}' не найдено в DOM.`);
             return;
         }
         
-        // Закрываем текущее активное модальное окно если есть
-        if (activeModal) {
-            closeModal(activeModal);
+        if (activeModalId && activeModalId !== modalId) {
+            logger.warn(`Modals: Попытка открыть '${modalId}', когда уже активно '${activeModalId}'. Сначала закроем предыдущее.`);
+            closeModal(activeModalId); 
         }
         
-        // Открываем новое окно
-        modal.classList.add('active');
-        document.body.classList.add('modal-open');
-        activeModal = modalId;
+        modalElement.classList.add('active');
+        document.body.classList.add('modal-open'); 
+        activeModalId = modalId; 
         
-        // Фокус на первом интерактивном элементе
         setTimeout(() => {
-            const focusable = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            const focusable = modalElement.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
             if (focusable) {
                 focusable.focus();
             }
-        }, 100);
+        }, 100); 
         
-        // Отправляем событие открытия
-        document.dispatchEvent(new CustomEvent('modalOpened', {
-            detail: { modalId: modalId }
-        }));
-        
-        if (logger) {
-            logger.debug(`Открыто модальное окно: ${modalId}`);
-        }
+        document.dispatchEvent(new CustomEvent('modalOpened', { detail: { modalId: modalId } }));
+        logger.info(`Modals: Модальное окно '${modalId}' успешно открыто.`);
     }
     
-    /**
-     * Закрытие модального окна
-     * @param {string} modalId - идентификатор модального окна
-     */
     function closeModal(modalId) {
-        const modal = document.getElementById(modalId);
+        if (!isModalsInitialized) {
+             logger.warn("Modals: Попытка закрыть модальное окно до полной инициализации модуля modals.");
+        }
+        logger.debug(`Modals: Попытка закрытия модального окна: '${modalId}'`);
+        const modalElement = document.getElementById(modalId);
         
-        if (!modal) {
-            if (logger) {
-                logger.error(`Модальное окно с ID ${modalId} не найдено`);
-            }
+        if (!modalElement) {
+            logger.error(`Modals: Модальное окно с ID '${modalId}' для закрытия не найдено.`);
             return;
         }
         
-        modal.classList.remove('active');
-        document.body.classList.remove('modal-open');
+        if (!modalElement.classList.contains('active')) {
+            logger.warn(`Modals: Попытка закрыть '${modalId}', которое уже неактивно.`);
+            if (activeModalId === modalId) activeModalId = null;
+            if (!document.querySelector('.overlay.active')) {
+                document.body.classList.remove('modal-open');
+            }
+            return; 
+        }
+
+        modalElement.classList.remove('active');
         
-        // Сбрасываем активное окно, только если закрываем текущее активное
-        if (activeModal === modalId) {
-            activeModal = null;
+        if (activeModalId === modalId) {
+            activeModalId = null;
+            if (!document.querySelector('.overlay.active')) {
+                 document.body.classList.remove('modal-open');
+                 logger.debug("Modals: Класс 'modal-open' удален с body.");
+            } else {
+                const stillActiveModal = document.querySelector('.overlay.active');
+                if (stillActiveModal) { 
+                    activeModalId = stillActiveModal.id;
+                    logger.warn(`Modals: Окно '${modalId}' закрыто, но '${activeModalId}' все еще активно.`);
+                }
+            }
         }
         
-        // Отправляем событие закрытия
-        document.dispatchEvent(new CustomEvent('modalClosed', {
-            detail: { modalId: modalId }
-        }));
-        
-        if (logger) {
-            logger.debug(`Закрыто модальное окно: ${modalId}`);
-        }
+        document.dispatchEvent(new CustomEvent('modalClosed', { detail: { modalId: modalId } }));
+        logger.info(`Modals: Модальное окно '${modalId}' успешно закрыто.`);
     }
     
-    /**
-     * Открытие модального окна консультации
-     */
     function openConsultationModal() {
+        logger.debug('Modals: Вызов openConsultationModal()');
+        // Сброс формы consultation.js теперь происходит по событию 'modalOpened' в самом consultation.js
         openModal('consultation-overlay');
     }
     
-    /**
-     * Открытие модального окна для примерки
-     */
     function openTryOnModal() {
+        logger.debug('Modals: Вызов openTryOnModal()');
+        // Сброс формы try-on.js происходит по событию 'modalOpened' в try-on.js
         openModal('try-on-overlay');
     }
     
-    /**
-     * Открытие модального окна результатов
-     */
     function openResultsModal() {
+        logger.debug('Modals: Вызов openResultsModal()');
         openModal('results-overlay');
     }
     
-    /**
-     * Проверка, открыто ли модальное окно
-     * @param {string} modalId - идентификатор модального окна
-     * @returns {boolean} - статус открытия
-     */
-    function isModalOpen(modalId) {
-        return activeModal === modalId;
+    function openTryOnResultModal() {
+        logger.debug('Modals: Вызов openTryOnResultModal()');
+        openModal('try-on-result-overlay');
     }
     
-    /**
-     * Получение активного модального окна
-     * @returns {string|null} - идентификатор активного окна
-     */
-    function getActiveModal() {
-        return activeModal;
-    }
+    function isModalOpen(modalId) { return activeModalId === modalId; }
+    function getActiveModal() { return activeModalId; }
     
-    // Публичный API
-    return {
-        init,
-        openModal,
-        closeModal,
-        openConsultationModal,
-        openTryOnModal,
-        openResultsModal,
-        isModalOpen,
-        getActiveModal
+    return { 
+        init, 
+        openModal, 
+        closeModal, 
+        openConsultationModal, 
+        openTryOnModal, 
+        openResultsModal, 
+        openTryOnResultModal, 
+        isModalOpen, 
+        getActiveModal,
+        isInitialized: () => isModalsInitialized // Экспортируем флаг
     };
 })();

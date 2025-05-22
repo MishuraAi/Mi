@@ -92,7 +92,13 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
             try {
                 const response = await fetch(url, {
                     ...options,
-                    signal: controller.signal
+                    signal: controller.signal,
+                    headers: {
+                        ...options.headers,
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors',
+                    credentials: 'include'
                 });
                 clearTimeout(id);
                 

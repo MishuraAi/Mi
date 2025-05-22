@@ -90,7 +90,7 @@ window.MishuraApp.components.modals = (function() {
     function openModal(modalId) {
         if (!isModalsInitialized) {
             logger.warn("Modals: Попытка открыть модальное окно до полной инициализации модуля modals. Вызов init().");
-            init(); // Попытка инициализации, если еще не было
+            init();
         }
         logger.debug(`Modals: Попытка открытия модального окна: '${modalId}'`);
         const modalElement = document.getElementById(modalId);
@@ -100,21 +100,32 @@ window.MishuraApp.components.modals = (function() {
             return;
         }
         
-        if (activeModalId && activeModalId !== modalId) {
-            logger.warn(`Modals: Попытка открыть '${modalId}', когда уже активно '${activeModalId}'. Сначала закроем предыдущее.`);
-            closeModal(activeModalId); 
+        // Закрываем все активные модальные окна перед открытием нового
+        const activeModals = document.querySelectorAll('.overlay.active');
+        activeModals.forEach(modal => {
+            if (modal.id !== modalId) {
+                logger.debug(`Modals: Закрытие активного окна '${modal.id}' перед открытием '${modalId}'`);
+                closeModal(modal.id);
+            }
+        });
+        
+        // Убеждаемся, что loading-overlay закрыт
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay && loadingOverlay.classList.contains('active')) {
+            logger.debug("Modals: Закрытие loading-overlay перед открытием нового окна");
+            loadingOverlay.classList.remove('active');
         }
         
         modalElement.classList.add('active');
-        document.body.classList.add('modal-open'); 
-        activeModalId = modalId; 
+        document.body.classList.add('modal-open');
+        activeModalId = modalId;
         
         setTimeout(() => {
             const focusable = modalElement.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
             if (focusable) {
                 focusable.focus();
             }
-        }, 100); 
+        }, 100);
         
         document.dispatchEvent(new CustomEvent('modalOpened', { detail: { modalId: modalId } }));
         logger.info(`Modals: Модальное окно '${modalId}' успешно открыто.`);
@@ -122,7 +133,7 @@ window.MishuraApp.components.modals = (function() {
     
     function closeModal(modalId) {
         if (!isModalsInitialized) {
-             logger.warn("Modals: Попытка закрыть модальное окно до полной инициализации модуля modals.");
+            logger.warn("Modals: Попытка закрыть модальное окно до полной инициализации модуля modals.");
         }
         logger.debug(`Modals: Попытка закрытия модального окна: '${modalId}'`);
         const modalElement = document.getElementById(modalId);
@@ -134,30 +145,40 @@ window.MishuraApp.components.modals = (function() {
         
         if (!modalElement.classList.contains('active')) {
             logger.warn(`Modals: Попытка закрыть '${modalId}', которое уже неактивно.`);
-            if (activeModalId === modalId) activeModalId = null;
-            if (!document.querySelector('.overlay.active')) {
-                document.body.classList.remove('modal-open');
+            if (activeModalId === modalId) {
+                activeModalId = null;
             }
-            return; 
+            return;
         }
 
+        // Удаляем класс active
         modalElement.classList.remove('active');
         
+        // Обновляем состояние активного модального окна
         if (activeModalId === modalId) {
             activeModalId = null;
-            if (!document.querySelector('.overlay.active')) {
-                 document.body.classList.remove('modal-open');
-                 logger.debug("Modals: Класс 'modal-open' удален с body.");
-            } else {
-                const stillActiveModal = document.querySelector('.overlay.active');
-                if (stillActiveModal) { 
-                    activeModalId = stillActiveModal.id;
-                    logger.warn(`Modals: Окно '${modalId}' закрыто, но '${activeModalId}' все еще активно.`);
-                }
-            }
         }
         
-        document.dispatchEvent(new CustomEvent('modalClosed', { detail: { modalId: modalId } }));
+        // Проверяем, остались ли активные модальные окна
+        const activeModals = document.querySelectorAll('.overlay.active');
+        if (activeModals.length === 0) {
+            document.body.classList.remove('modal-open');
+            logger.debug("Modals: Класс 'modal-open' удален с body - нет активных модальных окон");
+        } else {
+            // Если есть другие активные окна, обновляем activeModalId
+            const lastActiveModal = activeModals[activeModals.length - 1];
+            activeModalId = lastActiveModal.id;
+            logger.debug(`Modals: После закрытия '${modalId}' активным стало окно '${activeModalId}'`);
+        }
+        
+        // Отправляем событие о закрытии
+        document.dispatchEvent(new CustomEvent('modalClosed', { 
+            detail: { 
+                modalId: modalId,
+                newActiveModalId: activeModalId 
+            }
+        }));
+        
         logger.info(`Modals: Модальное окно '${modalId}' успешно закрыто.`);
     }
     

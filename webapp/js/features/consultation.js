@@ -184,9 +184,9 @@ window.MishuraApp.features.consultation = (function() {
             });
     }
     
-    function handleConsultationResponse(response) { // Общий для single и compare, если результаты одинаково обрабатываются
+    function handleConsultationResponse(response) {
         logger.info('Consultation: Ответ от сервера (обработка):', response);
-        const adviceText = response && response.advice; // advice - ключ с результатом от Gemini
+        const adviceText = response && response.advice;
         
         if (!response || response.status !== 'success' || typeof adviceText !== 'string') {
             const errorMessage = (response && response.message) ? response.message : 'ИИ-стилист не смог предоставить ответ (пусто).';
@@ -194,18 +194,21 @@ window.MishuraApp.features.consultation = (function() {
             if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMessage}`);
             if (resultsContainer) resultsContainer.innerHTML = `<p>Мишура не смогла дать совет: ${errorMessage}</p>`;
         } else {
-            currentConsultationData = adviceText; // Сохраняем только текст совета
+            currentConsultationData = adviceText;
             renderConsultationResults(adviceText);
             logger.info('Consultation: Консультация успешно получена и отображена.');
-        }
-        
-        if (modals && typeof modals.openResultsModal === 'function') {
-            modals.openResultsModal();
-        } else {
-            logger.error("Consultation: Не удалось открыть модальное окно результатов - modals.openResultsModal не найден.");
-        }
-        if (modals && typeof modals.closeModal === 'function' && document.getElementById('consultation-overlay')?.classList.contains('active')) {
-            modals.closeModal('consultation-overlay');
+            
+            // Закрываем окно консультации и открываем окно результатов
+            if (modals) {
+                // Сначала закрываем окно консультации
+                modals.closeModal('consultation-overlay');
+                
+                // Ждем завершения анимации закрытия
+                setTimeout(() => {
+                    // Открываем окно результатов
+                    modals.openResultsModal();
+                }, 300); // 300ms должно быть достаточно для завершения анимации
+            }
         }
     }
     

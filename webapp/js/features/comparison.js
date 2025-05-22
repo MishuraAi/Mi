@@ -57,25 +57,51 @@ window.MishuraApp.features.comparison = (function() {
             updateSubmitButtonState();
         };
 
-        document.addEventListener('compareImageUploaded', () => {
+        document.addEventListener('compareImageUploaded', (event) => {
             logger.debug(`Comparison (event compareImageUploaded): Обновляем счетчик и кнопку.`);
-            updateCountAndButton();
+            if (event.detail && event.detail.file) {
+                updateCountAndButton();
+            }
         });
-        document.addEventListener('compareImageRemoved', () => {
+        
+        document.addEventListener('compareImageRemoved', (event) => {
             logger.debug(`Comparison (event compareImageRemoved): Обновляем счетчик и кнопку.`);
-            updateCountAndButton();
+            if (event.detail && event.detail.slot !== undefined) {
+                updateCountAndButton();
+            }
         });
+        
         document.addEventListener('allCompareImagesRemoved', () => {
             logger.debug(`Comparison (event allCompareImagesRemoved): Обновляем счетчик и кнопку.`);
-            validCompareImagesCount = 0; // Явно сбрасываем
+            validCompareImagesCount = 0;
             updateSubmitButtonState();
         });
+        
         document.addEventListener('modeChanged', function(e) {
             logger.debug(`Comparison (event modeChanged): режим ${e.detail.mode}. Обновление кнопки.`);
-            updateSubmitButtonState();
-            // Если переключились С режима сравнения, сбросим его форму
-            // Это происходит в consultation.js -> resetConsultationForm -> resetCompareForm
+            if (e.detail.mode === 'compare') {
+                updateCountAndButton();
+            }
         });
+
+        // Добавляем обработчик для изменения видимости режима
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.target.id === 'compare-analysis-mode' && 
+                    (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+                    logger.debug('Comparison: Изменена видимость режима сравнения');
+                    updateCountAndButton();
+                }
+            });
+        });
+
+        const compareModeElement = document.getElementById('compare-analysis-mode');
+        if (compareModeElement) {
+            observer.observe(compareModeElement, {
+                attributes: true,
+                attributeFilter: ['class', 'style']
+            });
+        }
     }
 
     function countValidCompareImages() {
@@ -87,20 +113,24 @@ window.MishuraApp.features.comparison = (function() {
         return 0;
     }
     
-    function updateSubmitButtonState() { // Публичный, чтобы consultation.js мог вызывать
+    function updateSubmitButtonState() {
         if (!compareSubmitButton) return;
+        
+        // Проверяем активный режим
         const currentModeButton = document.querySelector('#consultation-overlay .mode-button.active');
         const isActiveCompareMode = currentModeButton && currentModeButton.dataset.mode === 'compare';
         
-        if (isActiveCompareMode) {
-            compareSubmitButton.disabled = !(validCompareImagesCount >= 2);
-        } else {
-            // Если режим не 'compare', кнопка должна управляться другим модулем (consultation.js)
-            // или быть деактивирована, если это единственная кнопка.
-            // Пока оставляем ее состояние как есть, если не compare режим.
-            // consultation.js должен обновить ее для режима single.
+        // Проверяем видимость режима сравнения
+        const compareModeElement = document.getElementById('compare-analysis-mode');
+        const isCompareModeVisible = compareModeElement && !compareModeElement.classList.contains('hidden');
+        
+        // Если мы в режиме сравнения (либо активна кнопка, либо виден режим)
+        if (isActiveCompareMode || isCompareModeVisible) {
+            const hasEnoughImages = validCompareImagesCount >= 2;
+            compareSubmitButton.disabled = !hasEnoughImages;
+            compareSubmitButton.classList.toggle('disabled', !hasEnoughImages);
+            logger.debug(`Comparison: Статус кнопки submit: ${compareSubmitButton.disabled ? 'отключена' : 'включена'} (режим compare: ${isActiveCompareMode}, видимый режим: ${isCompareModeVisible}, фото: ${validCompareImagesCount})`);
         }
-        logger.debug(`Comparison: Статус кнопки submit: ${compareSubmitButton.disabled ? 'отключена' : 'включена'} (режим compare: ${isActiveCompareMode}, фото: ${validCompareImagesCount})`);
     }
 
     function handleCompareSubmit() { 

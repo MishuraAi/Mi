@@ -1,9 +1,7 @@
-python-telegram-bot==20.3
-python-dotenv==1.0.0
-requests==2.31.0
-Pillow # Позволит pip выбрать последнюю стабильную версию, подходящую для Linux на Render
-fastapi==0.103.1
-uvicorn==0.23.2
-aiohttp # Позволит pip выбрать совместимую версию
-python-multipart
-google-generativeai==0.3.1
+fastapi==0.109.2
+uvicorn==0.27.1
+python-multipart==0.0.9
+python-dotenv==1.0.1
+Pillow==10.2.0
+google-generativeai==0.3.2
+python-telegram-bot==20.8

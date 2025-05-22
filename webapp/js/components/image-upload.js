@@ -236,6 +236,11 @@ window.MishuraApp.components.imageUpload = (function() {
                 }
                 logger.info(`ImageUpload (Single): Изображение ${file.name} загружено и отображено.`);
                 document.dispatchEvent(new CustomEvent('singleImageUploaded', { detail: { file: file } }));
+                
+                // Закрываем диалог выбора файла после успешной загрузки
+                if (singleFileInput) {
+                    singleFileInput.value = '';
+                }
             } else {
                 logger.error("ImageUpload (Single): DOM элементы для превью не найдены при попытке отображения.");
             }
@@ -300,45 +305,38 @@ window.MishuraApp.components.imageUpload = (function() {
     function handleCompareImageSelection(file, slotIndex) {
         logger.debug(`ImageUpload (Compare): Обработка изображения для слота ${slotIndex}: ${file.name}`);
         if (!isValidImageFile(file)) return;
-        
-        const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
-        if (!slot) return logger.error(`ImageUpload (Compare): Слот ${slotIndex} не найден в DOM для обновления.`);
-        
+
         isUploadingActive = true;
         const reader = new FileReader();
         reader.onload = (e) => {
-            const uploadIconElement = slot.querySelector('.upload-icon');
-            if (uploadIconElement) uploadIconElement.style.display = 'none';
-            
-            let img = slot.querySelector('.slot-image');
-            if (!img) { 
-                img = document.createElement('img'); 
-                img.className = 'slot-image'; 
-                slot.appendChild(img); 
+            const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
+            if (!slot) {
+                logger.error(`ImageUpload (Compare): Слот ${slotIndex} не найден.`);
+                isUploadingActive = false;
+                return;
             }
-            img.src = e.target.result;
-            img.style.display = 'block';
-            img.style.width = '100%'; // Добавляем явные стили
-            img.style.height = '100%';
-            img.style.objectFit = 'cover';
-            img.alt = `Изображение ${slotIndex + 1}`;
-            
-            let removeBtn = slot.querySelector('.remove-image');
-            if (removeBtn) removeBtn.removeEventListener('click', resetSlotHandler);
-            else removeBtn = document.createElement('div');
 
-            removeBtn.className = 'remove-image'; 
-            removeBtn.textContent = '✕';
-            removeBtn.setAttribute('role', 'button'); 
-            removeBtn.tabIndex = 0;
-            removeBtn.dataset.slot = slotIndex;
-            removeBtn.style.display = 'flex';
-            
-            const currentSlotIndex = slotIndex; 
+            const previewImg = slot.querySelector('.preview-image');
+            const uploadIconElement = slot.querySelector('.upload-icon');
+            const removeBtn = slot.querySelector('.delete-image') || document.createElement('button');
+
+            if (previewImg) {
+                previewImg.src = e.target.result;
+                previewImg.style.display = 'block';
+            }
+            if (uploadIconElement) {
+                uploadIconElement.style.display = 'none';
+            }
+
+            removeBtn.className = 'delete-image';
+            removeBtn.setAttribute('data-target', `compare-${slotIndex}`);
+            removeBtn.innerHTML = '×';
+            removeBtn.title = 'Удалить изображение';
+
             removeBtn.addEventListener('click', function localResetSlotHandler(ev) {
                 ev.stopPropagation();
-                logger.debug(`ImageUpload (Compare): Нажата кнопка удаления для слота ${currentSlotIndex} (динамическая).`);
-                resetSlot(currentSlotIndex);
+                logger.debug(`ImageUpload (Compare): Нажата кнопка удаления для слота ${slotIndex} (динамическая).`);
+                resetSlot(slotIndex);
             });
             if (!slot.contains(removeBtn)) slot.appendChild(removeBtn);
 
@@ -353,18 +351,34 @@ window.MishuraApp.components.imageUpload = (function() {
                     const labels = formContainer.querySelectorAll('.input-label');
                     const prefsInput = formContainer.querySelector('.preferences-input');
                     const submitBtn = formContainer.querySelector('#submit-consultation');
-                    if (occasionSel) occasionSel.classList.remove('hidden');
+                    if (occasionSel) {
+                        occasionSel.classList.remove('hidden');
+                        occasionSel.disabled = false;
+                    }
                     labels.forEach(l => l.classList.remove('hidden'));
-                    if (prefsInput) prefsInput.classList.remove('hidden');
-                    if (submitBtn) submitBtn.disabled = false;
+                    if (prefsInput) {
+                        prefsInput.classList.remove('hidden');
+                        prefsInput.disabled = false;
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('disabled');
+                    }
                 }
             }
             logger.info(`ImageUpload (Compare): Изображение ${file.name} загружено в слот ${slotIndex}.`);
             document.dispatchEvent(new CustomEvent('compareImageUploaded', { detail: { file: file, slot: slotIndex } }));
+            
+            // Очищаем input после успешной загрузки
+            const fileInput = slot.querySelector('input[type="file"]');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
             isUploadingActive = false;
         };
         reader.onerror = (error) => {
-            logger.error(`ImageUpload (Compare): Ошибка FileReader для слота ${slotIndex}:`, error);
+            logger.error("ImageUpload (Compare): Ошибка FileReader:", error);
             if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла.');
             isUploadingActive = false;
         };

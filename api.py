@@ -24,7 +24,7 @@ import logging
 import platform
 import sys
 from datetime import datetime
-from fastapi import FastAPI, File, UploadFile, Form, Request, APIRouter
+from fastapi import FastAPI, File, UploadFile, Form, Request, APIRouter, HTTPException
 from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv

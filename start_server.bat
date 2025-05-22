@@ -5,12 +5,16 @@ echo ===================================
 echo.
 
 echo Проверка установленных компонентов...
-python -c "import uvicorn" 2>nul
+py -3 -c "import uvicorn" 2>nul
 if errorlevel 1 (
     echo [ОШИБКА] uvicorn не установлен!
-    echo Установите его командой: pip install uvicorn
-    pause
-    exit /b 1
+    echo Установка необходимых компонентов...
+    py -3 -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo [ОШИБКА] Не удалось установить зависимости!
+        pause
+        exit /b 1
+    )
 )
 
 echo Проверка порта 8000...
@@ -30,7 +34,7 @@ echo.
 echo Для остановки сервера нажмите Ctrl+C
 echo.
 
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+py -3 -m uvicorn api:app --reload --host 0.0.0.0 --port 8000
 if errorlevel 1 (
     echo.
     echo [ОШИБКА] Не удалось запустить сервер!
@@ -40,6 +44,6 @@ if errorlevel 1 (
     echo 3. Доступен ли порт 8000
     echo.
     echo Для установки всех зависимостей выполните:
-    echo pip install -r requirements.txt
+    echo py -3 -m pip install -r requirements.txt
 )
 pause 

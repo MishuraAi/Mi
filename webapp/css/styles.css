@@ -587,47 +587,81 @@ body {
 /* ==================
    10. СТИЛИ ДЛЯ ЗАГРУЗКИ ФОТО
    ================== */
-.upload-area {
-    border: 2px dashed var(--primary-color);
-    border-radius: var(--radius-md);
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 16px;
-    background-color: rgba(0, 194, 255, 0.05);
+.image-preview-container {
+    display: none;
     position: relative;
-    cursor: pointer;
-    min-height: 150px;
-    justify-content: center;
-    transition: background-color var(--transition-normal), border-color var(--transition-normal);
+    width: 100%;
+    height: 200px;
+    margin: 10px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #f5f5f5;
 }
 
-.upload-area:active {
-    background-color: rgba(0, 194, 255, 0.1);
-    border-color: rgba(0, 194, 255, 0.8);
+.image-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
 }
 
-.upload-icon {
-    color: var(--primary-color);
-    margin-bottom: 16px;
-}
-
-.upload-text {
+.upload-area {
+    display: block;
+    width: 100%;
+    height: 200px;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    margin: 10px 0;
+    padding: 20px;
     text-align: center;
-    color: var(--text-secondary);
-    font-size: 14px;
-    line-height: 1.5;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-area.dragover {
+    border-color: #007bff;
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.upload-area:hover {
+    border-color: #007bff;
+    background-color: rgba(0, 123, 255, 0.05);
 }
 
 .upload-input {
+    display: none;
+}
+
+.upload-icon {
+    margin-bottom: 10px;
+}
+
+.upload-text {
+    color: #666;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.delete-image {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    font-size: 14px;
+    color: #666;
+    transition: all 0.3s ease;
+}
+
+.delete-image:hover {
+    background-color: rgba(255, 255, 255, 1);
+    color: #ff4444;
 }
 
 /* ==================
@@ -650,27 +684,38 @@ body {
 }
 
 .loading-indicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex-direction: column;
-    padding: 16px;
+    z-index: 1000;
 }
 
-.loading-spinner {
+.loading-indicator .spinner {
     width: 40px;
     height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
     border-radius: 50%;
-    border: 4px solid rgba(0, 194, 255, 0.2);
-    border-top-color: var(--primary-color);
     animation: spin 1s linear infinite;
-    margin-bottom: 16px;
+    margin-bottom: 10px;
+}
+
+.loading-indicator .loading-text {
+    color: #333;
+    font-size: 16px;
+    text-align: center;
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* ==================
@@ -932,32 +977,129 @@ body {
 .try-on-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
 }
 
 .upload-section {
-    margin-bottom: 10px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .section-title {
-    font-size: 14px;
     font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--text-primary);
+    margin-bottom: 10px;
+    color: #333;
 }
 
 .tryon-upload-area {
-    min-height: 120px;
+    min-height: 200px;
+    border: 2px dashed var(--primary-color);
+    background: rgba(0, 194, 255, 0.05);
+    transition: all 0.3s ease;
 }
 
-.try-on-result-container {
-    text-align: center;
+.tryon-upload-area:hover {
+    background: rgba(0, 194, 255, 0.1);
+    border-color: var(--primary-color);
 }
 
-.result-description {
-    margin-top: 16px;
+.tryon-upload-area.dragover {
+    background: rgba(0, 194, 255, 0.15);
+    border-color: var(--primary-color);
+    transform: scale(1.02);
+}
+
+.try-on-container .image-preview-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--background-color);
+}
+
+.try-on-container .image-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--background-color);
+}
+
+.try-on-container .delete-image {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.try-on-container .delete-image:hover {
+    background: rgba(0, 0, 0, 0.7);
+    transform: scale(1.1);
+}
+
+.try-on-container .occasion-selector {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-color);
+    color: var(--text-primary);
     font-size: 14px;
-    color: var(--text-secondary);
+    margin-top: 8px;
+}
+
+.try-on-container .occasion-selector:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+.try-on-container .btn-primary {
+    margin-top: 16px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.try-on-container .btn-primary:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Стили для результата примерки */
+.try-on-result-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+}
+
+.try-on-result-image {
+    max-width: 100%;
+    max-height: 500px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.try-on-result-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.try-on-result-actions .btn {
+    min-width: 120px;
 }
 
 /* ==================

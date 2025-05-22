@@ -82,7 +82,41 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
                                 : '/virtual-fitting'; 
             const url = `${apiBaseUrl}${endpoint}`;
             currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
-            return fetchWithTimeout(url, { method: 'POST', body: formData });
+            
+            // Проверяем, что formData содержит необходимые файлы
+            const personImage = formData.get('person_image');
+            const outfitImage = formData.get('outfit_image');
+            
+            if (!personImage || !outfitImage) {
+                throw new Error('Необходимо предоставить оба изображения');
+            }
+            
+            // Проверяем, что файлы действительно являются файлами
+            if (!(personImage instanceof File) || !(outfitImage instanceof File)) {
+                throw new Error('Загруженные данные не являются файлами');
+            }
+            
+            // Проверяем размер файлов
+            const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+            if (personImage.size > MAX_FILE_SIZE) {
+                throw new Error('Размер фотографии человека превышает 10MB');
+            }
+            if (outfitImage.size > MAX_FILE_SIZE) {
+                throw new Error('Размер фотографии одежды превышает 10MB');
+            }
+            
+            // Проверяем тип файлов
+            if (!personImage.type.startsWith('image/') || !outfitImage.type.startsWith('image/')) {
+                throw new Error('Загруженные файлы должны быть изображениями');
+            }
+            
+            return fetchWithTimeout(url, { 
+                method: 'POST', 
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            }, 60000); // Увеличиваем таймаут до 60 секунд для обработки изображений
         }
         
         async function fetchWithTimeout(url, options, timeout = 30000) {
@@ -92,7 +126,9 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
             try {
                 const response = await fetch(url, {
                     ...options,
-                    signal: controller.signal
+                    signal: controller.signal,
+                    mode: 'cors',
+                    credentials: 'include'
                 });
                 clearTimeout(id);
                 

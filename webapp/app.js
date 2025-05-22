@@ -186,16 +186,35 @@ function setupGlobalButtonHandlers(loggerInstance) {
         
         newTryOnButton.addEventListener('click', function() {
             logger.debug("App.js: Кнопка 'try-on-button' нажата.");
-            if (tryOnFeature && typeof tryOnFeature.resetFittingForm === 'function') {
-                tryOnFeature.resetFittingForm(); // Сначала сброс формы
-            } else {
-                 logger.warn("App.js: tryOnFeature.resetFittingForm не найден.");
+            
+            // Проверяем наличие модуля try-on
+            if (!tryOnFeature) {
+                logger.error("App.js: Модуль try-on не найден!");
+                if (uiHelpers) uiHelpers.showToast("Функция примерки временно недоступна (A06).");
+                return;
             }
-            if (typeof modals.openTryOnModal === 'function') {
+            
+            // Проверяем наличие необходимых методов
+            if (typeof tryOnFeature.resetFittingForm !== 'function') {
+                logger.error("App.js: tryOnFeature.resetFittingForm не найден!");
+                if (uiHelpers) uiHelpers.showToast("Функция примерки временно недоступна (A07).");
+                return;
+            }
+            
+            if (typeof modals.openTryOnModal !== 'function') {
+                logger.error("App.js: modals.openTryOnModal не найден!");
+                if (uiHelpers) uiHelpers.showToast("Функция примерки временно недоступна (A08).");
+                return;
+            }
+            
+            // Выполняем действия
+            try {
+                tryOnFeature.resetFittingForm();
                 modals.openTryOnModal();
-            } else {
-                 logger.error("App.js: modals.openTryOnModal не найден!");
-                 if (uiHelpers) uiHelpers.showToast("Функция примерки временно недоступна (A04).");
+                logger.info("App.js: Модальное окно примерки успешно открыто");
+            } catch (error) {
+                logger.error("App.js: Ошибка при открытии модального окна примерки:", error);
+                if (uiHelpers) uiHelpers.showToast("Произошла ошибка при открытии примерки (A09).");
             }
         });
         logger.info("App.js: Обработчик для 'try-on-button' назначен.");

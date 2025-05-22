@@ -15,7 +15,7 @@ window.MishuraApp.features = window.MishuraApp.features || {};
 window.MishuraApp.features.tryOn = (function() {
     'use strict';
     
-    let config, logger, uiHelpers, apiService, modals;
+    let config, logger, uiHelpers, apiService, modals, aiService;
     
     let tryOnButtonMain, tryOnOverlay; 
     let yourPhotoInput, outfitPhotoInput;
@@ -45,6 +45,20 @@ window.MishuraApp.features.tryOn = (function() {
         } else {
             logger.error("TryOn: API сервис НЕ НАЙДЕН! Запросы не будут работать.");
             if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис API не загружен (T00).", 5000);
+        }
+
+        // Инициализация AI сервиса
+        if (window.MishuraApp.services && window.MishuraApp.services.aiService) {
+            aiService = window.MishuraApp.services.aiService;
+            if (typeof aiService.init === 'function') {
+                aiService.init();
+                logger.info('TryOn: AI сервис инициализирован');
+            } else {
+                logger.error("TryOn: AI сервис найден, но не имеет метода init");
+            }
+        } else {
+            logger.error("TryOn: AI сервис НЕ НАЙДЕН!");
+            if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис AI не загружен (T01).", 5000);
         }
 
         logger.debug("Инициализация модуля виртуальной примерки (v0.5.3)");
@@ -135,70 +149,209 @@ window.MishuraApp.features.tryOn = (function() {
 
     function setupUploadArea(uploadArea, fileInput, type) {
         if (!uploadArea || !fileInput) {
-            logger.warn(`TryOn: Элементы для загрузки типа '${type}' не найдены (uploadArea или fileInput).`);
+            logger.error(`TryOn: Не удалось настроить область загрузки для ${type}: элементы не найдены`);
             return;
         }
-        uploadArea.addEventListener('click', () => {
-            logger.debug(`TryOn: Клик на область загрузки '${type}'. Сброс инпута.`);
-            resetFileInputLocal(fileInput); // Используем локальный сброс
-            fileInput.click();
-        });
-        fileInput.addEventListener('change', (e) => {
-            logger.debug(`TryOn: Файл выбран для типа '${type}'.`);
-            handlePhotoUpload(e, type);
+
+        // Добавляем подсказку о требованиях к фото
+        const hintText = type === 'yourPhoto' 
+            ? 'Загрузите фото в полный рост на нейтральном фоне'
+            : 'Загрузите фото одежды или образа';
+        
+        const hintElement = document.createElement('div');
+        hintElement.className = 'upload-hint';
+        hintElement.textContent = hintText;
+        uploadArea.appendChild(hintElement);
+
+        // Настройка drag & drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('dragover');
         });
 
-        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+        });
+
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                logger.debug(`TryOn: Файл перетащен для типа '${type}'.`);
-                handlePhotoUpload({ target: { files: [e.dataTransfer.files[0]] } }, type);
+            
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                const file = e.dataTransfer.files[0];
+                handlePhotoUpload({ target: { files: [file] } }, type);
             }
+        });
+
+        // Клик по области загрузки
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Обработка выбора файла
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                handlePhotoUpload(e, type);
+            }
+        });
+
+        logger.debug(`TryOn: Область загрузки для ${type} настроена`);
+    }
+    
+    function isValidImageFileLocal(file) {
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        const defaultMaxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = (config && config.LIMITS && config.LIMITS.MAX_FILE_SIZE) ? config.LIMITS.MAX_FILE_SIZE : defaultMaxSize;
+        
+        if (!file || !file.type) { 
+            logger.warn("TryOn.isValid: Файл/тип отсутствуют."); 
+            return false; 
+        }
+        
+        if (!validTypes.includes(file.type)) {
+            logger.warn(`TryOn.isValid: Недопустимый тип: ${file.type} для ${file.name}`);
+            if (uiHelpers) uiHelpers.showToast('Поддерживаются только JPG, PNG и WEBP форматы');
+            return false;
+        }
+        
+        if (file.size > maxSize) {
+            logger.warn(`TryOn.isValid: Файл ${file.name} слишком большой: ${(file.size / (1024*1024)).toFixed(1)}MB`);
+            if (uiHelpers) uiHelpers.showToast(`Файл слишком большой. Максимальный размер: ${(maxSize / (1024*1024)).toFixed(1)}MB`);
+            return false;
+        }
+
+        // Проверка размеров изображения
+        return new Promise((resolve) => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            
+            img.onload = function() {
+                const minWidth = 512;  // Увеличиваем минимальный размер
+                const minHeight = 512; // Увеличиваем минимальный размер
+                const maxWidth = 2000;
+                const maxHeight = 3000;
+                
+                // Освобождаем URL
+                URL.revokeObjectURL(objectUrl);
+                
+                if (img.width < minWidth || img.height < minHeight) {
+                    logger.warn(`TryOn.isValid: Изображение слишком маленькое: ${img.width}x${img.height}`);
+                    if (uiHelpers) uiHelpers.showToast(`Изображение должно быть не менее ${minWidth}x${minHeight} пикселей`);
+                    resolve(false);
+                } else if (img.width > maxWidth || img.height > maxHeight) {
+                    logger.warn(`TryOn.isValid: Изображение слишком большое: ${img.width}x${img.height}`);
+                    if (uiHelpers) uiHelpers.showToast(`Изображение должно быть не более ${maxWidth}x${maxHeight} пикселей`);
+                    resolve(false);
+                } else {
+                    resolve(true);
+                }
+            };
+            
+            img.onerror = function() {
+                // Освобождаем URL в случае ошибки
+                URL.revokeObjectURL(objectUrl);
+                logger.warn("TryOn.isValid: Ошибка загрузки изображения для проверки размеров");
+                if (uiHelpers) uiHelpers.showToast('Ошибка при проверке изображения');
+                resolve(false);
+            };
+            
+            img.src = objectUrl;
         });
     }
     
-    function handlePhotoUpload(e, type) {
-        if (!e.target.files || !e.target.files[0]) return logger.warn(`TryOn: Нет файлов для загрузки (тип: ${type})`);
-        const file = e.target.files[0];
-        logger.debug(`TryOn: Обработка загрузки фото типа ${type}: ${file.name}`);
-
-        if (!isValidImageFileLocal(file)) { // Используем локальную isValidImageFileLocal
-            logger.warn(`TryOn: Файл ${file.name} не является валидным.`);
-            if (uiHelpers) uiHelpers.showToast('Выберите изображение (JPG, PNG, WEBP).');
-            resetFileInputLocal(e.target); 
+    async function handlePhotoUpload(event, type) {
+        event.preventDefault();
+        logger.debug(`TryOn: Обработка загрузки фото типа ${type}`);
+        
+        const file = event.target.files[0];
+        if (!file) {
+            logger.warn('TryOn: Файл не выбран');
             return;
         }
+
+        // Показываем индикатор загрузки
+        const loadingIndicator = document.getElementById('try-on-loading');
+        const loadingText = document.getElementById('try-on-loading-text');
         
-        uploadedImages[type] = file;
-        
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            let previewEl, containerEl, uploadAreaEl;
-            if (type === 'yourPhoto') {
-                previewEl = yourPhotoPreview; containerEl = yourPhotoContainer; uploadAreaEl = yourPhotoUploadArea;
-            } else {
-                previewEl = outfitPhotoPreview; containerEl = outfitPhotoContainer; uploadAreaEl = outfitPhotoUploadArea;
+        if (loadingIndicator && loadingText) {
+            loadingIndicator.style.display = 'flex';
+            loadingText.textContent = 'Проверка фото...';
+        }
+
+        try {
+            // Проверяем валидность изображения
+            const isValid = await isValidImageFileLocal(file);
+            if (!isValid) {
+                if (uiHelpers) uiHelpers.showToast('Изображение не соответствует требованиям');
+                resetFileInputLocal(event.target);
+                return;
             }
-            
-            if (previewEl && containerEl && uploadAreaEl) {
-                previewEl.src = event.target.result;
-                previewEl.style.display = 'block'; 
-                containerEl.classList.remove('hidden');
-                uploadAreaEl.classList.add('hidden');
-                logger.debug(`TryOn: Превью для ${type} установлено.`);
-            } else {
-                logger.error(`TryOn: DOM элементы для превью (тип: ${type}) не найдены!`);
+
+            // Создаем превью
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewId = type === 'yourPhoto' ? 'your-photo-preview' : 'outfit-photo-preview';
+                const preview = document.getElementById(previewId);
+                const containerId = type === 'yourPhoto' ? 'your-photo-container' : 'outfit-photo-container';
+                const container = document.getElementById(containerId);
+                const uploadAreaId = type === 'yourPhoto' ? 'your-photo-upload-area' : 'outfit-photo-upload-area';
+                const uploadArea = document.getElementById(uploadAreaId);
+
+                if (preview && container && uploadArea) {
+                    // Создаем временное изображение для проверки размеров
+                    const tempImg = new Image();
+                    tempImg.onload = function() {
+                        // Проверяем размеры изображения
+                        if (tempImg.width < 512 || tempImg.height < 512) {
+                            logger.warn(`TryOn: Изображение слишком маленькое (${tempImg.width}x${tempImg.height})`);
+                            if (uiHelpers) uiHelpers.showToast('Изображение должно быть не менее 512x512 пикселей');
+                            resetFileInputLocal(event.target);
+                            return;
+                        }
+
+                        // Если все проверки пройдены, отображаем превью
+                        preview.src = e.target.result;
+                        preview.style.display = 'block';
+                        container.style.display = 'block';
+                        uploadArea.style.display = 'none';
+                        
+                        // Сохраняем изображение
+                        uploadedImages[type] = file;
+                        updateTryOnButtonState();
+                        
+                        logger.info(`TryOn: Фото ${type} успешно загружено и отображено (${tempImg.width}x${tempImg.height})`);
+                    };
+                    tempImg.onerror = function() {
+                        logger.error('TryOn: Ошибка при загрузке изображения для проверки размеров');
+                        if (uiHelpers) uiHelpers.showToast('Ошибка при обработке изображения');
+                        resetFileInputLocal(event.target);
+                    };
+                    tempImg.src = e.target.result;
+                } else {
+                    logger.error(`TryOn: Не найдены необходимые элементы для ${type}`);
+                    if (uiHelpers) uiHelpers.showToast('Ошибка отображения превью');
+                }
+            };
+            reader.onerror = function() {
+                logger.error('TryOn: Ошибка при чтении файла');
+                if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла');
+                resetFileInputLocal(event.target);
+            };
+            reader.readAsDataURL(file);
+        } catch (error) {
+            logger.error('TryOn: Ошибка при обработке фото:', error);
+            if (uiHelpers) uiHelpers.showToast('Ошибка при обработке фото. Пожалуйста, попробуйте еще раз.');
+            resetFileInputLocal(event.target);
+        } finally {
+            // Скрываем индикатор загрузки в любом случае
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
             }
-            updateTryOnButtonState();
-        };
-        reader.onerror = (error) => {
-            logger.error(`TryOn: Ошибка FileReader (тип: ${type}):`, error);
-            if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла.');
-        };
-        reader.readAsDataURL(file);
+        }
     }
     
     function resetPhoto(type) {
@@ -214,9 +367,16 @@ window.MishuraApp.features.tryOn = (function() {
         }
         
         resetFileInputLocal(input);
-        if (preview) { preview.src = ''; preview.style.display = 'none'; }
-        if (container) container.classList.add('hidden');
-        if (uploadArea) uploadArea.classList.remove('hidden');
+        if (preview) { 
+            preview.src = ''; 
+            preview.style.display = 'none'; 
+        }
+        if (container) { 
+            container.style.display = 'none';
+        }
+        if (uploadArea) { 
+            uploadArea.style.display = 'block';
+        }
         
         uploadedImages[type] = null;
         updateTryOnButtonState();
@@ -230,65 +390,55 @@ window.MishuraApp.features.tryOn = (function() {
         }
     }
     
-    function handleTryOnSubmit() {
-        logger.info("TryOn: Обработка запроса на примерку...");
+    async function handleTryOnSubmit(event) {
+        event.preventDefault();
+        logger.info('TryOn: Обработка запроса на примерку...');
         
         if (!uploadedImages.yourPhoto || !uploadedImages.outfitPhoto) {
-            if (uiHelpers) uiHelpers.showToast('Загрузите оба изображения для примерки.');
-            logger.warn("TryOn: Запрос отклонен: не все изображения загружены.");
+            logger.warn('TryOn: Не все изображения загружены');
+            uiHelpers.showToast('Пожалуйста, загрузите оба изображения', 'warning');
             return;
         }
         
-        const styleType = tryOnStyleSelector ? tryOnStyleSelector.value : "default";
-        logger.debug(`TryOn: Выбранный стиль примерки: ${styleType}`);
-        
-        if (uiHelpers) uiHelpers.showLoading('Мишура создает ваш новый образ...');
-        
-        const formData = new FormData();
-        formData.append('personImage', uploadedImages.yourPhoto);
-        formData.append('outfitImage', uploadedImages.outfitPhoto);
-        formData.append('styleType', styleType);
-        
-        if (!apiService || typeof apiService.processTryOn !== 'function') {
-            logger.error('TryOn: КРИТИЧЕСКАЯ ОШИБКА - apiService или processTryOn недоступен!');
-            if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Сервис API недоступен (T01/T02).');}
-            // emulateTryOnResponse(formData); // Можно включить для отладки UI без бэкенда
-            return;
+        try {
+            const formData = new FormData();
+            formData.append('person_image', uploadedImages.yourPhoto);
+            formData.append('outfit_image', uploadedImages.outfitPhoto);
+            formData.append('style_type', tryOnStyleSelector ? tryOnStyleSelector.value : 'default');
+            
+            // Показываем индикатор загрузки
+            const loadingIndicator = document.getElementById('try-on-loading');
+            const loadingText = document.getElementById('try-on-loading-text');
+            if (loadingIndicator && loadingText) {
+                loadingIndicator.style.display = 'flex';
+                loadingText.textContent = 'Обработка примерки...';
+            }
+            
+            if (!aiService || typeof aiService.processTryOn !== 'function') {
+                throw new Error('AI сервис не инициализирован или недоступен');
+            }
+            
+            logger.debug('TryOn: Отправка запроса на примерку...');
+            const result = await aiService.processTryOn(formData);
+            logger.debug('TryOn: Получен ответ от AI сервиса:', result);
+            
+            if (result && result.status === 'ok' && result.resultImage) {
+                logger.info('TryOn: Примерка успешно обработана');
+                uiHelpers.showToast('Примерка успешно обработана!', 'success');
+                showTryOnResult(result.resultImage);
+            } else {
+                throw new Error(result?.message || 'Неизвестная ошибка при обработке примерки');
+            }
+        } catch (error) {
+            logger.error('TryOn: Ошибка при обработке примерки:', error);
+            uiHelpers.showToast(error.message || 'Произошла ошибка при обработке примерки', 'error');
+        } finally {
+            // Скрываем индикатор загрузки
+            const loadingIndicator = document.getElementById('try-on-loading');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
         }
-
-        apiService.processTryOn(formData)
-            .then(response => {
-                logger.info("TryOn: Ответ от API примерки:", response);
-                // Учтем, что API может вернуть URL как текст (success_text_response) или JSON
-                const resultImageUrl = response && (response.resultImage || (response.advice && typeof response.advice === 'string' && (response.advice.startsWith('http') || response.advice.startsWith('data:image'))));
-
-                if (response && (response.status === 'success' || response.status === "success_text_response" || response.status === "success_blob_response") && resultImageUrl) {
-                    currentTryOnResultDataUrl = resultImageUrl;
-                    showTryOnResult(currentTryOnResultDataUrl);
-                } else if (response && response.status === "success_blob_response" && response.blob){
-                    // Если вернулся Blob, создаем URL
-                    currentTryOnResultDataUrl = URL.createObjectURL(response.blob);
-                    showTryOnResult(currentTryOnResultDataUrl);
-                    // Помним, что URL.createObjectURL нужно освобождать через URL.revokeObjectURL() когда он больше не нужен
-                }
-                else {
-                    const errorMsg = response && response.message ? response.message : "Не удалось выполнить примерку (неверный формат ответа).";
-                    logger.error("TryOn: Ошибка от API примерки:", errorMsg, response);
-                    if (uiHelpers) uiHelpers.showToast(`Примерка: ${errorMsg}`);
-                    if (tryOnResultImage) { tryOnResultImage.src=''; tryOnResultImage.alt = errorMsg; tryOnResultImage.style.display = 'block';}
-                    if (modals) modals.openTryOnResultModal();
-                }
-            })
-            .catch(error => {
-                const errorMsg = error && error.message ? error.message : "Ошибка сети или сервера при примерке.";
-                logger.error("TryOn: Сетевая ошибка или ошибка сервера:", errorMsg, error);
-                if (uiHelpers) uiHelpers.showToast(`Ошибка связи: ${errorMsg}`);
-                if (tryOnResultImage) { tryOnResultImage.src=''; tryOnResultImage.alt = errorMsg; tryOnResultImage.style.display = 'block';}
-                if (modals) modals.openTryOnResultModal();
-            })
-            .finally(() => {
-                if (uiHelpers) uiHelpers.hideLoading();
-            });
     }
     
     function showTryOnResult(imageDataUrl) {
@@ -316,22 +466,6 @@ window.MishuraApp.features.tryOn = (function() {
         if(uiHelpers) uiHelpers.showToast("Функция скачивания в разработке.");
     }
 
-    function isValidImageFileLocal(file) { // Локальная копия isValidImageFile
-        const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        const defaultMaxSize = 5 * 1024 * 1024;
-        const maxSize = (config && config.LIMITS && config.LIMITS.MAX_FILE_SIZE) ? config.LIMITS.MAX_FILE_SIZE : defaultMaxSize;
-        if (!file || !file.type) { logger.warn("TryOn.isValid: Файл/тип отсутствуют."); return false; }
-        if (!validTypes.includes(file.type)) {
-            logger.warn(`TryOn.isValid: Недопустимый тип: ${file.type} для ${file.name}`);
-            return false;
-        }
-        if (file.size > maxSize) {
-            logger.warn(`TryOn.isValid: Файл ${file.name} слишком большой: ${(file.size / (1024*1024)).toFixed(1)}MB`);
-            return false;
-        }
-        return true;
-    }
-    
     function resetFittingForm() {
         logger.info('TryOn: Сброс формы примерки (resetFittingForm)');
         resetPhoto('yourPhoto');
@@ -353,5 +487,11 @@ window.MishuraApp.features.tryOn = (function() {
         logger.debug('TryOn: Форма примерки полностью сброшена.');
     }
     
-    return { init, resetFittingForm };
+    return { 
+        init, 
+        resetFittingForm,
+        handleTryOnSubmit,
+        handlePhotoUpload,
+        resetPhoto
+    };
 })();

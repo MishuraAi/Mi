@@ -2,8 +2,13 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: API Сервер (api.py)
+<<<<<<< HEAD
 ВЕРСИЯ: 0.4.0 (Добавлены мониторинг, валидация и rate limiting)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-20
+=======
+ВЕРСИЯ: 0.3.4 (Добавлена поддержка virtual-fitting)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-22
+>>>>>>> 6148b3d3d5d4bd0027962b5e3bddc882725ddd64
 
 МЕТОДОЛОГИЯ РАБОТЫ И ОБНОВЛЕНИЯ КОДА:
 1.  Целостность Обновлений: Любые изменения файлов предоставляются целиком.
@@ -29,6 +34,8 @@ from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
 
 # Импорт новых модулей
 from monitoring import monitor_request, start_metrics_server
@@ -37,7 +44,7 @@ from rate_limiter import default_rate_limit_middleware
 
 # Попытка импорта модулей проекта
 try:
-    from gemini_ai import analyze_clothing_image, compare_clothing_images
+    from gemini_ai import analyze_clothing_image, compare_clothing_images, virtual_fitting_with_gemini
 except ImportError as e:
     logging.critical(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось импортировать модуль gemini_ai. {e}")
     # В production можно было бы завершить работу или перейти в аварийный режим
@@ -48,6 +55,9 @@ except ImportError as e:
     async def compare_clothing_images(*args, **kwargs):
         logging.error("Функция compare_clothing_images не доступна из-за ошибки импорта gemini_ai.")
         return "Ошибка сервера: ИИ-модуль не инициализирован."
+    async def virtual_fitting_with_gemini(*args, **kwargs):
+        logging.error("Функция virtual_fitting_with_gemini не доступна из-за ошибки импорта gemini_ai.")
+        return {"status": "error", "message": "Ошибка сервера: ИИ-модуль не инициализирован."}
 
 
 # Настройка стандартного логирования Python
@@ -74,7 +84,11 @@ logger.info(f"Определена директория веб-приложен�
 app = FastAPI(
     title="МИШУРА - API ИИ-Стилиста",
     description="API для поддержки Telegram Mini App 'МИШУРА', предоставляющего консультации по стилю с использованием Gemini AI.",
+<<<<<<< HEAD
     version="0.4.0"
+=======
+    version="0.3.4"
+>>>>>>> 6148b3d3d5d4bd0027962b5e3bddc882725ddd64
 )
 
 # Настройка CORS
@@ -259,6 +273,89 @@ async def health_check():
         }
     }
 
+@api_v1.post("/virtual-fitting", summary="Виртуальная примерка одежды", tags=["AI Analysis"])
+async def virtual_fitting_endpoint(
+    person_image: UploadFile = File(..., description="Фотография человека в полный рост."),
+    outfit_image: UploadFile = File(..., description="Фотография одежды для примерки."),
+    style_type: str = Form("default", description="Тип стиля примерки (default, casual, business, evening).")
+):
+    """
+    Эндпоинт для виртуальной примерки одежды на фотографию человека.
+    
+    Args:
+        person_image: Фотография человека в полный рост
+        outfit_image: Фотография одежды для примерки
+        style_type: Тип стиля примерки (default, casual, business, evening)
+        
+    Returns:
+        VirtualFittingResponse: Результат виртуальной примерки
+    """
+    logger.info(f"Получен запрос на виртуальную примерку. Тип стиля: {style_type}")
+    
+    try:
+        # Проверка типов файлов
+        if not person_image.content_type.startswith('image/') or not outfit_image.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=400,
+                detail="Оба файла должны быть изображениями"
+            )
+        
+        # Проверка размера файлов (максимум 10MB)
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+        person_size = 0
+        outfit_size = 0
+        
+        # Читаем файлы и проверяем их размер
+        person_data = await person_image.read()
+        person_size = len(person_data)
+        if person_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail="Размер фотографии человека превышает 10MB"
+            )
+            
+        outfit_data = await outfit_image.read()
+        outfit_size = len(outfit_data)
+        if outfit_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail="Размер фотографии одежды превышает 10MB"
+            )
+        
+        logger.info(f"Размеры файлов: человек - {person_size/1024/1024:.2f}MB, одежда - {outfit_size/1024/1024:.2f}MB")
+        
+        # Выполняем виртуальную примерку
+        result = await virtual_fitting_with_gemini(person_data, outfit_data, style_type)
+        
+        if not result or not isinstance(result, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Некорректный ответ от сервиса виртуальной примерки"
+            )
+            
+        if result.get("status") == "error":
+            logger.error(f"Ошибка при выполнении виртуальной примерки: {result.get('advice', 'Неизвестная ошибка')}")
+            raise HTTPException(
+                status_code=422,
+                detail=result.get("advice", "Неизвестная ошибка при выполнении виртуальной примерки")
+            )
+        
+        return VirtualFittingResponse(
+            status="ok",
+            resultImage=result.get("resultImage", ""),
+            advice=result.get("advice", "Виртуальная примерка выполнена успешно!"),
+            metadata=result.get("metadata", {})
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Неожиданная ошибка при выполнении виртуальной примерки: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Внутренняя ошибка сервера при выполнении виртуальной примерки"
+        )
+
 # Подключаем роутер API v1 к основному приложению
 app.include_router(api_v1)
 
@@ -361,6 +458,12 @@ async def debug_info():
     except Exception as e:
         logger.error(f"Критическая ошибка при генерации отладочной информации /debug/info: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error_message": f"Ошибка при сборе отладочной информации: {str(e)}"})
+
+class VirtualFittingResponse(BaseModel):
+    status: str
+    resultImage: str
+    advice: str
+    metadata: dict = {}
 
 if __name__ == "__main__":
     # Запускаем сервер метрик на порту 8000

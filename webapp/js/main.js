@@ -17,12 +17,14 @@ window.MishuraApp = window.MishuraApp || {};
     
     let MainLogger, MainDeviceDetect, MainUIHelpers, MainModals, MainNavigation, MainImageUpload, MainAPIService;
     let MainConsultationFeature, MainComparisonFeature, MainTryOnFeature;
+    let MainAIService;
     
     const REQUIRED_MODULES = {
         "Logger": "MishuraApp.utils.logger",
         "DeviceDetect": "MishuraApp.utils.deviceDetector", // Исправлено с deviceDetect на deviceDetector
         "UIHelpers": "MishuraApp.utils.uiHelpers",
         "APIService": "MishuraApp.api.service",
+        "AIService": "MishuraApp.services.aiService",
         "Modals": "MishuraApp.components.modals",
         "Navigation": "MishuraApp.components.navigation",
         "ImageUpload": "MishuraApp.components.imageUpload",
@@ -105,7 +107,6 @@ window.MishuraApp = window.MishuraApp || {};
         
         if (!checkRequiredModules(MainLogger)) {
             MainLogger.error("Main.js: Не все обязательные модули были найдены. Инициализация может быть неполной или некорректной.");
-            // Можно здесь показать пользователю сообщение о критической ошибке, если нужно.
         }
 
         MainLogger.info("Main.js: Начало инициализации приложения МИШУРА (app.init)");
@@ -119,31 +120,56 @@ window.MishuraApp = window.MishuraApp || {};
         MainNavigation = app.components.navigation;
         MainImageUpload = app.components.imageUpload;
         MainAPIService = app.api.service;
+        
+        // Инициализация API сервиса
+        if (MainAPIService && typeof MainAPIService.init === 'function') {
+            MainAPIService.init();
+            MainLogger.info("Main.js: API Service инициализирован");
+        } else {
+            MainLogger.error("Main.js: API Service не найден или не имеет метода init");
+        }
+        
+        // Инициализация AI сервиса
+        if (app.services && app.services.aiService) {
+            MainAIService = app.services.aiService;
+            if (typeof MainAIService.init === 'function') {
+                MainAIService.init();
+                MainLogger.info("Main.js: AI Service инициализирован");
+            } else {
+                MainLogger.error("Main.js: AI Service не имеет метода init");
+            }
+        } else {
+            MainLogger.error("Main.js: AI Service не найден");
+        }
+        
         MainConsultationFeature = app.features.consultation;
         MainComparisonFeature = app.features.comparison;
         MainTryOnFeature = app.features.tryOn;
+
+        // Инициализация модулей
+        if (MainConsultationFeature && typeof MainConsultationFeature.init === 'function') {
+            MainConsultationFeature.init();
+            MainLogger.info("Main.js: Модуль консультации инициализирован");
+        }
+        
+        if (MainComparisonFeature && typeof MainComparisonFeature.init === 'function') {
+            MainComparisonFeature.init();
+            MainLogger.info("Main.js: Модуль сравнения инициализирован");
+        }
+        
+        if (MainTryOnFeature && typeof MainTryOnFeature.init === 'function') {
+            MainTryOnFeature.init();
+            MainLogger.info("Main.js: Модуль примерки инициализирован");
+        } else {
+            MainLogger.error("Main.js: Модуль примерки не найден или не имеет метода init");
+        }
 
         // Инициализация Telegram WebApp API
         const telegramInitialized = initTelegramWebApp(MainLogger);
         if (!telegramInitialized && !(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
             MainLogger.warn("Main.js: Telegram WebApp API не инициализирован, некоторые функции могут быть недоступны.");
-            // Можно показать сообщение пользователю, если это не локальная разработка
-            // if (MainUIHelpers && MainUIHelpers.showToast) MainUIHelpers.showToast("Ошибка интеграции с Telegram.", 4000);
         }
         
-        // Инициализация модулей в правильном порядке (их init уже должен был быть вызван из app.js)
-        // Здесь можно выполнить дополнительные действия, если модули требуют чего-то после общей инициализации.
-        // Например, если main.js должен координировать их работу.
-        // Пока что, предполагаем, что app.js уже вызвал init() для всех.
-        MainLogger.info("Main.js: Все модули должны были быть инициализированы через app.js.");
-
-
-        // Показ приветственного сообщения или проверка состояния
-        if (MainUIHelpers && typeof MainUIHelpers.showToast === 'function') {
-            // MainUIHelpers.showToast("Приложение МИШУРА готово!", 2500);
-        } else {
-            MainLogger.warn("Main.js: MainUIHelpers или showToast не найден для приветственного сообщения.");
-        }
         MainLogger.info("Main.js: Инициализация приложения МИШУРА (app.init) завершена.");
     };
     

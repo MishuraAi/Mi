@@ -128,35 +128,22 @@ async def test_gemini_connection() -> Tuple[bool, str]:
         logger_gemini.error(f"Ошибка при тестовом соединении с Gemini API: {e}", exc_info=True)
         return False, f"Ошибка при тестировании соединения с Gemini API: {str(e)}"
 
-def handle_gemini_error(error: Exception, context_message: str = "") -> str:
-    """
-    Обрабатывает ошибки от Gemini API и возвращает стандартизированное сообщение.
-    
-    Args:
-        error (Exception): Объект исключения, которое нужно обработать
-        context_message (str): Дополнительный контекст для сообщения об ошибке
-        
-    Returns:
-        str: Понятное пользователю сообщение об ошибке
-    """
-    logger_gemini.error(f"Ошибка Gemini AI в контексте '{context_message}': {type(error).__name__} - {error}", exc_info=True)
+def handle_gemini_error(error: Exception, context: str = "Gemini AI") -> str:
+    """Обработка ошибок Gemini API с понятными сообщениями для пользователя."""
     error_str = str(error).lower()
-
-    if "api key" in error_str or "authentication" in error_str or isinstance(error, (genai.types.PermissionDeniedError, genai.types.UnauthenticatedError)): # type: ignore
-        return "Ошибка аутентификации с Gemini API. Проверьте правильность и активность вашего API ключа."
-    elif "content filtered" in error_str or "safety" in error_str or (hasattr(error, 'response') and hasattr(error.response, 'prompt_feedback') and error.response.prompt_feedback.block_reason): # type: ignore
-        reason = "неизвестная причина безопасности"
-        if hasattr(error, 'response') and hasattr(error.response, 'prompt_feedback') and error.response.prompt_feedback.block_reason: # type: ignore
-            reason = error.response.prompt_feedback.block_reason_message or error.response.prompt_feedback.block_reason # type: ignore
-        return f"Запрос к Gemini API был заблокирован по соображениям безопасности: {reason}. Попробуйте изменить изображение или текст запроса."
-    elif isinstance(error, genai.types.ResourceExhaustedError): # type: ignore
-        return "Исчерпан лимит запросов к Gemini API. Пожалуйста, проверьте квоты или попробуйте позже."
-    elif isinstance(error, genai.types.DeadlineExceededError): # type: ignore
-         return "Превышено время ожидания ответа от Gemini API. Попробуйте позже или уменьшите размер запроса."
-    # Другие специфические ошибки Gemini можно добавить здесь
+    logger_gemini.error(f"Ошибка {context}: {type(error).__name__} - {error_str}")
+    
+    # Проверяем наличие ключевых слов в сообщении об ошибке
+    if "api key" in error_str or "authentication" in error_str:
+        return "Ошибка аутентификации API. Пожалуйста, проверьте ваш API ключ."
+    elif "content filtered" in error_str:
+        return "Извините, изображение не может быть обработано из-за ограничений безопасности."
+    elif "deadline" in error_str:
+        return "Превышено время ожидания ответа от сервера. Пожалуйста, попробуйте еще раз."
+    elif "resource exhausted" in error_str:
+        return "Превышен лимит запросов. Пожалуйста, попробуйте позже."
     else:
-        # Обрезаем слишком длинные общие сообщения об ошибках
-        return f"Произошла ошибка при взаимодействии с ИИ-стилистом ({context_message}): {str(error)[:200]}"
+        return f"Произошла ошибка при обработке запроса. Пожалуйста, попробуйте еще раз. ({type(error).__name__})"
 
 
 def optimize_image(img_pil: Image.Image, max_size: int = 1024, quality: int = 85, format: str = 'JPEG') -> bytes:
@@ -355,13 +342,15 @@ async def analyze_clothing_image(image_data: bytes, occasion: str, preferences: 
     logger_gemini.info(f"Начало анализа изображения для повода: {occasion}")
     
     try:
-        # Проверяем кэш
-        cache_key = f"analysis_{hash(image_data)}_{occasion}_{preferences}"
-        if CACHE_ENABLED:
-            cached_result = cache_manager.get_from_cache(cache_key)
-            if cached_result:
-                logger_gemini.info("Результат найден в кэше")
-                return cached_result
+        # Проверяем кэш только если он включен
+        if CACHE_ENABLED and cache_manager:
+            try:
+                cached_result = cache_manager.get_from_cache(image_data, occasion, preferences)
+                if cached_result:
+                    logger_gemini.info("Результат найден в кэше")
+                    return cached_result
+            except Exception as cache_error:
+                logger_gemini.warning(f"Ошибка при работе с кэшем: {cache_error}. Продолжаем без кэша.")
         
         # Оптимизируем изображение
         img = Image.open(BytesIO(image_data))
@@ -376,9 +365,12 @@ async def analyze_clothing_image(image_data: bytes, occasion: str, preferences: 
             f"анализ одежды для {occasion}"
         )
         
-        # Сохраняем в кэш
-        if CACHE_ENABLED:
-            cache_manager.save_to_cache(cache_key, response)
+        # Сохраняем в кэш только если он включен
+        if CACHE_ENABLED and cache_manager:
+            try:
+                cache_manager.save_to_cache(image_data, occasion, response, preferences)
+            except Exception as cache_error:
+                logger_gemini.warning(f"Ошибка при сохранении в кэш: {cache_error}. Продолжаем без сохранения в кэш.")
         
         return response
         
@@ -397,7 +389,7 @@ async def compare_clothing_images(image_data_list: List[bytes], occasion: str, p
         preferences (Optional[str]): Предпочтения пользователя по стилю
         
     Returns:
-        str: Сравнительный анализ образов
+        str: Сравнительный анализ и рекомендации по стилю
         
     Raises:
         RuntimeError: При ошибках взаимодействия с API
@@ -407,9 +399,9 @@ async def compare_clothing_images(image_data_list: List[bytes], occasion: str, p
     
     try:
         # Проверяем кэш
-        cache_key = f"comparison_{hash(str(image_data_list))}_{occasion}_{preferences}"
         if CACHE_ENABLED:
-            cached_result = cache_manager.get_from_cache(cache_key)
+            # Для сравнения используем хеш первого изображения как ключ
+            cached_result = cache_manager.get_from_cache(image_data_list[0], occasion, preferences)
             if cached_result:
                 logger_gemini.info("Результат сравнения найден в кэше")
                 return cached_result
@@ -436,7 +428,7 @@ async def compare_clothing_images(image_data_list: List[bytes], occasion: str, p
         
         # Сохраняем в кэш
         if CACHE_ENABLED:
-            cache_manager.save_to_cache(cache_key, response)
+            cache_manager.save_to_cache(image_data_list[0], occasion, response, preferences)
         
         return response
         

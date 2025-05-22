@@ -28,6 +28,7 @@ from fastapi import FastAPI, File, UploadFile, Form, Request, APIRouter
 from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import uvicorn
 
 # Попытка импорта модулей проекта
 try:
@@ -226,10 +227,26 @@ async def test_endpoint():
 # Подключаем роутер API v1 к основному приложению
 app.include_router(api_v1)
 
+# Корневой маршрут для перенаправления на веб-приложение
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def root():
+    logger.info("Обращение к корневому URL (/), перенаправление на /webapp/")
+    return HTMLResponse(content=f"""
+        <html>
+            <head>
+                <meta http-equiv="refresh" content="0;url=/webapp/">
+                <title>Перенаправление на МИШУРА</title>
+            </head>
+            <body>
+                <p>Перенаправление на <a href="/webapp/">МИШУРА - ИИ Стилист</a>...</p>
+            </body>
+        </html>
+    """)
+
 # Оставляем старый корневой маршрут для обратной совместимости
-@app.get("/", summary="Корневой эндпоинт API (устаревший)", tags=["General"])
+@app.get("/api", summary="Корневой эндпоинт API (устаревший)", tags=["General"])
 async def root_legacy():
-    logger.info("Обращение к устаревшему корневому эндпоинту API (/).")
+    logger.info("Обращение к устаревшему корневому эндпоинту API (/api).")
     return {
         "project": "МИШУРА - ИИ Стилист",
         "message": "Этот эндпоинт устарел. Используйте /api/v1/",

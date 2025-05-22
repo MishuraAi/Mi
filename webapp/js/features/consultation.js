@@ -101,8 +101,7 @@ window.MishuraApp.features.consultation = (function() {
         
         document.addEventListener('modalOpened', function(e) {
             if (e.detail.modalId === 'consultation-overlay') {
-                logger.debug("Consultation (event modalOpened 'consultation-overlay'): Сброс формы и обновление состояния кнопки.");
-                resetConsultationForm(); // Сбрасываем при каждом открытии модалки консультации
+                logger.debug("Consultation (event modalOpened 'consultation-overlay'): Обновление состояния кнопки.");
                 updateSingleModeSubmitButtonState(); // Обновляем состояние кнопки на случай, если режим 'single' активен
                  if (window.MishuraApp.features.comparison && typeof window.MishuraApp.features.comparison.updateSubmitButtonState === 'function') {
                     window.MishuraApp.features.comparison.updateSubmitButtonState(); // Также обновляем кнопку для режима сравнения

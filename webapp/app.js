@@ -102,7 +102,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         tryInitModule('MishuraApp.features.consultation', 'Консультации');
         tryInitModule('MishuraApp.features.comparison', 'Сравнение образов');
-        tryInitModule('MishuraApp.features.tryOn', 'Виртуальная примерка');
         
         tryInitModule('MishuraApp.main', 'Основной модуль'); 
         
@@ -131,7 +130,6 @@ function setupGlobalButtonHandlers(loggerInstance) {
 
     const modals = window.MishuraApp.components.modals;
     const consultationFeature = window.MishuraApp.features.consultation;
-    const tryOnFeature = window.MishuraApp.features.tryOn;
     const uiHelpers = window.MishuraApp.utils.uiHelpers;
 
     if (!modals) {
@@ -176,50 +174,6 @@ function setupGlobalButtonHandlers(loggerInstance) {
         logger.info("App.js: Обработчик для 'consultation-button' назначен.");
     } else {
         logger.warn("App.js: Кнопка 'consultation-button' не найдена в DOM.");
-    }
-
-    // Кнопка "Примерить" (ID: try-on-button)
-    const tryOnButton = document.getElementById('try-on-button');
-    if (tryOnButton) {
-        const newTryOnButton = tryOnButton.cloneNode(true);
-        tryOnButton.parentNode.replaceChild(newTryOnButton, tryOnButton);
-        
-        newTryOnButton.addEventListener('click', function() {
-            logger.debug("App.js: Кнопка 'try-on-button' нажата.");
-            
-            // Проверяем наличие модуля try-on
-            if (!tryOnFeature) {
-                logger.error("App.js: Модуль try-on не найден!");
-                if (uiHelpers) uiHelpers.showToast("Функция примерки временно недоступна (A06).");
-                return;
-            }
-            
-            // Проверяем наличие необходимых методов
-            if (typeof tryOnFeature.resetFittingForm !== 'function') {
-                logger.error("App.js: tryOnFeature.resetFittingForm не найден!");
-                if (uiHelpers) uiHelpers.showToast("Функция примерки временно недоступна (A07).");
-                return;
-            }
-            
-            if (typeof modals.openTryOnModal !== 'function') {
-                logger.error("App.js: modals.openTryOnModal не найден!");
-                if (uiHelpers) uiHelpers.showToast("Функция примерки временно недоступна (A08).");
-                return;
-            }
-            
-            // Выполняем действия
-            try {
-                tryOnFeature.resetFittingForm();
-                modals.openTryOnModal();
-                logger.info("App.js: Модальное окно примерки успешно открыто");
-            } catch (error) {
-                logger.error("App.js: Ошибка при открытии модального окна примерки:", error);
-                if (uiHelpers) uiHelpers.showToast("Произошла ошибка при открытии примерки (A09).");
-            }
-        });
-        logger.info("App.js: Обработчик для 'try-on-button' назначен.");
-    } else {
-        logger.warn("App.js: Кнопка 'try-on-button' не найдена в DOM.");
     }
 
     // Плавающая кнопка (FAB) (ID: fab-button)

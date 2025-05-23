@@ -51,7 +51,6 @@ window.MishuraApp.config = (function() {
         endpoints: {
             consultation: '/analyze-outfit',      
             compare: '/compare-outfits',          
-            virtualFitting: '/virtual-fitting', 
         },
         headers: { 'Accept-Language': 'ru' }
     };

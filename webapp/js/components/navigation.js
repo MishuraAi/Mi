@@ -43,7 +43,7 @@ window.MishuraApp.components.navigation = (function() {
         }
         
         // Инициализация элементов DOM
-        navLinks = document.querySelectorAll('.nav-link');
+        navLinks = document.querySelectorAll('.nav-item');
         contentSections = document.querySelectorAll('.content-section');
         
         // Настройка обработчиков событий
@@ -63,12 +63,19 @@ window.MishuraApp.components.navigation = (function() {
         // Обработчики для ссылок навигации
         if (navLinks) {
             navLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
+                // Удаляем старые обработчики
+                const newLink = link.cloneNode(true);
+                link.parentNode.replaceChild(newLink, link);
+                
+                newLink.addEventListener('click', function(e) {
                     e.preventDefault();
                     const targetPage = this.getAttribute('data-page');
                     navigateTo(targetPage);
                 });
             });
+            
+            // Обновляем коллекцию после клонирования
+            navLinks = document.querySelectorAll('.nav-item');
         }
         
         // Обработчик изменения хэша URL

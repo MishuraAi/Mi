@@ -30,7 +30,7 @@ window.MishuraApp.config = (function() {
         //   apiUrl: 'https://ВАШ_РЕАЛЬНЫЙ_ДОМЕН_API/api/v1',
         //
         // ТЕКУЩЕЕ ЗНАЧЕНИЕ (ЗАМЕНИТЕ ПРИ НЕОБХОДИМОСТИ):
-        apiUrl: 'http://127.0.0.1:8000/api/v1', // Используем IP вместо localhost
+        apiUrl: 'http://127.0.0.1:8001/api/v1', // Используем IP вместо localhost
         // ================================================================================
         defaultLanguage: 'ru',
         debugMode: true, 

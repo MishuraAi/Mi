@@ -29,15 +29,9 @@ window.MishuraApp.features.consultation = (function() {
         imageUpload = window.MishuraApp.components.imageUpload;
         
         // Инициализация API сервиса
-        if (window.MishuraApp.api && window.MishuraApp.api.service) {
-            apiService = window.MishuraApp.api.service;
-            if (typeof apiService.init === 'function') {
-                apiService.init();
-                logger.info("Consultation: API сервис успешно инициализирован");
-            } else {
-                logger.error("Consultation: apiService.init не является функцией");
-                if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис API не инициализирован (C01).", 5000);
-            }
+        if (window.MishuraApp.utils && window.MishuraApp.utils.api) {
+            apiService = window.MishuraApp.utils.api;
+            logger.info("Consultation: API сервис успешно инициализирован");
         } else {
             logger.error("Consultation: API сервис НЕ НАЙДЕН! Запросы не будут работать.");
             if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис API не загружен (C00).", 5000);
@@ -157,24 +151,18 @@ window.MishuraApp.features.consultation = (function() {
             return;
         }
         
-        const formData = new FormData();
-        formData.append('image', uploadedImage);
-        formData.append('occasion', occasion);
-        formData.append('preferences', preferences);
-
-        logger.info('Consultation (single): Данные для запроса:', {occasion, preferencesLength: preferences.length, imageName: uploadedImage.name});
-        if (uiHelpers) uiHelpers.showLoading('Мишура анализирует ваш образ...');
-        
-        if (!apiService || typeof apiService.processStylistConsultation !== 'function') {
-            logger.error('Consultation (single): КРИТИЧЕСКАЯ ОШИБКА - apiService или processStylistConsultation недоступен!');
+        if (!apiService || typeof apiService.analyzeImage !== 'function') {
+            logger.error('Consultation (single): КРИТИЧЕСКАЯ ОШИБКА - apiService или analyzeImage недоступен!');
             if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Сервис API недоступен (C02/C03).');}
             return;
         }
 
         // Отключаем кнопку на время запроса
         if (submitButton) submitButton.disabled = true;
+        
+        if (uiHelpers) uiHelpers.showLoading('Мишура анализирует ваш образ...');
 
-        apiService.processStylistConsultation(formData)
+        apiService.analyzeImage(uploadedImage, 'single', occasion, preferences)
             .then(handleConsultationResponse)
             .catch(handleConsultationError)
             .finally(() => {
@@ -193,21 +181,34 @@ window.MishuraApp.features.consultation = (function() {
             logger.error('Consultation: Ошибка в ответе сервера:', errorMessage, response);
             if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMessage}`);
             if (resultsContainer) resultsContainer.innerHTML = `<p>Мишура не смогла дать совет: ${errorMessage}</p>`;
-        } else {
-            currentConsultationData = adviceText;
-            renderConsultationResults(adviceText);
-            logger.info('Consultation: Консультация успешно получена и отображена.');
-            
-            // Закрываем окно консультации и открываем окно результатов
-            if (modals) {
-                // Сначала закрываем окно консультации
+        }
+        currentConsultationData = adviceText;
+        renderConsultationResults(adviceText);
+        logger.info('Consultation: Консультация успешно получена и отображена.');
+        
+        // Закрываем окно консультации и открываем окно результатов
+        if (modals) {
+            // Проверяем, активно ли окно консультации перед закрытием
+            const consultationModal = document.getElementById('consultation-overlay');
+            if (consultationModal && consultationModal.classList.contains('active')) {
                 modals.closeModal('consultation-overlay');
-                
-                // Ждем завершения анимации закрытия
+                // Добавляем небольшую задержку перед открытием окна результатов
                 setTimeout(() => {
-                    // Открываем окно результатов
                     modals.openResultsModal();
-                }, 300); // 300ms должно быть достаточно для завершения анимации
+                    // Фокусируемся на кнопке закрытия
+                    const closeButton = document.getElementById('results-close');
+                    if (closeButton) {
+                        closeButton.focus();
+                    }
+                }, 150); // Увеличиваем задержку для более плавного перехода
+            } else {
+                // Если окно консультации уже закрыто, сразу открываем результаты
+                modals.openResultsModal();
+                // Фокусируемся на кнопке закрытия
+                const closeButton = document.getElementById('results-close');
+                if (closeButton) {
+                    closeButton.focus();
+                }
             }
         }
     }
@@ -232,7 +233,13 @@ window.MishuraApp.features.consultation = (function() {
         resultsContainer.innerHTML = ''; 
         
         if (uiHelpers && typeof uiHelpers.parseMarkdownToHtml === 'function') {
-            resultsContainer.innerHTML = uiHelpers.parseMarkdownToHtml(adviceText);
+            const parsedHtml = uiHelpers.parseMarkdownToHtml(adviceText);
+            resultsContainer.innerHTML = parsedHtml;
+            
+            // Добавляем обработчик для прокрутки к началу после рендеринга
+            setTimeout(() => {
+                resultsContainer.scrollTop = 0;
+            }, 100);
         } else {
             resultsContainer.innerHTML = adviceText; 
             logger.warn("Consultation: uiHelpers.parseMarkdownToHtml не найден, результат вставлен как есть.");
@@ -278,5 +285,10 @@ window.MishuraApp.features.consultation = (function() {
         return currentConsultationData;
     }
     
-    return { init, openConsultationModal, getCurrentConsultationData, resetConsultationForm };
+    return { 
+        init, 
+        openConsultationModal, 
+        getCurrentConsultationData, 
+        resetConsultationForm 
+    };
 })();

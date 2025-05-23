@@ -20,7 +20,7 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
         'use strict';
         
         let configModule, loggerModule; // Избегаем прямого использования config, logger до их инициализации
-        let apiBaseUrl = 'http://localhost:8000/api/v1'; // Дефолт, если конфиг не загружен
+        let apiBaseUrl = 'http://localhost:8001/api/v1'; // Дефолт, если конфиг не загружен
         let isInitializedLocal = false;
         
         function getLogger() {

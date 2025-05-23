@@ -87,14 +87,21 @@ window.MishuraApp.components.imageUpload = (function() {
             newButton.addEventListener('click', function() {
                 const mode = this.getAttribute('data-mode');
                 logger.debug(`ImageUpload: Кнопка режима нажата - '${mode}'`);
-                modeButtons.forEach(btn => document.getElementById(btn.id)?.classList.remove('active')); // Обновляем оригинальные кнопки
+                
+                // Обновляем активную кнопку
+                modeButtons.forEach(btn => btn.classList.remove('active'));
                 this.classList.add('active');
                 
-                if (singleAnalysisMode) singleAnalysisMode.classList.add('hidden');
-                if (compareAnalysisMode) compareAnalysisMode.classList.add('hidden');
+                // Обновляем видимость режимов
+                if (singleAnalysisMode) singleAnalysisMode.classList.toggle('hidden', mode !== 'single');
+                if (compareAnalysisMode) compareAnalysisMode.classList.toggle('hidden', mode !== 'compare');
                 
-                if (mode === 'single' && singleAnalysisMode) singleAnalysisMode.classList.remove('hidden');
-                else if (mode === 'compare' && compareAnalysisMode) compareAnalysisMode.classList.remove('hidden');
+                // Сбрасываем загруженные изображения при смене режима
+                if (mode === 'single') {
+                    resetCompareImageUploads();
+                } else if (mode === 'compare') {
+                    resetSingleImageUpload();
+                }
                 
                 document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
             });
@@ -115,7 +122,7 @@ window.MishuraApp.components.imageUpload = (function() {
                 compareAnalysisMode.classList.add('hidden');
                 if (modeButtons.length > 0) modeButtons[0].classList.add('active');
                 logger.debug("ImageUpload: Режим 'single' и первая кнопка активированы по умолчанию.");
-                 document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: 'single' } }));
+                document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: 'single' } }));
             }
         }
     }

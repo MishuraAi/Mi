@@ -200,3 +200,77 @@ function setupGlobalButtonHandlers(loggerInstance) {
     }
     logger.debug("App.js: Настройка обработчиков глобальных кнопок завершена.");
 }
+
+window.MishuraApp = window.MishuraApp || {};
+window.MishuraApp.app = (function() {
+    'use strict';
+    
+    let logger;
+    let currentPage = 'home';
+    
+    function init() {
+        logger = window.MishuraApp.utils.logger;
+        logger.debug('Инициализация главного модуля приложения');
+        
+        // Проверяем наличие всех необходимых модулей
+        if (!window.MishuraApp.components) {
+            logger.error('MishuraApp.components не инициализирован');
+            return;
+        }
+        
+        if (!window.MishuraApp.components.modals) {
+            logger.error('MishuraApp.components.modals не инициализирован');
+            return;
+        }
+        
+        if (!window.MishuraApp.features) {
+            logger.error('MishuraApp.features не инициализирован');
+            return;
+        }
+        
+        if (!window.MishuraApp.features.consultation) {
+            logger.error('MishuraApp.features.consultation не инициализирован');
+            return;
+        }
+        
+        setupEventListeners();
+        setupNavigation();
+        
+        logger.info('Главный модуль приложения успешно инициализирован');
+    }
+    
+    function setupEventListeners() {
+        // Обработчик кнопки консультации
+        const consultationButton = document.getElementById('consultation-button');
+        if (consultationButton) {
+            logger.debug('Найден элемент consultation-button, добавляю обработчик');
+            consultationButton.addEventListener('click', function() {
+                logger.debug('Кнопка консультации нажата');
+                if (window.MishuraApp.features.consultation && 
+                    typeof window.MishuraApp.features.consultation.openConsultationModal === 'function') {
+                    window.MishuraApp.features.consultation.openConsultationModal();
+                } else {
+                    logger.error('Модуль консультации не инициализирован или метод openConsultationModal не найден');
+                }
+            });
+        } else {
+            logger.warn('Элемент consultation-button не найден в DOM');
+        }
+        
+        // Обработчики навигации
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = this.dataset.page;
+                if (page && page !== currentPage) {
+                    navigateTo(page);
+                }
+            });
+        });
+    }
+    
+    // ... existing code ...
+    
+    return { init };
+})();

@@ -6,101 +6,118 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>МИШУРА - ИИ Стилист</title>
-    <link rel="icon" type="image/svg+xml" href="/webapp/images/single-mode-icon.svg">
-    <link rel="icon" type="image/png" href="/webapp/images/single-mode-icon.svg">
+    <title>МИШУРА - Ваш персональный стилист</title>
+    <link rel="icon" type="image/svg+xml" href="images/single-mode-icon.svg">
+    <link rel="icon" type="image/png" href="images/single-mode-icon.svg">
     <!-- Обновленные пути к стилям -->
-    <link rel="stylesheet" href="/webapp/css/styles.css">
+    <link rel="stylesheet" href="css/styles.css">
     <style>
         /* Предотвращение FOUC (Flash Of Unstyled Content) */
         body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }
         body.loaded { display: flex; opacity: 1; } /* display: flex для phone-container */
+        /* Предотвращаем FOUC */
+        .hidden { display: none; }
     </style>
 </head>
 <body>
     <div class="phone-container">
         <div class="app-container">
-            <header class="header">
-                <div class="header-left" id="menu-button" role="button" aria-label="Меню" tabindex="0">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
-                </div>
-                <div class="header-title-container" id="home-button" role="button" aria-label="На главную" tabindex="0">
-                    <div class="header-title">МИШУРА</div>
-                    <div class="header-subtitle">Ваш персональный стилист</div>
-                </div>
-                <div class="header-right" id="search-button" role="button" aria-label="Поиск" tabindex="0">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="#919EAB" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                </div>
+            <div class="shimmer-effect"></div>
+            <!-- Gold accent lines -->
+            <div class="gold-accent gold-accent-1"></div>
+            <div class="gold-accent gold-accent-2"></div>
+
+            <!-- Header -->
+            <header class="app-header">
+                <h1 class="app-logo">МИШУРА</h1>
+                <p class="app-tagline">Ваш персональный стилист</p>
             </header>
 
-            <main class="main-content" id="main-content-area">
-                <!-- Добавляем id home-section для корректной навигации -->
+            <main class="main-content">
+                <!-- Главная страница -->
                 <div id="home-section" class="content-section">
                     <div class="main-buttons">
-                        <div class="main-button" id="consultation-button" role="button" tabindex="0">
-                            <div class="main-button-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        <button class="main-button consultation-button">
+                            <div class="main-button-icon">
+                                <svg class="heart-icon" viewBox="0 0 24 24">
+                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                                 </svg>
                             </div>
                             <div class="main-button-title">Получить консультацию</div>
-                            <div class="main-button-description">Анализ предмета одежды или сравнение нескольких</div>
-                        </div>
-                        <div class="main-button" id="analyze-button" role="button" tabindex="0">
-                            <div class="button-icon">
-                                <img src="/webapp/images/analyze-icon.svg" alt="Анализ" class="icon">
+                            <div class="main-button-description">Получите персональные рекомендации от вашего стилиста</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- История консультаций -->
+                <div id="history-section" class="content-section hidden">
+                    <div class="history-list">
+                        <!-- Здесь будет динамически добавляться история консультаций -->
+                    </div>
+                </div>
+
+                <!-- Советы -->
+                <div id="tips-section" class="content-section hidden">
+                    <div class="tips-container">
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                </svg>
                             </div>
-                            <div class="button-text">Анализ образа</div>
-                            <div class="main-button-description">Получите рекомендации по вашему образу</div>
+                            <h3 class="tip-title">Как сделать хорошее фото</h3>
+                            <p class="tip-text">Убедитесь, что предмет одежды хорошо освещен и занимает большую часть кадра. Избегайте теней и бликов.</p>
                         </div>
-                        <div class="main-button" id="compare-button" role="button" tabindex="0">
-                            <div class="button-icon">
-                                <img src="/webapp/images/compare-icon.svg" alt="Сравнение" class="icon">
+                        
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                </svg>
                             </div>
-                            <div class="button-text">Сравнение образов</div>
-                            <div class="main-button-description">Сравните несколько образов между собой</div>
+                            <h3 class="tip-title">Дополнительная информация</h3>
+                            <p class="tip-text">Укажите, для какого случая вы подбираете образ. Это поможет стилисту дать более точные рекомендации.</p>
+                        </div>
+                        
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                </svg>
+                            </div>
+                            <h3 class="tip-title">Сравнение образов</h3>
+                            <p class="tip-text">Загрузите несколько фотографий, чтобы сравнить разные варианты и получить рекомендации по выбору лучшего образа.</p>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Добавляем другие необходимые секции для навигации -->
-                <div id="wardrobe-section" class="content-section hidden">
-                    <!-- Содержимое секции гардероба -->
-                </div>
-                
-                <div id="tips-section" class="content-section hidden">
-                    <!-- Содержимое секции советов -->
-                </div>
-                
-                <div id="consultations-section" class="content-section hidden">
-                    <!-- Содержимое секции консультаций -->
-                </div>
             </main>
 
-            <nav class="bottom-nav">
-                <div class="nav-item active" data-tab="home" role="button" tabindex="0" aria-label="Главная">
-                    <div class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><use href="#home-svg-icon"></use></svg></div><div class="nav-text">Главная</div>
-                </div>
-                <div class="nav-item" data-tab="wardrobe" role="button" tabindex="0" aria-label="Гардероб">
-                    <div class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><use href="#wardrobe-svg-icon"></use></svg></div><div class="nav-text">Гардероб</div>
-                </div>
-                <div class="nav-item" data-tab="tips" role="button" tabindex="0" aria-label="Советы">
-                    <div class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><use href="#tips-svg-icon"></use></svg></div><div class="nav-text">Советы</div>
-                </div>
-                <div class="nav-item" data-tab="consultations" role="button" tabindex="0" aria-label="Консультации">
-                    <div class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><use href="#consultations-svg-icon"></use></svg></div><div class="nav-text">Консультации</div>
-                </div>
+            <nav class="nav-bar">
+                <a href="#" class="nav-item" data-page="history">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M13 3c-4.97 0-9 4.03-9 9H1l4 3.99L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.25 2.52.77-1.28-3.52-2.09V8z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">История</span>
+                </a>
+                <a href="#" class="nav-item" data-page="tips">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">Совет</span>
+                </a>
+                <a href="#" class="nav-item active" data-page="home">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">Главная</span>
+                </a>
             </nav>
-
-            <div class="fab" id="fab-button" role="button" tabindex="0" aria-label="Создать новую консультацию">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2" aria-hidden="true">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle>
-                </svg>
-            </div>
         </div> </div> <div class="overlay" id="consultation-overlay" role="dialog" aria-labelledby="consultation-dialog-title" aria-modal="true">
         <div class="dialog">
             <div class="dialog-header">
@@ -243,90 +260,70 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-        <symbol id="upload-svg-icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>
-        </symbol>
-        <symbol id="home-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </symbol>
-        <symbol id="wardrobe-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-        </symbol>
-        <symbol id="tips-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </symbol>
-        <symbol id="consultations-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line>
+    <!-- SVG иконки -->
+    <svg style="display: none;">
+        <symbol id="upload-svg-icon" viewBox="0 0 24 24">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
         </symbol>
     </svg>
 
-    <!-- Подключение JavaScript файлов -->
-    <!-- Конфигурация -->
-    <script src="/webapp/js/config.js"></script>
-    
-    <!-- Утилиты -->
-    <script src="/webapp/js/utils/logger.js"></script>
-    <script src="/webapp/js/utils/device-detect.js"></script>
-    <script src="/webapp/js/utils/ui-helpers.js"></script>
-    
-    <!-- API -->
-    <script src="/webapp/js/api/api-service.js"></script>
-    
-    <!-- Сервисы -->
-    <script src="/webapp/js/services/ai-service.js"></script>
-    
-    <!-- Компоненты -->
-    <script src="/webapp/js/components/navigation.js"></script>
-    <script src="/webapp/js/components/modals.js"></script>
-    <script src="/webapp/js/components/image-upload.js"></script>
-    
-    <!-- Функциональность -->
-    <script src="/webapp/js/features/consultation.js"></script>
-    <script src="/webapp/js/features/comparison.js"></script>
-    <script src="/webapp/js/features/try-on.js"></script>
-    
-    <!-- Основной модуль -->
-    <script src="/webapp/js/main.js"></script>
-    
-    <!-- Внешние библиотеки -->
-    <script src="/webapp/vendor/cursor-effect.js" defer></script>
-    
-    <!-- Загрузчик приложения -->
-    <script src="/webapp/app.js" defer></script>
-    
+    <!-- Скрипты -->
+    <script src="js/utils/logger.js"></script>
+    <script src="js/utils/ui-helpers.js"></script>
+    <script src="js/services/api.js"></script>
+    <script src="js/components/modals.js"></script>
+    <script src="js/features/consultation.js"></script>
+    <script src="js/app.js"></script>
     <script>
+        // Инициализация приложения после загрузки DOM
         document.addEventListener('DOMContentLoaded', function() {
-            const body = document.body;
-            // ИЗМЕНЕН ПУТЬ: ссылка на /webapp/css/styles.css
-            const mainStyles = document.querySelector('link[href="/webapp/css/styles.css"]');
-            let stylesLoaded = false;
-
-            function showBody() {
-                if (body.classList.contains('loaded')) return;
-                body.classList.add('loaded');
-            }
-
-            if (mainStyles) {
-                if (mainStyles.sheet) {
-                    showBody();
+            // Показываем контент после загрузки
+            document.body.classList.add('loaded');
+            
+            // Инициализируем все модули
+            if (window.MishuraApp) {
+                // Инициализируем утилиты
+                if (window.MishuraApp.utils) {
+                    if (window.MishuraApp.utils.logger) {
+                        window.MishuraApp.utils.logger.init();
+                    }
+                    if (window.MishuraApp.utils.api) {
+                        window.MishuraApp.utils.api.init();
+                    }
+                }
+                
+                // Инициализируем компоненты
+                if (window.MishuraApp.components) {
+                    if (window.MishuraApp.components.modals) {
+                        window.MishuraApp.components.modals.init();
+                    }
+                    if (window.MishuraApp.components.imageUpload) {
+                        window.MishuraApp.components.imageUpload.init();
+                    }
+                    if (window.MishuraApp.components.navigation) {
+                        window.MishuraApp.components.navigation.init();
+                    }
+                }
+                
+                // Инициализируем фичи
+                if (window.MishuraApp.features) {
+                    if (window.MishuraApp.features.consultation) {
+                        window.MishuraApp.features.consultation.init();
+                    }
+                    if (window.MishuraApp.features.comparison) {
+                        window.MishuraApp.features.comparison.init();
+                    }
+                }
+                
+                // Инициализируем приложение
+                if (window.MishuraApp.app) {
+                    window.MishuraApp.app.init();
                 } else {
-                    mainStyles.onload = showBody;
-                    mainStyles.onerror = function() {
-                        console.error("[FOUC Guard] Error loading /webapp/css/styles.css. Showing body anyway.");
-                        showBody(); 
-                    };
+                    console.error('MishuraApp.app не инициализирован');
                 }
             } else {
-                 console.error("[FOUC Guard] Main stylesheet /webapp/css/styles.css link not found in head! Showing body.");
-                 showBody();
+                console.error('MishuraApp не инициализирован');
             }
-            setTimeout(function() {
-                if (!body.classList.contains('loaded')) {
-                    console.warn("[FOUC Guard] Fallback: Showing body due to timeout. CSS onload/onerror for /webapp/css/styles.css might not have fired.");
-                    showBody();
-                }
-            }, 750);
         });
     </script>
 </body>

@@ -14,6 +14,7 @@
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
 window.MishuraApp.utils = window.MishuraApp.utils || {};
+
 window.MishuraApp.utils.logger = (function() {
     'use strict';
     
@@ -25,120 +26,72 @@ window.MishuraApp.utils.logger = (function() {
         ERROR: 3
     };
     
-    // Текущий уровень логирования (можно изменить во время выполнения)
-    let currentLogLevel = LOG_LEVELS.INFO;
+    // Текущий уровень логирования
+    let currentLogLevel = LOG_LEVELS.DEBUG;
     
-    // Префикс для всех логов
-    const LOG_PREFIX = 'МишураApp';
+    // Префикс для всех сообщений
+    const LOG_PREFIX = 'MishuraApp';
     
-    /**
-     * Инициализация модуля логирования
-     */
     function init() {
-        autoConfigureLogLevel();
-        info('Модуль логирования инициализирован');
-        return true;
+        console.debug(`${LOG_PREFIX}: Logger initialized with level: ${getLogLevelName(currentLogLevel)}`);
     }
     
-    /**
-     * Вывод отладочной информации (только для разработки)
-     * @param {string} message - сообщение для логирования
-     * @param {...any} args - дополнительные аргументы
-     */
-    function debug(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.DEBUG) {
-            console.debug(`[DEBUG] ${LOG_PREFIX}: ${message}`, ...args);
-        }
-    }
-    
-    /**
-     * Вывод информационного сообщения
-     * @param {string} message - сообщение для логирования
-     * @param {...any} args - дополнительные аргументы
-     */
-    function info(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.INFO) {
-            console.log(`[INFO] ${LOG_PREFIX}: ${message}`, ...args);
-        }
-    }
-    
-    /**
-     * Вывод предупреждения
-     * @param {string} message - сообщение для логирования
-     * @param {...any} args - дополнительные аргументы
-     */
-    function warn(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.WARN) {
-            console.warn(`[WARN] ${LOG_PREFIX}: ${message}`, ...args);
-        }
-    }
-    
-    /**
-     * Вывод сообщения об ошибке
-     * @param {string} message - сообщение для логирования
-     * @param {...any} args - дополнительные аргументы
-     */
-    function error(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.ERROR) {
-            console.error(`[ERROR] ${LOG_PREFIX}: ${message}`, ...args);
-        }
-    }
-    
-    /**
-     * Установка уровня логирования
-     * @param {string} level - уровень логирования ('debug', 'info', 'warn', 'error')
-     */
     function setLogLevel(level) {
-        const levelUpper = level.toUpperCase();
-        if (LOG_LEVELS[levelUpper] !== undefined) {
-            currentLogLevel = LOG_LEVELS[levelUpper];
-            info(`Уровень логирования установлен: ${levelUpper}`);
+        if (LOG_LEVELS[level] !== undefined) {
+            currentLogLevel = LOG_LEVELS[level];
+            console.debug(`${LOG_PREFIX}: Log level set to: ${level}`);
         } else {
-            warn(`Неизвестный уровень логирования: ${level}`);
+            console.warn(`${LOG_PREFIX}: Invalid log level: ${level}`);
         }
     }
     
-    /**
-     * Получение текущего уровня логирования
-     * @returns {string} - текущий уровень логирования
-     */
-    function getLogLevel() {
-        for (const [key, value] of Object.entries(LOG_LEVELS)) {
-            if (value === currentLogLevel) {
-                return key;
-            }
-        }
-        return 'UNKNOWN';
+    function getLogLevelName(level) {
+        return Object.keys(LOG_LEVELS).find(key => LOG_LEVELS[key] === level) || 'UNKNOWN';
     }
     
-    // Автоматическая установка уровня логирования на основе URL параметров
-    function autoConfigureLogLevel() {
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const logLevel = urlParams.get('log_level');
-            if (logLevel) {
-                setLogLevel(logLevel);
-            }
-            
-            // В режиме разработки включаем отладочные логи
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                setLogLevel('DEBUG');
-                debug('Режим разработки: логирование DEBUG включено');
-            }
-        } catch (e) {
-            console.error('Ошибка при автоматической настройке уровня логирования:', e);
+    function shouldLog(level) {
+        return level >= currentLogLevel;
+    }
+    
+    function formatMessage(level, ...args) {
+        const timestamp = new Date().toISOString();
+        const levelName = getLogLevelName(level);
+        return [`${LOG_PREFIX} [${timestamp}] ${levelName}:`, ...args];
+    }
+    
+    function debug(...args) {
+        if (shouldLog(LOG_LEVELS.DEBUG)) {
+            console.debug(...formatMessage(LOG_LEVELS.DEBUG, ...args));
         }
     }
     
-    // Публичный API модуля
+    function info(...args) {
+        if (shouldLog(LOG_LEVELS.INFO)) {
+            console.info(...formatMessage(LOG_LEVELS.INFO, ...args));
+        }
+    }
+    
+    function warn(...args) {
+        if (shouldLog(LOG_LEVELS.WARN)) {
+            console.warn(...formatMessage(LOG_LEVELS.WARN, ...args));
+        }
+    }
+    
+    function error(...args) {
+        if (shouldLog(LOG_LEVELS.ERROR)) {
+            console.error(...formatMessage(LOG_LEVELS.ERROR, ...args));
+        }
+    }
+    
+    // Инициализация при создании
+    init();
+    
     return {
         init,
+        setLogLevel,
         debug,
         info,
         warn,
-        error,
-        setLogLevel,
-        getLogLevel,
-        LEVELS: LOG_LEVELS
+        error
     };
 })();

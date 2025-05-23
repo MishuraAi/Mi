@@ -14,215 +14,128 @@
 // Добавляем модуль в пространство имен приложения
 window.MishuraApp = window.MishuraApp || {};
 window.MishuraApp.utils = window.MishuraApp.utils || {};
+
 window.MishuraApp.utils.uiHelpers = (function() {
     'use strict';
     
-    // Локальные ссылки на другие модули
-    let config, logger;
+    let logger;
+    let loadingOverlay;
+    let toast;
     
-    // Константы по умолчанию
-    const DEFAULT_TOAST_DURATION = 3000; // 3 секунды
-    
-    /**
-     * Показывает уведомление пользователю
-     * @param {string} message - текст уведомления
-     * @param {number} duration - длительность показа в мс (по умолчанию 3000)
-     */
-    function showToast(message, duration) {
-        // Исправлено: используем значение по умолчанию вместо config.LIMITS.TOAST_DURATION
-        const toastDuration = duration || DEFAULT_TOAST_DURATION;
-        const toastElement = document.getElementById('toast');
+    function init() {
+        logger = window.MishuraApp.utils.logger;
+        logger.debug('Инициализация UI Helpers');
         
-        if (toastElement) {
-            toastElement.textContent = message;
-            toastElement.classList.add('show');
-            setTimeout(() => toastElement.classList.remove('show'), toastDuration);
+        // Создаем элементы UI, если их нет
+        createLoadingOverlay();
+        createToast();
+        
+        logger.info('UI Helpers инициализированы');
+    }
+    
+    function createLoadingOverlay() {
+        if (!document.getElementById('loading-overlay')) {
+            loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'loading-overlay';
+            loadingOverlay.className = 'overlay';
+            loadingOverlay.innerHTML = `
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Загрузка...</div>
+                </div>
+            `;
+            document.body.appendChild(loadingOverlay);
         } else {
-            if (logger) {
-                logger.warn("Элемент #toast не найден для показа сообщения:", message);
-            } else {
-                console.warn("Элемент #toast не найден для показа сообщения:", message);
-            }
-            // Запасной вариант - обычный alert в крайнем случае
-            if (message.includes('ошибка') || message.includes('Ошибка')) {
-                alert(message);
-            }
+            loadingOverlay = document.getElementById('loading-overlay');
         }
     }
     
-    /**
-     * Показывает глобальный индикатор загрузки
-     * @param {string} message - текст, отображаемый в индикаторе
-     */
+    function createToast() {
+        if (!document.getElementById('toast')) {
+            toast = document.createElement('div');
+            toast.id = 'toast';
+            toast.className = 'toast';
+            document.body.appendChild(toast);
+        } else {
+            toast = document.getElementById('toast');
+        }
+    }
+    
     function showLoading(message = 'Загрузка...') {
-        if (logger) {
-            logger.debug(`Показ индикатора загрузки: ${message}`);
+        if (!loadingOverlay) {
+            createLoadingOverlay();
         }
         
-        const loadingText = document.getElementById('loading-text');
-        if (loadingText) loadingText.textContent = message;
-        
-        const loadingOverlay = document.getElementById('loading-overlay');
-        if (loadingOverlay) {
-            loadingOverlay.classList.add('active');
-            document.body.style.overflow = 'hidden'; // Предотвращаем прокрутку фона
-        } else {
-            if (logger) {
-                logger.error("Элемент #loading-overlay не найден.");
-            } else {
-                console.error("Элемент #loading-overlay не найден.");
-            }
+        const loadingText = loadingOverlay.querySelector('.loading-text');
+        if (loadingText) {
+            loadingText.textContent = message;
         }
+        
+        loadingOverlay.classList.add('active');
+        document.body.classList.add('modal-open');
     }
     
-    /**
-     * Скрывает глобальный индикатор загрузки
-     */
     function hideLoading() {
-        if (logger) {
-            logger.debug('Скрытие индикатора загрузки');
-        }
-        
-        const loadingOverlay = document.getElementById('loading-overlay');
         if (loadingOverlay) {
             loadingOverlay.classList.remove('active');
-            document.body.style.overflow = ''; // Восстанавливаем прокрутку фона
+            document.body.classList.remove('modal-open');
         }
     }
     
-    /**
-     * Показывает локальный индикатор загрузки внутри элемента
-     * @param {HTMLElement} element - элемент, внутри которого будет показан индикатор
-     */
-    function showLoadingIndicatorFor(element) {
-        if (!element) return;
+    function showToast(message, duration = 3000) {
+        if (!toast) {
+            createToast();
+        }
         
-        // Проверяем, существует ли уже индикатор
-        let indicator = element.querySelector('.upload-loading-indicator');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.className = 'upload-loading-indicator';
-            indicator.innerHTML = '<div class="loading-spinner" style="width:25px;height:25px;"></div>';
-            indicator.style.position = 'absolute';
-            indicator.style.top = '50%';
-            indicator.style.left = '50%';
-            indicator.style.transform = 'translate(-50%, -50%)';
-            indicator.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-            indicator.style.borderRadius = '50%';
-            indicator.style.padding = '10px';
-            indicator.style.zIndex = '5';
-            
-            element.appendChild(indicator);
-            
-            // Полупрозрачный фон для элемента
-            element.style.position = 'relative';
-            element.style.opacity = '0.7';
-        }
-    }
-    
-    /**
-     * Скрывает локальный индикатор загрузки
-     * @param {HTMLElement} element - элемент с индикатором
-     */
-    function hideLoadingIndicatorFor(element) {
-        if (!element) return;
+        toast.textContent = message;
+        toast.classList.add('active');
         
-        const indicator = element.querySelector('.upload-loading-indicator');
-        if (indicator) {
-            element.removeChild(indicator);
+        // Удаляем предыдущий таймер, если он есть
+        if (toast.hideTimer) {
+            clearTimeout(toast.hideTimer);
         }
-        element.style.opacity = '1';
+        
+        // Устанавливаем новый таймер
+        toast.hideTimer = setTimeout(() => {
+            toast.classList.remove('active');
+        }, duration);
     }
     
-    /**
-     * Парсит текст в формате Markdown в HTML
-     * @param {string} markdown - текст в формате Markdown
-     * @returns {string} - HTML-разметка
-     */
     function parseMarkdownToHtml(markdown) {
-        if (typeof markdown !== 'string' || !markdown.trim()) {
-            return '<p>К сожалению, ИИ-стилист Мишура не смог предоставить ответ. Попробуйте другой запрос или изображение.</p>';
-        }
+        if (!markdown) return '';
         
-        let html = markdown;
-        
-        // Заголовки (### Наименование ### -> <h4>Наименование</h4>)
-        html = html.replace(/^###\s*(.*?)\s*###\s*$/gm, '<h4>$1</h4>');
-        html = html.replace(/^###\s*(.*?)\s*$/gm, '<div class="result-section-title">$1</div>');
-
-        // Списки (* или - )
-        html = html.replace(/^\s*[\*\-]\s+(.*)$/gm, '<li>$1</li>');
-        
-        // Обертывание блоков <li> в <ul>
-        let inList = false;
-        const lines = html.split('\n');
-        html = lines.map(line => {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('<li>')) {
-                if (!inList) {
-                    inList = true;
-                    return '<ul>' + line;
-                }
-                return line;
-            } else if (trimmedLine.startsWith('💡')) { // Для подсказок
-                 if (inList) {
-                    inList = false;
-                    return '</ul><p class="ai-tip">' + line + '</p>';
-                }
-                return '<p class="ai-tip">' + line + '</p>';
-            }
-            else { // Не элемент списка
-                if (inList) { // Если перед этим был список, закрываем его
-                    inList = false;
-                    // Если строка не пустая после списка, оборачиваем ее в <p>
-                    return trimmedLine === '' ? '</ul>' : '</ul><p>' + line + '</p>';
-                }
-                // Если строка не пустая и не является уже HTML тегом, оборачиваем в <p>
-                return (trimmedLine !== '' && !trimmedLine.match(/^<(\w+)\b[^>]*>/)) ? '<p>' + line + '</p>' : line;
-            }
-        }).join('\n');
-
-        if (inList) { // Если список был последним элементом
-            html += '</ul>';
-        }
-        
-        // Заменяем двойные переносы строк на один
-        html = html.replace(/\n\n+/g, '\n');
-        // Заменяем оставшиеся одинарные \n на <br> для сохранения переносов
-        html = html.replace(/\n/g, '<br>');
-        // Убираем <br> внутри <li> если он там лишний
-        html = html.replace(/<li><br\s*\/?>/gi, '<li>');
-        // Убираем <br> перед закрывающим </li>
-        html = html.replace(/<br\s*\/?>\s*<\/li>/gi, '</li>');
-        // Убираем <p><br></p> или <p></p>
-        html = html.replace(/<p>(<br\s*\/?>|\s*)<\/p>/gi, '');
-
-        return html;
+        // Простой парсер Markdown
+        return markdown
+            // Заголовки
+            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+            
+            // Жирный текст
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            
+            // Курсив
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            
+            // Списки
+            .replace(/^\s*\*\s(.*$)/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+            
+            // Параграфы
+            .replace(/^(?!<[h|u|li])(.*$)/gm, '<p>$1</p>')
+            
+            // Убираем лишние переносы строк
+            .replace(/\n\n/g, '\n')
+            
+            // Убираем пустые параграфы
+            .replace(/<p><\/p>/g, '');
     }
     
-    /**
-     * Инициализация модуля
-     */
-    function init() {
-        // Получаем ссылки на другие модули
-        config = window.MishuraApp.config;
-        logger = window.MishuraApp.utils.logger;
-        
-        if (logger) {
-            logger.debug('UI-хелперы инициализированы');
-        } else {
-            console.debug('UI-хелперы инициализированы');
-        }
-    }
-    
-    // Публичный API модуля
     return {
         init,
-        showToast,
         showLoading,
         hideLoading,
-        showLoadingIndicatorFor,
-        hideLoadingIndicatorFor,
+        showToast,
         parseMarkdownToHtml
     };
 })();

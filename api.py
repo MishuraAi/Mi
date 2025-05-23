@@ -27,6 +27,7 @@ from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, Form, Request, APIRouter, HTTPException
 from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import uvicorn
 from pydantic import BaseModel
@@ -72,6 +73,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEBAPP_DIR = os.path.join(BASE_DIR, "webapp")
 logger.info(f"Определена директория веб-приложения: {WEBAPP_DIR}")
 
+# Проверяем существование директории webapp
+if not os.path.exists(WEBAPP_DIR) or not os.path.isdir(WEBAPP_DIR):
+    logger.critical(f"Директория веб-приложения '{WEBAPP_DIR}' не найдена!")
+    raise RuntimeError(f"Директория веб-приложения '{WEBAPP_DIR}' не найдена!")
+
+# Проверяем существование index.html
+index_html_path = os.path.join(WEBAPP_DIR, "index.html")
+if not os.path.exists(index_html_path) or not os.path.isfile(index_html_path):
+    logger.critical(f"Основной файл webapp/index.html не найден по пути: {index_html_path}")
+    raise RuntimeError(f"Основной файл webapp/index.html не найден по пути: {index_html_path}")
 
 app = FastAPI(
     title="МИШУРА - API ИИ-Стилиста",
@@ -82,12 +93,32 @@ app = FastAPI(
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://127.0.0.1:8001", "http://localhost:8001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-logger.info("CORS middleware настроен с allow_origins=['*'].")
+logger.info("CORS middleware настроен с allow_origins=['http://127.0.0.1:8001', 'http://localhost:8001'].")
+
+# Корневой маршрут для перенаправления на веб-приложение
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def root():
+    logger.info("Обращение к корневому URL (/), перенаправление на /webapp/")
+    return HTMLResponse(content=f"""
+        <html>
+            <head>
+                <meta http-equiv="refresh" content="0;url=/webapp/">
+                <title>Перенаправление на МИШУРА</title>
+            </head>
+            <body>
+                <p>Перенаправление на <a href="/webapp/">МИШУРА - ИИ Стилист</a>...</p>
+            </body>
+        </html>
+    """)
+
+# Монтируем статические файлы
+app.mount("/webapp", StaticFiles(directory=WEBAPP_DIR, html=True), name="webapp")
+logger.info(f"Статические файлы из директории '{WEBAPP_DIR}' смонтированы по пути /webapp")
 
 # Создаем подгруппу API v1
 api_v1 = APIRouter(prefix="/api/v1")
@@ -118,56 +149,6 @@ async def root():
         "webapp_status": "Веб-приложение доступно по адресу /webapp/",
         "docs_url": "/docs", "redoc_url": "/redoc"
     }
-
-@app.get("/webapp/{file_path:path}", summary="Обслуживание статических файлов веб-приложения", tags=["WebApp"])
-@monitor_request()
-async def serve_static_file(request: Request, file_path: str):
-    # Формируем полный путь к запрашиваемому файлу внутри WEBAPP_DIR
-    # Проверяем, что WEBAPP_DIR существует
-    if not os.path.exists(WEBAPP_DIR) or not os.path.isdir(WEBAPP_DIR):
-        logger.critical(f"Директория веб-приложения '{WEBAPP_DIR}' не найдена. Невозможно отдать статические файлы.")
-        return Response(content="Ошибка сервера: директория веб-приложения не настроена.", status_code=500)
-
-    requested_path = os.path.join(WEBAPP_DIR, file_path.strip("/")) # Убираем возможные слеши в начале file_path
-    logger.info(f"Запрос статического файла: '{file_path}'. Абсолютный путь: '{os.path.abspath(requested_path)}'")
-
-    normalized_path = os.path.normpath(requested_path)
-
-    if not normalized_path.startswith(os.path.normpath(WEBAPP_DIR)):
-        logger.warning(f"Попытка доступа к файлу вне директории webapp: '{file_path}' (нормализован в '{normalized_path}')")
-        return Response(content=f"Доступ запрещен: {file_path}", status_code=403)
-
-    if os.path.isdir(normalized_path):
-        index_file_path = os.path.join(normalized_path, "index.html")
-        if os.path.isfile(index_file_path):
-            logger.info(f"Запрошена директория '{file_path}', отдается index.html: '{index_file_path}'")
-            return FileResponse(index_file_path, media_type="text/html")
-        else:
-            logger.error(f"Запрошена директория '{file_path}', но index.html в ней не найден ('{index_file_path}').")
-            return Response(content=f"Directory listing not allowed, and no index.html found in: {file_path}", status_code=404)
-
-    if not os.path.exists(normalized_path) or not os.path.isfile(normalized_path):
-        logger.error(f"Статический файл не найден: '{normalized_path}' (запрошен как '{file_path}')")
-        return Response(content=f"Файл не найден: {file_path}", status_code=404)
-
-    mime_type = get_mime_type(normalized_path)
-    logger.info(f"Отдача статического файла: '{normalized_path}' с MIME-типом '{mime_type}'")
-    return FileResponse(normalized_path, media_type=mime_type)
-
-@app.get("/webapp", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/webapp/", response_class=HTMLResponse, include_in_schema=False)
-@monitor_request()
-async def serve_webapp_root_redirect():
-    index_html_path = os.path.join(WEBAPP_DIR, "index.html")
-    logger.info(f"Запрос к /webapp/ или /webapp, попытка отдать: {index_html_path}")
-    if not os.path.exists(WEBAPP_DIR) or not os.path.isdir(WEBAPP_DIR):
-        logger.critical(f"Директория веб-приложения '{WEBAPP_DIR}' не найдена. Невозможно отдать index.html.")
-        return HTMLResponse(content="Ошибка сервера: директория веб-приложения не настроена.", status_code=500)
-    if os.path.exists(index_html_path) and os.path.isfile(index_html_path):
-        return FileResponse(index_html_path, media_type="text/html")
-    else:
-        logger.critical(f"КРИТИЧЕСКАЯ ОШИБКА: Основной файл webapp/index.html не найден по пути: {index_html_path}")
-        return HTMLResponse(content="Ошибка сервера: основной файл веб-приложения не найден.", status_code=500)
 
 @api_v1.post("/analyze-outfit", summary="Анализ одного предмета одежды", tags=["AI Analysis"])
 @monitor_request()
@@ -263,22 +244,6 @@ async def health_check():
 
 # Подключаем роутер API v1 к основному приложению
 app.include_router(api_v1)
-
-# Корневой маршрут для перенаправления на веб-приложение
-@app.get("/", response_class=HTMLResponse, include_in_schema=False)
-async def root():
-    logger.info("Обращение к корневому URL (/), перенаправление на /webapp/")
-    return HTMLResponse(content=f"""
-        <html>
-            <head>
-                <meta http-equiv="refresh" content="0;url=/webapp/">
-                <title>Перенаправление на МИШУРА</title>
-            </head>
-            <body>
-                <p>Перенаправление на <a href="/webapp/">МИШУРА - ИИ Стилист</a>...</p>
-            </body>
-        </html>
-    """)
 
 # Оставляем старый корневой маршрут для обратной совместимости
 @app.get("/api", summary="Корневой эндпоинт API (устаревший)", tags=["General"])

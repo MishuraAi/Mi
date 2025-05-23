@@ -42,3 +42,15 @@ CREATE TABLE IF NOT EXISTS feedbacks (
     FOREIGN KEY (user_id) REFERENCES users (telegram_id),
     FOREIGN KEY (consultation_id) REFERENCES consultations (id)
 );
+
+-- Новая таблица гардероба
+CREATE TABLE IF NOT EXISTS wardrobe (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    telegram_file_id TEXT NOT NULL,
+    item_name TEXT,
+    item_tag TEXT,
+    category TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (telegram_id)
+);

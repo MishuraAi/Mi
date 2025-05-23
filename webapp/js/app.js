@@ -56,11 +56,7 @@ window.MishuraApp.app = (function() {
         // Обработчик для кнопки консультации
         const consultationButton = document.querySelector('.consultation-button');
         if (consultationButton) {
-            // Клонируем кнопку для удаления старых обработчиков
-            const newButton = consultationButton.cloneNode(true);
-            consultationButton.parentNode.replaceChild(newButton, consultationButton);
-            
-            newButton.addEventListener('click', function(e) {
+            consultationButton.addEventListener('click', function(e) {
                 e.preventDefault();
                 logger.debug('Нажата кнопка консультации');
                 consultation.openConsultationModal();
@@ -72,11 +68,7 @@ window.MishuraApp.app = (function() {
         // Обработчики для навигации
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(item => {
-            // Клонируем элемент для удаления старых обработчиков
-            const newItem = item.cloneNode(true);
-            item.parentNode.replaceChild(newItem, item);
-            
-            newItem.addEventListener('click', function(e) {
+            item.addEventListener('click', function(e) {
                 e.preventDefault();
                 const page = this.dataset.page;
                 logger.debug(`Переход на страницу: ${page}`);
@@ -86,50 +78,55 @@ window.MishuraApp.app = (function() {
                     section.classList.add('hidden');
                 });
                 
-                // Показываем выбранную секцию
+                // Показываем выбранную секцию или главную
                 const targetSection = document.getElementById(`${page}-section`);
                 if (targetSection) {
                     targetSection.classList.remove('hidden');
+                    logger.debug(`Секция ${page}-section отображена`);
+                } else {
+                    // Если секция не найдена, показываем главную
+                    const homeSection = document.getElementById('home-section');
+                    if (homeSection) {
+                        homeSection.classList.remove('hidden');
+                    }
+                    logger.warn(`Секция ${page}-section не найдена`);
                 }
                 
                 // Обновляем активный элемент навигации
                 navItems.forEach(navItem => navItem.classList.remove('active'));
                 this.classList.add('active');
+                
+                // Убеждаемся, что навигация всегда видна
+                const navBar = document.querySelector('.nav-bar');
+                if (navBar) {
+                    navBar.style.display = 'flex';
+                    navBar.style.visibility = 'visible';
+                }
+
+                // Уведомляем другие модули о смене страницы
+                logger.debug(`Отправка события navigationChanged для страницы: ${page}`);
+                document.dispatchEvent(new CustomEvent('navigationChanged', { 
+                    detail: { page: page } 
+                }));
+                logger.debug(`Событие navigationChanged отправлено`);
             });
         });
     }
-    
-    // Инициализация при загрузке страницы
-    document.addEventListener('DOMContentLoaded', function() {
-        init();
-        // Показываем страницу после инициализации
-        document.body.classList.add('loaded');
-    });
     
     return {
         init
     };
 })();
 
+// Убираем дублирующийся код навигации
 document.addEventListener('DOMContentLoaded', () => {
-    // Navigation handling
-    const navItems = document.querySelectorAll('.nav-item');
-    
-    navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            
-            // Remove active class from all items
-            navItems.forEach(navItem => navItem.classList.remove('active'));
-            
-            // Add active class to clicked item
-            item.classList.add('active');
-            
-            // Here you can add navigation logic
-            const section = item.querySelector('.nav-label').textContent.toLowerCase();
-            console.log(`Navigating to: ${section}`);
-        });
-    });
+    // Инициализация приложения
+    if (window.MishuraApp && window.MishuraApp.app) {
+        window.MishuraApp.app.init();
+        
+        // Показываем страницу после инициализации
+        document.body.classList.add('loaded');
+    }
 
     // Feature cards hover effect
     const featureCards = document.querySelectorAll('.feature-card');
@@ -147,12 +144,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add smooth scrolling
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth'
-                });
+            const href = this.getAttribute('href');
+            // Проверяем, что href не пустой и не равен только "#"
+            if (href && href !== '#' && href.length > 1) {
+                e.preventDefault();
+                const target = document.querySelector(href);
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
             }
         });
     });

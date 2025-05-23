@@ -126,6 +126,27 @@ window.MishuraApp.components.modals = (function() {
     return {
         init,
         openModal,
-        closeModal
+        closeModal,
+        openConsultationModal: function() {
+            logger.debug('Открытие модального окна консультации');
+            openModal(consultationOverlay);
+            // Инициируем событие для других модулей
+            document.dispatchEvent(new CustomEvent('modalOpened', {
+                detail: { modalId: 'consultation-overlay' }
+            }));
+        },
+        openResultsModal: function() {
+            logger.debug('Открытие модального окна результатов');
+            openModal(resultsOverlay);
+        },
+        closeModalById: function(overlayId) {
+            let overlay;
+            if (typeof overlayId === 'string') {
+                overlay = document.getElementById(overlayId);
+            } else {
+                overlay = overlayId;
+            }
+            closeModal(overlay);
+        }
     };
 })();

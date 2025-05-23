@@ -1,14 +1,44 @@
-fastapi==0.109.2
-uvicorn==0.27.1
-python-multipart==0.0.9
-python-dotenv==1.0.1
-Pillow==10.2.0
-google-generativeai==0.3.2
-python-telegram-bot==20.8
-pytest==8.0.0
-pytest-asyncio==0.23.5
-prometheus-client==0.19.0
-pydantic==2.6.1
-python-jose==3.3.0
-passlib==1.7.4
-bcrypt==4.1.2
+# МИШУРА - Персональный ИИ-Стилист
+# Зависимости для Telegram-бота с Gemini AI интеграцией
+
+# Telegram Bot API
+python-telegram-bot==20.3
+
+# Работа с переменными окружения
+python-dotenv==1.0.0
+
+# Google Gemini AI
+google-generativeai==0.3.0
+
+# Обработка изображений
+Pillow==10.0.0
+
+# Web приложение
+fastapi==0.104.1
+uvicorn==0.24.0
+aiofiles==23.2.1
+jinja2==3.1.2
+
+# HTTP клиент
+httpx==0.25.0
+
+# Асинхронное программирование
+aiohttp==3.8.6
+
+# Работа с JSON
+orjson==3.9.9
+
+# Логирование
+structlog==23.2.0
+
+# Валидация данных
+pydantic==2.4.2
+
+# Кэширование
+diskcache==5.6.3
+
+# Работа с датами
+python-dateutil==2.8.2
+
+# Утилиты для файлов
+pathlib2==2.3.7

@@ -90,6 +90,66 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Сравнение образов -->
+                <div id="compare-section" class="content-section hidden">
+                    <div class="compare-main-container">
+                        <div class="compare-header">
+                            <h2 class="compare-title">Сравнение образов</h2>
+                            <p class="compare-description">Загрузите от 2 до 4 фотографий для сравнения</p>
+                        </div>
+                        
+                        <div class="compare-slots-wrapper">
+                            <div class="image-slots">
+                                <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 1">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="0">
+                                </div>
+                                <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 2">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="1">
+                                </div>
+                                <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 3">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="2">
+                                </div>
+                                <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 4">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="3">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="compare-form" style="display: none;">
+                            <label for="compare-occasion-selector" class="input-label">Выберите повод:</label>
+                            <select class="occasion-selector" id="compare-occasion-selector" aria-label="Выберите повод">
+                                <option value="повседневный">Повседневный</option>
+                                <option value="деловой">Деловой</option>
+                                <option value="вечеринка">Вечеринка</option>
+                                <option value="свидание">Свидание</option>
+                                <option value="спорт">Спорт/Активный отдых</option>
+                                <option value="особый случай">Особый случай</option>
+                            </select>
+                            
+                            <label for="compare-preferences-input" class="input-label">Ваши предпочтения:</label>
+                            <textarea class="preferences-input" id="compare-preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
+                            
+                            <button class="btn btn-primary" id="compare-submit" type="button">Сравнить образы</button>
+                        </div>
+                    </div>
+                </div>
             </main>
 
             <nav class="nav-bar">
@@ -101,13 +161,13 @@
                     </div>
                     <span class="nav-label">История</span>
                 </a>
-                <a href="#" class="nav-item" data-page="tips">
+                <a href="#" class="nav-item" data-page="compare">
                     <div class="nav-icon">
                         <svg viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
-                    <span class="nav-label">Совет</span>
+                    <span class="nav-label">Сравнить</span>
                 </a>
                 <a href="#" class="nav-item active" data-page="home">
                     <div class="nav-icon">
@@ -145,10 +205,34 @@
                     <div id="compare-analysis-mode" class="analysis-mode hidden" role="tabpanel">
                         <div class="compare-container">
                             <div class="image-slots" aria-label="Слоты для сравнения изображений">
-                                <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="0"></div>
-                                <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="1"></div>
-                                <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="2"></div>
-                                <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения"><div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg></div><input type="file" class="compare-upload-input" accept="image/*" data-slot="3"></div>
+                                <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 1">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="0">
+                                </div>
+                                <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 2">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="1">
+                                </div>
+                                <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 3">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="2">
+                                </div>
+                                <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 4">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="3">
+                                </div>
                             </div>
                             <div class="upload-text">Загрузите от 2 до 4 фотографий для сравнения</div>
                         </div>
@@ -270,9 +354,12 @@
     <!-- Скрипты -->
     <script src="js/utils/logger.js"></script>
     <script src="js/utils/ui-helpers.js"></script>
+    <script src="js/utils/api.js"></script>
     <script src="js/services/api.js"></script>
     <script src="js/components/modals.js"></script>
+    <script src="js/components/image-upload.js"></script>
     <script src="js/features/consultation.js"></script>
+    <script src="js/features/comparison.js"></script>
     <script src="js/app.js"></script>
     <script>
         // Инициализация приложения после загрузки DOM
@@ -286,6 +373,9 @@
                 if (window.MishuraApp.utils) {
                     if (window.MishuraApp.utils.logger) {
                         window.MishuraApp.utils.logger.init();
+                    }
+                    if (window.MishuraApp.utils.uiHelpers) {
+                        window.MishuraApp.utils.uiHelpers.init();
                     }
                     if (window.MishuraApp.utils.api) {
                         window.MishuraApp.utils.api.init();
@@ -324,6 +414,20 @@
             } else {
                 console.error('MishuraApp не инициализирован');
             }
+            
+            // Дополнительная отладка для страницы сравнения
+            setTimeout(() => {
+                const compareSection = document.getElementById('compare-section');
+                const compareSlots = document.querySelectorAll('#compare-section .image-slot');
+                console.log('DEBUG: compareSection =', compareSection);
+                console.log('DEBUG: compareSlots.length =', compareSlots.length);
+                
+                // Проверяем каждый слот
+                compareSlots.forEach((slot, index) => {
+                    const input = slot.querySelector('.compare-upload-input');
+                    console.log(`DEBUG: слот ${index}, input =`, input);
+                });
+            }, 1000);
         });
     </script>
 </body>

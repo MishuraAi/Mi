@@ -30,7 +30,13 @@ from datetime import datetime
 # Попытка импорта модулей проекта
 try:
     import database as db
-    from gemini_ai import analyze_clothing_file
+    from database import save_wardrobe_item, get_user_wardrobe, get_wardrobe_item, update_wardrobe_item, delete_wardrobe_item
+    from gemini_ai import analyze_clothing_file, analyze_clothing_image
+    from wardrobe_handlers import handle_name_command, handle_tag_command, handle_wardrobe_command
+    from wardrobe_callbacks import (
+        handle_view_item, handle_edit_item, handle_delete_item, 
+        handle_confirm_delete, handle_refresh_wardrobe, handle_wardrobe_stats
+    )
 except ImportError as e:
     logging.critical(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось импортировать модули database или gemini_ai для бота. {e}")
     # Для целей отладки, бот может попытаться запуститься, но функционал будет ограничен.
@@ -39,6 +45,27 @@ except ImportError as e:
     async def analyze_clothing_file(*args, **kwargs):
         logging.error("Функция analyze_clothing_file не доступна из-за ошибки импорта gemini_ai.")
         return "Ошибка сервера: ИИ-модуль не инициализирован."
+    async def analyze_clothing_image(*args, **kwargs):
+        logging.error("Функция analyze_clothing_image не доступна из-за ошибки импорта gemini_ai.")
+        return "Ошибка сервера: ИИ-модуль не инициализирован."
+    async def handle_name_command(*args, **kwargs):
+        pass
+    async def handle_tag_command(*args, **kwargs):
+        pass  
+    async def handle_wardrobe_command(*args, **kwargs):
+        pass
+    async def handle_view_item(*args, **kwargs):
+        pass
+    async def handle_edit_item(*args, **kwargs):
+        pass
+    async def handle_delete_item(*args, **kwargs):
+        pass
+    async def handle_confirm_delete(*args, **kwargs):
+        pass
+    async def handle_refresh_wardrobe(*args, **kwargs):
+        pass
+    async def handle_wardrobe_stats(*args, **kwargs):
+        pass
 
 
 # Настройка логирования для этого модуля
@@ -129,8 +156,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
-        [KeyboardButton("Мои консультации"), KeyboardButton("Пополнить баланс")],
-        [KeyboardButton("О сервисе МИШУРА"), KeyboardButton("Поддержка")]
+        [KeyboardButton("💎 Гардероб"), KeyboardButton("Мои консультации")],
+        [KeyboardButton("Пополнить баланс"), KeyboardButton("О сервисе МИШУРА")],
+        [KeyboardButton("Поддержка")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -207,6 +235,54 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             logger.error(f"Ошибка БД при получении консультаций для пользователя {user_id}: {e_db_consult}", exc_info=True)
             await update.message.reply_text("Не удалось загрузить ваши консультации. Попробуйте позже.")
 
+    elif text == "💎 Гардероб":
+        if not db:
+            await update.message.reply_text("Сервис гардероба временно недоступен.")
+            return
+        try:
+            wardrobe_items = get_user_wardrobe(user_id, limit=10)  # Получаем последние 10 предметов
+            if not wardrobe_items:
+                await update.message.reply_html(
+                    "💎 <b>Ваш Гардероб пуст</b>\n\n"
+                    "Сохраните предметы одежды в Гардероб после получения консультации, "
+                    "чтобы быстро использовать их в будущих анализах!\n\n"
+                    "Отправьте фото одежды для анализа и увидите кнопку \"Сохранить в Гардероб\"."
+                )
+                return
+            
+            message = "💎 <b>Ваш Гардероб:</b>\n\n"
+            keyboard = []
+            for item in wardrobe_items:
+                item_name = item.get('item_name') or "Без названия"
+                item_tag = item.get('item_tag') or ""
+                created_date = item.get('created_at', '')[:10]  # Только дата
+                
+                display_name = f"{item_name}"
+                if item_tag:
+                    display_name += f" #{item_tag}"
+                    
+                message += f"🔸 {display_name} (добавлено: {created_date})\n"
+                
+                # Добавляем кнопки для каждого предмета
+                keyboard.append([
+                    InlineKeyboardButton(f"👁️ {item_name[:15]}...", callback_data=f"view_item_{item['id']}"),
+                    InlineKeyboardButton("📝", callback_data=f"edit_item_{item['id']}"),
+                    InlineKeyboardButton("🗑️", callback_data=f"delete_item_{item['id']}")
+                ])
+            
+            # Добавляем кнопки управления
+            keyboard.append([
+                InlineKeyboardButton("📊 Статистика гардероба", callback_data="wardrobe_stats"),
+                InlineKeyboardButton("🔄 Обновить", callback_data="refresh_wardrobe")
+            ])
+            
+            message += f"\n<i>Показано последних {len(wardrobe_items)} предметов</i>"
+            await update.message.reply_html(message, reply_markup=InlineKeyboardMarkup(keyboard))
+            
+        except Exception as e_wardrobe:
+            logger.error(f"Ошибка при получении гардероба для пользователя {user_id}: {e_wardrobe}", exc_info=True)
+            await update.message.reply_text("Не удалось загрузить ваш гардероб. Попробуйте позже.")
+
     elif text == "Пополнить баланс":
         keyboard = [
             [InlineKeyboardButton("1 консультация - 299₽", callback_data="buy_1"), InlineKeyboardButton("3 консультации - 799₽ (выгода!)", callback_data="buy_3")],
@@ -250,35 +326,33 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     try:
+        # ИСПРАВЛЕНИЕ: Получаем файл максимального размера для лучшего качества
+        # Берем самое большое разрешение из доступных
         photo_file = await update.message.photo[-1].get_file()
         
-        # Создаем директорию для хранения фотографий, если она не существует
-        # Важно: в production среде (например, Render) файловая система может быть эфемерной.
-        # Рассмотрите использование облачного хранилища для фото.
-        user_photos_dir = "user_photos"
-        os.makedirs(user_photos_dir, exist_ok=True)
+        # ИСПРАВЛЕНИЕ: Загружаем изображение в память как байты для сохранения максимального качества
+        # Избегаем промежуточного сохранения на диск, что может привести к дополнительному сжатию
+        image_bytes = await photo_file.download_as_bytearray()
+        logger.info(f"Фото загружено в память: размер {len(image_bytes)} байт, file_id: {photo_file.file_id}")
         
-        file_name = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.jpg" # Добавил микросекунды для большей уникальности
-        file_path = os.path.join(user_photos_dir, file_name)
-        
-        await photo_file.download_to_drive(file_path)
-        logger.info(f"Фото сохранено по пути: {file_path}")
+        # Сохраняем file_id для возможного использования в Гардеробе
+        telegram_file_id = photo_file.file_id
         
         db.update_user_balance(user_id, -1) # Списываем одну консультацию
         
         processing_message = await update.message.reply_text("МИШУРА анализирует вашу одежду... Это займет несколько мгновений. ✨")
         
-        # Анализ фото (повод по умолчанию, если не указан через WebApp)
-        # Предпочтения здесь не передаются, т.к. это прямая загрузка фото боту
-        advice = await analyze_clothing_file(file_path, "повседневный образ") # Используем await, т.к. analyze_clothing_file асинхронная
+        # ИСПРАВЛЕНИЕ: Передаем байты напрямую в analyze_clothing_image для максимального качества
+        advice = await analyze_clothing_image(bytes(image_bytes), "повседневный образ") 
         
-        if "Ошибка сервера" in advice: # Проверка, если AI модуль вернул ошибку
-            logger.error(f"Ошибка от ИИ-модуля при анализе фото {file_path}: {advice}")
+        if "Ошибка сервера" in advice or _is_error_message(advice): # Проверка на ошибки
+            logger.error(f"Ошибка от ИИ-модуля при анализе фото user_id={user_id}: {advice}")
             await processing_message.edit_text(f"К сожалению, МИШУРА не смогла обработать ваше фото: {advice}")
             db.update_user_balance(user_id, 1) # Возвращаем консультацию при ошибке ИИ
             return
         
-        consultation_id = db.save_consultation(user_id, "повседневный образ", "Не указаны (прямая загрузка)", file_path, advice)
+        # Сохраняем file_id вместо пути к файлу для эффективного хранения
+        consultation_id = db.save_consultation(user_id, "повседневный образ", "Не указаны (прямая загрузка)", telegram_file_id, advice)
         logger.info(f"Консультация #{consultation_id} сохранена для пользователя {user_id}.")
         
         await processing_message.delete()
@@ -288,18 +362,36 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         short_summary = "\n\n".join(summary_parts[:2]) # Первые два "абзаца"
         
         new_balance = db.get_user_balance(user_id)
+        
+        # Добавляем кнопку "Сохранить в Гардероб" для новой функциональности
+        keyboard = [
+            [InlineKeyboardButton("💎 Сохранить в Гардероб", callback_data=f"save_to_wardrobe_{consultation_id}")],
+            [InlineKeyboardButton("📄 Полная консультация", callback_data=f"full_consultation_{consultation_id}")]
+        ]
+        
         await update.message.reply_html(
             f"<b>МИШУРА завершила анализ (ID: {consultation_id}):</b>\n\n"
             f"{short_summary}\n\n"
-            f"Для полной консультации отправьте команду <code>/consultation {consultation_id}</code>\n\n"
-            f"Ваш обновленный баланс: {new_balance} консультаций."
+            f"Ваш обновленный баланс: {new_balance} консультаций.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     except Exception as e_photo:
         logger.error(f"Ошибка при обработке фото от пользователя {user_id}: {e_photo}", exc_info=True)
         await update.message.reply_text("Произошла неожиданная ошибка при обработке вашего фото. Попробуйте еще раз или обратитесь в поддержку.")
-        # Опционально: вернуть списанную консультацию, если ошибка произошла до успешного анализа
-        # if 'processing_message' in locals() and processing_message: # Если списание было, но анализ не завершился
-        #     db.update_user_balance(user_id, 1)
+        # Возвращаем списанную консультацию при системной ошибке
+        try:
+            db.update_user_balance(user_id, 1)
+        except Exception as e_rollback:
+            logger.error(f"Не удалось вернуть баланс пользователю {user_id} после ошибки: {e_rollback}")
+
+# Добавляем вспомогательную функцию для проверки ошибок
+def _is_error_message(text: str) -> bool:
+    """Проверяет, является ли текст сообщением об ошибке."""
+    error_indicators = [
+        "ошибка", "error", "не удалось", "failed", 
+        "недоступно", "unavailable", "превышен лимит"
+    ]
+    return any(indicator in text.lower() for indicator in error_indicators)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -309,10 +401,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await query.answer("Обрабатываем ваш запрос...") # Ответ Telegram, что кнопка нажата
     
     if not db:
-        await query.edit_message_text(text="Сервис оплаты временно недоступен из-за проблем с базой данных.")
+        await query.edit_message_text(text="Сервис временно недоступен из-за проблем с базой данных.")
         return
 
     try:
+        # Обработка покупки консультаций
         if query.data.startswith("buy_"):
             num_consultations = int(query.data.split("_")[1])
             prices = {1: 299, 3: 799, 5: 1299, 10: 2499} # Цены в рублях
@@ -335,8 +428,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 f"Вы успешно приобрели {num_consultations} консультаций от МИШУРЫ за {amount_rub}₽.\n"
                 f"Ваш текущий баланс: {new_balance} консультаций."
             )
+            
         elif query.data == "add_balance":
-            # Повторно показываем кнопки для пополнения, если пользователь нажал "Пополнить баланс" из сообщения о нехватке средств
+            # Повторно показываем кнопки для пополнения
             keyboard = [
                 [InlineKeyboardButton("1 консультация - 299₽", callback_data="buy_1"), InlineKeyboardButton("3 консультации - 799₽", callback_data="buy_3")],
                 [InlineKeyboardButton("5 консультаций - 1299₽", callback_data="buy_5"), InlineKeyboardButton("10 консультаций - 2499₽", callback_data="buy_10")]
@@ -345,6 +439,89 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "Выберите пакет консультаций от МИШУРЫ:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
+            
+        # Обработка сохранения в гардероб
+        elif query.data.startswith("save_to_wardrobe_"):
+            consultation_id = int(query.data.split("_")[-1])
+            consultation = db.get_consultation(consultation_id, user_id)
+            
+            if not consultation:
+                await query.edit_message_text("Консультация не найдена.")
+                return
+            
+            # Сохраняем в гардероб, используя telegram_file_id из консультации
+            telegram_file_id = consultation.get('image_path')  # Теперь это file_id
+            if telegram_file_id:
+                wardrobe_id = save_wardrobe_item(user_id, telegram_file_id, "Предмет одежды", "новый")
+                if wardrobe_id:
+                    keyboard = [
+                        [InlineKeyboardButton("📝 Задать название", callback_data=f"name_item_{wardrobe_id}")],
+                        [InlineKeyboardButton("💎 Мой гардероб", callback_data="refresh_wardrobe")]
+                    ]
+                    await query.edit_message_text(
+                        f"✅ Предмет сохранен в ваш Гардероб (ID: {wardrobe_id})!\n\n"
+                        "Вы можете задать название или посмотреть весь гардероб.",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+                else:
+                    await query.edit_message_text("Не удалось сохранить предмет в гардероб. Попробуйте позже.")
+            else:
+                await query.edit_message_text("Изображение для этой консультации недоступно.")
+                
+        # Обработка просмотра полной консультации
+        elif query.data.startswith("full_consultation_"):
+            consultation_id = int(query.data.split("_")[-1])
+            consultation = db.get_consultation(consultation_id, user_id)
+            
+            if not consultation:
+                await query.edit_message_text("Консультация не найдена.")
+                return
+                
+            advice = consultation.get('advice', "Текст консультации отсутствует.")
+            telegram_file_id = consultation.get('image_path')
+            
+            response_message = f"<b>Полная консультация от МИШУРЫ #{consultation_id}:</b>\n\n{advice}"
+            
+            if telegram_file_id and not telegram_file_id.startswith("/"):  # Это file_id, а не путь к файлу
+                try:
+                    # Отправляем фото с подписью в новом сообщении
+                    await context.bot.send_photo(
+                        chat_id=query.message.chat_id, 
+                        photo=telegram_file_id, 
+                        caption=response_message, 
+                        parse_mode='HTML'
+                    )
+                    # Удаляем исходное сообщение с кнопками
+                    await query.delete_message()
+                except Exception as e_send_photo:
+                    logger.error(f"Не удалось отправить фото для консультации #{consultation_id}: {e_send_photo}")
+                    await query.edit_message_text(response_message + "\n\n(Изображение недоступно)", parse_mode='HTML')
+            else:
+                await query.edit_message_text(response_message, parse_mode='HTML')
+                
+        # Обработка callback'ов гардероба
+        elif query.data.startswith("view_item_"):
+            item_id = int(query.data.split("_")[-1])
+            await handle_view_item(query, user_id, item_id, context)
+            
+        elif query.data.startswith("edit_item_") or query.data.startswith("name_item_"):
+            item_id = int(query.data.split("_")[-1])
+            await handle_edit_item(query, user_id, item_id)
+            
+        elif query.data.startswith("delete_item_"):
+            item_id = int(query.data.split("_")[-1])
+            await handle_delete_item(query, user_id, item_id)
+            
+        elif query.data.startswith("confirm_delete_"):
+            item_id = int(query.data.split("_")[-1])
+            await handle_confirm_delete(query, user_id, item_id)
+            
+        elif query.data == "refresh_wardrobe":
+            await handle_refresh_wardrobe(query, user_id)
+            
+        elif query.data == "wardrobe_stats":
+            await handle_wardrobe_stats(query, user_id)
+            
         else:
             logger.warning(f"Неизвестный callback_data: {query.data}")
             await query.edit_message_text("Произошла ошибка при обработке вашего выбора.")
@@ -389,20 +566,23 @@ async def get_consultation_command(update: Update, context: ContextTypes.DEFAULT
             return
         
         advice = consultation.get('advice', "Текст консультации отсутствует.")
-        image_path = consultation.get('image_path')
+        telegram_file_id = consultation.get('image_path')  # Теперь это telegram_file_id
 
         # Формируем сообщение
         response_message = f"<b>Консультация от МИШУРЫ #{consultation_id}:</b>\n\n{advice}"
         
-        if image_path and os.path.exists(image_path):
+        # Проверяем, есть ли telegram_file_id и это не путь к файлу
+        if telegram_file_id and not telegram_file_id.startswith("/"):
             try:
-                await update.message.reply_photo(photo=open(image_path, 'rb'), caption=response_message, parse_mode='HTML')
+                await update.message.reply_photo(
+                    photo=telegram_file_id, 
+                    caption=response_message, 
+                    parse_mode='HTML'
+                )
             except Exception as e_send_photo:
                 logger.error(f"Не удалось отправить фото для консультации #{consultation_id}: {e_send_photo}")
-                await update.message.reply_html(response_message + "\n\n(Не удалось загрузить изображение к этой консультации)")
+                await update.message.reply_html(response_message + "\n\n(Изображение недоступно)")
         else:
-            if image_path:
-                 logger.warning(f"Файл изображения {image_path} для консультации #{consultation_id} не найден.")
             await update.message.reply_html(response_message)
             
     except Exception as e_get_consult:
@@ -431,14 +611,21 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "    * Также можно просто отправить мне фото в чат (в этом случае анализ будет по стандартным параметрам).\n\n"
         "2.  **Просмотр консультаций:**\n"
         "    * Используйте кнопку «Мои консультации» в меню или команду <code>/consultation ID</code> для просмотра полной версии ранее полученного совета.\n\n"
-        "3.  **Баланс:**\n"
+        "3.  **Гардероб (НОВИНКА!):**\n"
+        "    * Используйте кнопку «💎 Гардероб» или команду <code>/wardrobe</code> для управления сохраненными предметами одежды.\n"
+        "    * Сохраняйте фото одежды после консультаций кнопкой «Сохранить в Гардероб».\n"
+        "    * Быстро используйте сохраненные предметы в новых консультациях без повторной загрузки.\n\n"
+        "4.  **Баланс:**\n"
         "    * Каждая консультация списывает одну единицу с вашего баланса.\n"
         "    * Пополнить баланс можно через соответствующую кнопку в меню.\n\n"
         "📋 <b>Доступные команды:</b>\n"
         "•  /start - Начать работу с МИШУРОЙ / обновить меню\n"
         "•  /help - Эта справка\n"
         "•  /webapp - Открыть веб-приложение для консультации\n"
-        "•  <code>/consultation &lt;ID&gt;</code> - Получить полный текст консультации по её номеру\n\n"
+        "•  /wardrobe - Быстрый доступ к гардеробу\n"
+        "•  <code>/consultation &lt;ID&gt;</code> - Получить полный текст консультации по её номеру\n"
+        "•  <code>/name_&lt;ID&gt; новое название</code> - Изменить название предмета в гардеробе\n"
+        "•  <code>/tag_&lt;ID&gt; новый_тег</code> - Изменить тег предмета в гардеробе\n\n"
         f"{balance_text}\n\n"
         "Если возникнут вопросы, используйте кнопку «Поддержка» в меню."
     )
@@ -462,6 +649,19 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("webapp", webapp_command))
     application.add_handler(CommandHandler("consultation", get_consultation_command)) # Обновленное имя функции
+    application.add_handler(CommandHandler("wardrobe", handle_wardrobe_command))  # Команда гардероба
+    
+    # Динамические команды гардероба (для редактирования предметов)
+    # Эти обработчики должны быть добавлены до общего текстового обработчика
+    from telegram.ext import MessageHandler, filters
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r'^/name_\d+'), 
+        handle_name_command
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r'^/tag_\d+'), 
+        handle_tag_command
+    ))
     
     # Текстовые сообщения (должен идти после CommandHandlers, чтобы не перехватывать команды)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))

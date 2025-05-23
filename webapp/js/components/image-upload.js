@@ -81,7 +81,7 @@ window.MishuraApp.components.imageUpload = (function() {
         }
         
         modeButtons.forEach(button => {
-            // Удаляем старые обработчики (если были) и добавляем новый
+            // Удаляем старые обработчики и добавляем новый
             const newButton = button.cloneNode(true);
             button.parentNode.replaceChild(newButton, button);
             newButton.addEventListener('click', function() {
@@ -89,7 +89,8 @@ window.MishuraApp.components.imageUpload = (function() {
                 logger.debug(`ImageUpload: Кнопка режима нажата - '${mode}'`);
                 
                 // Обновляем активную кнопку
-                modeButtons.forEach(btn => btn.classList.remove('active'));
+                const allModeButtons = document.querySelectorAll('#consultation-overlay .mode-button');
+                allModeButtons.forEach(btn => btn.classList.remove('active'));
                 this.classList.add('active');
                 
                 // Обновляем видимость режимов
@@ -99,8 +100,14 @@ window.MishuraApp.components.imageUpload = (function() {
                 // Сбрасываем загруженные изображения при смене режима
                 if (mode === 'single') {
                     resetCompareImageUploads();
+                    // Реинициализируем single режим
+                    initSingleImageUpload();
                 } else if (mode === 'compare') {
                     resetSingleImageUpload();
+                    // Реинициализируем compare режим
+                    setTimeout(() => {
+                        initCompareImageUpload();
+                    }, 100); // Небольшая задержка для обновления DOM
                 }
                 
                 document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
@@ -267,19 +274,23 @@ window.MishuraApp.components.imageUpload = (function() {
         const slots = imageSlotsContainer.querySelectorAll('.image-slot');
         if (!slots.length) return logger.warn("ImageUpload (Compare): Слоты (.image-slot) не найдены.");
 
-        slots.forEach(currentSlot => {
+        slots.forEach((currentSlot, index) => {
             const slotIndex = parseInt(currentSlot.dataset.slot, 10);
             const input = currentSlot.querySelector('.compare-upload-input');
             if (!input) {
                 logger.warn(`ImageUpload (Compare): Инпут для слота ${slotIndex} не найден.`);
-                return; // Пропускаем этот слот, если нет инпута
+                return;
             }
-            // Переназначаем обработчик клика на слот через клонирование
-            let newSlot = currentSlot.cloneNode(true); // Клонируем весь слот
-            currentSlot.parentNode.replaceChild(newSlot, currentSlot);
-            const newSlotInput = newSlot.querySelector('.compare-upload-input'); // Находим инпут в новом слоте
+            
+            // Очищаем предыдущие обработчики
+            currentSlot.replaceWith(currentSlot.cloneNode(true));
+            const newSlot = imageSlotsContainer.querySelectorAll('.image-slot')[index];
+            const newSlotInput = newSlot.querySelector('.compare-upload-input');
 
-            newSlot.addEventListener('click', function() {
+            // Обработчик клика на слот
+            newSlot.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 if (!this.classList.contains('filled')) {
                     logger.debug(`ImageUpload (Compare): Клик на пустой слот ${slotIndex}. Сброс инпута.`);
                     resetFileInput(newSlotInput); 
@@ -287,16 +298,22 @@ window.MishuraApp.components.imageUpload = (function() {
                 }
             });
             
-            // Обработчик change для инпута в новом слоте
+            // Обработчик change для инпута 
             newSlotInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     logger.debug(`ImageUpload (Compare): Файл выбран для слота ${slotIndex}: ${file.name}`);
-                    handleCompareImageSelection(file, slotIndex); // slotIndex правильный
+                    handleCompareImageSelection(file, slotIndex);
+                } else {
+                    logger.debug(`ImageUpload (Compare): Выбор файла отменен для слота ${slotIndex}`);
                 }
             });
 
-            newSlot.addEventListener('dragover', (e) => { e.preventDefault(); if (!newSlot.classList.contains('filled')) newSlot.classList.add('dragover'); });
+            // Drag & Drop обработчики
+            newSlot.addEventListener('dragover', (e) => { 
+                e.preventDefault(); 
+                if (!newSlot.classList.contains('filled')) newSlot.classList.add('dragover'); 
+            });
             newSlot.addEventListener('dragleave', () => newSlot.classList.remove('dragover'));
             newSlot.addEventListener('drop', (e) => {
                 e.preventDefault();
@@ -307,6 +324,8 @@ window.MishuraApp.components.imageUpload = (function() {
                 }
             });
         });
+        
+        logger.debug("ImageUpload (Compare): Инициализация слотов завершена");
     }
     
     function handleCompareImageSelection(file, slotIndex) {
@@ -325,7 +344,7 @@ window.MishuraApp.components.imageUpload = (function() {
 
             const previewImg = slot.querySelector('.preview-image');
             const uploadIconElement = slot.querySelector('.upload-icon');
-            const removeBtn = slot.querySelector('.delete-image') || document.createElement('button');
+            let removeBtn = slot.querySelector('.delete-image');
 
             if (previewImg) {
                 previewImg.src = e.target.result;
@@ -335,17 +354,24 @@ window.MishuraApp.components.imageUpload = (function() {
                 uploadIconElement.style.display = 'none';
             }
 
-            removeBtn.className = 'delete-image';
-            removeBtn.setAttribute('data-target', `compare-${slotIndex}`);
-            removeBtn.innerHTML = '×';
-            removeBtn.title = 'Удалить изображение';
+            // Создаем кнопку удаления если её нет
+            if (!removeBtn) {
+                removeBtn = document.createElement('button');
+                removeBtn.className = 'delete-image';
+                removeBtn.innerHTML = '×';
+                removeBtn.title = 'Удалить изображение';
+                slot.appendChild(removeBtn);
+            }
 
-            removeBtn.addEventListener('click', function localResetSlotHandler(ev) {
+            // Удаляем старые обработчики и добавляем новый
+            const newRemoveBtn = removeBtn.cloneNode(true);
+            removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
+            
+            newRemoveBtn.addEventListener('click', function(ev) {
                 ev.stopPropagation();
-                logger.debug(`ImageUpload (Compare): Нажата кнопка удаления для слота ${slotIndex} (динамическая).`);
+                logger.debug(`ImageUpload (Compare): Нажата кнопка удаления для слота ${slotIndex}.`);
                 resetSlot(slotIndex);
             });
-            if (!slot.contains(removeBtn)) slot.appendChild(removeBtn);
 
             slot.classList.add('filled');
             uploadedImages.compare[slotIndex] = file;
@@ -468,14 +494,17 @@ window.MishuraApp.components.imageUpload = (function() {
         logger.debug('ImageUpload: Одиночное изображение сброшено.');
     }
     
-    function resetSlot(slotIndex) { /* ... как в версии 0.4.6, но используем актуальный DOM элемент для слота ... */ 
+    function resetSlot(slotIndex) {
         logger.debug(`ImageUpload: Сброс слота сравнения ${slotIndex}...`);
         const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
         if (!slot) return logger.error(`ImageUpload: Слот ${slotIndex} не найден в DOM для сброса.`);
         
-        const img = slot.querySelector('.slot-image');
-        if (img) img.remove();
-        const removeBtn = slot.querySelector('.remove-image');
+        const img = slot.querySelector('.preview-image');
+        if (img) {
+            img.src = '';
+            img.style.display = 'none';
+        }
+        const removeBtn = slot.querySelector('.delete-image');
         if (removeBtn) removeBtn.remove();
         
         const uploadIconElement = slot.querySelector('.upload-icon');
@@ -483,14 +512,14 @@ window.MishuraApp.components.imageUpload = (function() {
         
         slot.classList.remove('filled');
         const input = slot.querySelector('.compare-upload-input');
-        resetFileInput(input); // Убедимся, что инпут сброшен
+        resetFileInput(input);
         uploadedImages.compare[slotIndex] = null;
         
         const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
         logger.debug(`ImageUpload: Кол-во заполненных слотов после сброса слота ${slotIndex}: ${filledSlotsCount}`);
         if (filledSlotsCount < 2) { 
              const formContainer = document.getElementById('consultation-overlay');
-             if(formContainer){ /* ... скрыть поля, деактивировать кнопку ... */ 
+             if(formContainer){
                 const occasionSel = formContainer.querySelector('.occasion-selector');
                 const labels = formContainer.querySelectorAll('.input-label');
                 const prefsInput = formContainer.querySelector('.preferences-input');

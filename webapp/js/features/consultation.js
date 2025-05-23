@@ -191,7 +191,7 @@ window.MishuraApp.features.consultation = (function() {
             // Проверяем, активно ли окно консультации перед закрытием
             const consultationModal = document.getElementById('consultation-overlay');
             if (consultationModal && consultationModal.classList.contains('active')) {
-                modals.closeModal('consultation-overlay');
+                modals.closeModalById('consultation-overlay');
                 // Добавляем небольшую задержку перед открытием окна результатов
                 setTimeout(() => {
                     modals.openResultsModal();

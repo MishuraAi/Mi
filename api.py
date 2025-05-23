@@ -245,6 +245,89 @@ async def health_check():
 # Подключаем роутер API v1 к основному приложению
 app.include_router(api_v1)
 
+# Добавляем endpoint'ы для обратной совместимости с веб-приложением
+@app.post("/api/analyze", summary="Анализ одного предмета одежды (совместимость)", tags=["AI Analysis"])
+@monitor_request()
+async def analyze_outfit_legacy(
+    image: UploadFile = File(..., description="Фотография предмета одежды для анализа."),
+    occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
+    preferences: str = Form(None, description="Дополнительные предпочтения пользователя (опционально)."),
+    mode: str = Form("single", description="Режим анализа (single или compare).")
+):
+    """Endpoint для обратной совместимости с веб-приложением"""
+    logger.info(f"Получен запрос на /api/analyze (legacy). Режим: '{mode}', Повод: '{occasion}', Предпочтения: '{preferences}', Имя файла: '{image.filename}'")
+    
+    # Используем тот же код, что и в /api/v1/analyze-outfit
+    request_data = ImageAnalysisRequest(occasion=occasion, preferences=preferences)
+    
+    try:
+        image_data = await image.read()
+        if not image_data:
+            logger.error("Ошибка в /api/analyze: получены пустые данные изображения.")
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Файл изображения не может быть пустым."}
+            )
+
+        logger.info(f"Изображение для /api/analyze прочитано, размер: {len(image_data)} байт. Вызов Gemini AI...")
+        advice = await analyze_clothing_image(image_data, request_data.occasion, request_data.preferences)
+        if "Ошибка сервера" in advice:
+            logger.error(f"Ошибка вызова ИИ-модуля для /api/analyze: {advice}")
+            return JSONResponse(status_code=503, content={"status": "error", "message": advice})
+        
+        logger.info("Анализ от Gemini AI для /api/analyze успешно получен.")
+        return {"status": "success", "advice": advice}
+    except Exception as e:
+        logger.error(f"Критическая ошибка при обработке /api/analyze: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"Внутренняя ошибка сервера при анализе одежды: {str(e)}"}
+        )
+
+@app.post("/api/compare", summary="Сравнение нескольких предметов одежды (совместимость)", tags=["AI Analysis"])
+@monitor_request()
+async def compare_outfits_legacy(
+    images: list[UploadFile] = File(..., description="Список из 2-5 фотографий предметов одежды для сравнения."),
+    occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
+    preferences: str = Form(None, description="Дополнительные предпочтения пользователя (опционально).")
+):
+    """Endpoint для обратной совместимости с веб-приложением"""
+    logger.info(f"Получен запрос на /api/compare (legacy). Количество изображений: {len(images)}, Повод: '{occasion}', Предпочтения: '{preferences}'")
+    
+    # Используем тот же код, что и в /api/v1/compare-outfits
+    request_data = ImageComparisonRequest(
+        occasion=occasion,
+        preferences=preferences,
+        image_count=len(images)
+    )
+    
+    try:
+        image_data_list = []
+        for img_file in images:
+            image_data = await img_file.read()
+            if not image_data:
+                logger.error(f"Ошибка в /api/compare: получены пустые данные для изображения {img_file.filename}")
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "message": f"Файл изображения {img_file.filename} не может быть пустым."}
+                )
+            image_data_list.append(image_data)
+        
+        logger.info(f"Все изображения для /api/compare прочитаны. Вызов Gemini AI...")
+        advice = await compare_clothing_images(image_data_list, request_data.occasion, request_data.preferences)
+        if "Ошибка сервера" in advice:
+            logger.error(f"Ошибка вызова ИИ-модуля для /api/compare: {advice}")
+            return JSONResponse(status_code=503, content={"status": "error", "message": advice})
+        
+        logger.info("Сравнение от Gemini AI для /api/compare успешно получено.")
+        return {"status": "success", "advice": advice}
+    except Exception as e:
+        logger.error(f"Критическая ошибка при обработке /api/compare: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"Внутренняя ошибка сервера при сравнении одежды: {str(e)}"}
+        )
+
 # Оставляем старый корневой маршрут для обратной совместимости
 @app.get("/api", summary="Корневой эндпоинт API (устаревший)", tags=["General"])
 async def root_legacy():

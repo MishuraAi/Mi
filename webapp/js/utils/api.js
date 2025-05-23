@@ -100,10 +100,29 @@ window.MishuraApp.utils.api = (function() {
         }
     }
     
+    async function processCompareOutfits(formData) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/compare`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            logger.error('Ошибка при сравнении образов:', error);
+            throw error;
+        }
+    }
+    
     return {
         init,
         sendRequest,
         analyzeImage,
-        compareImages
+        compareImages,
+        processCompareOutfits
     };
 })(); 

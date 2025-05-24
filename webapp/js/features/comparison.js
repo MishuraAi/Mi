@@ -33,7 +33,7 @@ window.MishuraApp.features.comparison = (function() {
             error: (...args) => console.error("Comparison:", ...args) 
         };
         uiHelpers = window.MishuraApp.utils.uiHelpers;
-        apiService = window.MishuraApp.services.api;
+        apiService = window.MishuraApp.utils.api;
         
         logger.debug("Инициализация модуля сравнения образов");
         
@@ -285,7 +285,7 @@ window.MishuraApp.features.comparison = (function() {
                 throw new Error('API сервис не доступен');
             }
             
-            const result = await apiService.compareOutfits(filledImages, occasion, preferences);
+            const result = await apiService.compareImages(filledImages, occasion, preferences);
             
             if (uiHelpers) {
                 uiHelpers.hideLoading();

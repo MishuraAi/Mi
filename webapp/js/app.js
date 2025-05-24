@@ -46,10 +46,54 @@ window.MishuraApp.app = (function() {
         }
         consultation.init();
         
+        // Инициализация модуля сравнения
+        const comparison = window.MishuraApp.features.comparison;
+        if (!comparison) {
+            logger.error('Модуль сравнения не найден');
+            return;
+        }
+        comparison.init();
+        
         // Настройка обработчиков событий
         setupEventHandlers();
         
         logger.info('Главный модуль приложения инициализирован');
+    }
+    
+    function setModalMode(mode) {
+        console.log(`🔧 setModalMode вызвана с режимом: ${mode}`);
+        logger.debug(`Установка режима модального окна: ${mode}`);
+        
+        const singleMode = document.getElementById('single-analysis-mode');
+        const compareMode = document.getElementById('compare-analysis-mode');
+        const dialogTitle = document.getElementById('consultation-dialog-title');
+        const dialogSubtitle = document.querySelector('#consultation-overlay .dialog-subtitle');
+        
+        console.log(`🔍 DOM элементы:`, {
+            singleMode: !!singleMode, 
+            compareMode: !!compareMode,
+            dialogTitle: !!dialogTitle,
+            dialogSubtitle: !!dialogSubtitle
+        });
+        
+        if (mode === 'single') {
+            if (singleMode) singleMode.classList.remove('hidden');
+            if (compareMode) compareMode.classList.add('hidden');
+            if (dialogTitle) dialogTitle.textContent = 'Получить консультацию';
+            if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите фото одежды для анализа';
+            console.log(`✅ Режим single установлен`);
+        } else if (mode === 'compare') {
+            if (singleMode) singleMode.classList.add('hidden');
+            if (compareMode) compareMode.classList.remove('hidden');
+            if (dialogTitle) dialogTitle.textContent = 'Сравнить образы';
+            if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите от 2 до 4 фотографий для сравнения';
+            console.log(`✅ Режим compare установлен`);
+        }
+        
+        // Эмулируем событие изменения режима для совместимости
+        console.log(`📡 Отправляем событие modeChanged с режимом: ${mode}`);
+        document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
+        console.log(`📡 Событие modeChanged отправлено`);
     }
     
     function setupEventHandlers() {
@@ -60,9 +104,29 @@ window.MishuraApp.app = (function() {
                 e.preventDefault();
                 logger.debug('Нажата кнопка консультации');
                 consultation.openConsultationModal();
+                // Устанавливаем режим после небольшой задержки
+                setTimeout(() => {
+                    setModalMode('single');
+                }, 100);
             });
         } else {
             logger.warn('Кнопка консультации не найдена');
+        }
+        
+        // Обработчик для кнопки сравнения образов
+        const compareButton = document.querySelector('.compare-button');
+        if (compareButton) {
+            compareButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                logger.debug('Нажата кнопка сравнения образов');
+                consultation.openConsultationModal();
+                // Устанавливаем режим после небольшой задержки
+                setTimeout(() => {
+                    setModalMode('compare');
+                }, 100);
+            });
+        } else {
+            logger.warn('Кнопка сравнения образов не найдена');
         }
         
         // Обработчики для навигации

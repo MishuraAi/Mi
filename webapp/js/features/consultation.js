@@ -21,6 +21,7 @@ window.MishuraApp.features.consultation = (function() {
     let currentConsultationData = null;
     let uploadedImage = null; // Только для режима 'single'
     let uploadedCompareImages = [null, null, null, null]; // Для режима 'compare'
+    let currentMode = 'single'; // Отслеживаем текущий режим
     
     function init() {
         config = window.MishuraApp.config;
@@ -62,8 +63,7 @@ window.MishuraApp.features.consultation = (function() {
         if (consultationForm) {
             consultationForm.addEventListener('submit', function(e) {
                 e.preventDefault();
-                const currentModeButton = document.querySelector('#consultation-overlay .mode-button.active');
-                const currentMode = currentModeButton ? currentModeButton.dataset.mode : 'single';
+                // Используем сохраненный режим вместо поиска кнопки
                 logger.info(`Consultation: Обработчик submit формы, режим '${currentMode}'`);
 
                 if (currentMode === 'single') {
@@ -116,40 +116,20 @@ window.MishuraApp.features.consultation = (function() {
                 updateCompareSubmitButtonState(); // Также обновляем кнопку для режима сравнения
             }
         });
-         // modalClosed для consultation-overlay уже не нужен здесь, т.к. reset при открытии
          document.addEventListener('modeChanged', function(e) {
-            logger.debug(`Consultation (event modeChanged): режим ${e.detail.mode}. Обновление кнопки.`);
-            if (e.detail.mode === 'single') {
+            currentMode = e.detail.mode; // Сохраняем текущий режим
+            logger.debug(`Consultation (event modeChanged): режим ${currentMode}. Обновление кнопки.`);
+            if (currentMode === 'single') {
                 updateSingleModeSubmitButtonState();
-            } else if (e.detail.mode === 'compare') {
+            } else if (currentMode === 'compare') {
                 updateCompareSubmitButtonState();
             }
         });
     }
     
-    function updateSingleModeSubmitButtonState() {
-        if (submitButton) {
-            const currentModeButton = document.querySelector('#consultation-overlay .mode-button.active');
-            const currentMode = currentModeButton ? currentModeButton.dataset.mode : 'single';
-            if (currentMode === 'single') {
-                submitButton.disabled = !uploadedImage;
-                logger.debug(`Consultation: Кнопка submit (single mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'}`);
-            }
-            // Для режима 'compare' кнопка управляется через updateCompareSubmitButtonState
-        }
-    }
+        function updateSingleModeSubmitButtonState() {        if (submitButton) {            if (currentMode === 'single') {                submitButton.disabled = !uploadedImage;                logger.debug(`Consultation: Кнопка submit (single mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'}`);            }            // Для режима 'compare' кнопка управляется через updateCompareSubmitButtonState        }    }
 
-    function updateCompareSubmitButtonState() {
-        if (submitButton) {
-            const currentModeButton = document.querySelector('#consultation-overlay .mode-button.active');
-            const currentMode = currentModeButton ? currentModeButton.dataset.mode : 'single';
-            if (currentMode === 'compare') {
-                const filledImages = uploadedCompareImages.filter(img => img !== null);
-                submitButton.disabled = filledImages.length < 2;
-                logger.debug(`Consultation: Кнопка submit (compare mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'} (изображений: ${filledImages.length})`);
-            }
-        }
-    }
+        function updateCompareSubmitButtonState() {        if (submitButton) {            if (currentMode === 'compare') {                const filledImages = uploadedCompareImages.filter(img => img !== null);                submitButton.disabled = filledImages.length < 2;                logger.debug(`Consultation: Кнопка submit (compare mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'} (изображений: ${filledImages.length})`);            }        }    }
 
     function openConsultationModal() { // Вызывается из app.js
         logger.info('Consultation: вызов openConsultationModal()');

@@ -69,70 +69,51 @@ window.MishuraApp.components.imageUpload = (function() {
     }
     
     function initModeButtons() {
-        if (!modeButtons || !modeButtons.length) {
-            logger.warn("ImageUpload: Переключатели режимов (.mode-button в #consultation-overlay) не найдены.");
-            // Если режимов нет, возможно, по умолчанию должен быть активен 'single-analysis-mode'
-            if(singleAnalysisMode && compareAnalysisMode) {
-                singleAnalysisMode.classList.remove('hidden');
-                compareAnalysisMode.classList.add('hidden');
-                logger.debug("ImageUpload: Режим 'single' установлен по умолчанию, т.к. кнопок режимов нет.");
-            }
-            return;
-        }
+        // Теперь у нас нет переключателей режимов в интерфейсе
+        // Режим будет устанавливаться программно через события
+        logger.debug("ImageUpload: Переключатели режимов отключены. Используется программное управление режимами.");
         
-        modeButtons.forEach(button => {
-            // Удаляем старые обработчики и добавляем новый
-            const newButton = button.cloneNode(true);
-            button.parentNode.replaceChild(newButton, button);
-            newButton.addEventListener('click', function() {
-                const mode = this.getAttribute('data-mode');
-                logger.debug(`ImageUpload: Кнопка режима нажата - '${mode}'`);
-                
-                // Обновляем активную кнопку
-                const allModeButtons = document.querySelectorAll('#consultation-overlay .mode-button');
-                allModeButtons.forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                
-                // Обновляем видимость режимов
-                if (singleAnalysisMode) singleAnalysisMode.classList.toggle('hidden', mode !== 'single');
-                if (compareAnalysisMode) compareAnalysisMode.classList.toggle('hidden', mode !== 'compare');
-                
-                // Сбрасываем загруженные изображения при смене режима
-                if (mode === 'single') {
-                    resetCompareImageUploads();
-                    // Реинициализируем single режим
-                    initSingleImageUpload();
-                } else if (mode === 'compare') {
-                    resetSingleImageUpload();
-                    // Реинициализируем compare режим с задержкой
-                    setTimeout(() => {
-                        // Обновляем ссылку на контейнер слотов после переключения
-                        imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
-                        initCompareImageUpload();
-                    }, 150); // Увеличиваем задержку для стабильности
-                }
-                
-                document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
-            });
+        // Слушаем события изменения режима
+        document.addEventListener('modeChanged', function(e) {
+            const mode = e.detail.mode;
+            console.log(`🎯 ImageUpload: Получено событие modeChanged с режимом '${mode}'`);
+            logger.debug(`ImageUpload: Получено событие изменения режима на '${mode}'`);
+            
+            if (mode === 'single') {
+                console.log(`📱 ImageUpload: Переключение на режим single`);
+                if (singleAnalysisMode) singleAnalysisMode.classList.remove('hidden');
+                if (compareAnalysisMode) compareAnalysisMode.classList.add('hidden');
+                resetCompareImageUploads();
+                initSingleImageUpload();
+                logger.debug('ImageUpload: Режим single активирован');
+            } else if (mode === 'compare') {
+                console.log(`📷 ImageUpload: Переключение на режим compare`);
+                if (singleAnalysisMode) singleAnalysisMode.classList.add('hidden');
+                if (compareAnalysisMode) compareAnalysisMode.classList.remove('hidden');
+                resetSingleImageUpload();
+                logger.debug('ImageUpload: Переключение на режим compare, запуск инициализации...');
+                // Реинициализируем compare режим с задержкой
+                setTimeout(() => {
+                    console.log(`⏰ ImageUpload: Таймер сработал, запуск initCompareImageUpload...`);
+                    logger.debug('ImageUpload: Запуск initCompareImageUpload...');
+                    imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
+                    if (imageSlotsContainer) {
+                        console.log(`✅ ImageUpload: Найден контейнер слотов, слотов: ${imageSlotsContainer.querySelectorAll('.image-slot').length}`);
+                        logger.debug(`ImageUpload: Найден контейнер слотов, слотов: ${imageSlotsContainer.querySelectorAll('.image-slot').length}`);
+                    } else {
+                        console.error(`❌ ImageUpload: Контейнер слотов НЕ НАЙДЕН!`);
+                        logger.error('ImageUpload: Контейнер слотов НЕ НАЙДЕН!');
+                    }
+                    initCompareImageUpload();
+                }, 250); // Увеличиваем задержку
+            }
         });
         
-        // Обновляем коллекцию modeButtons после клонирования
-        modeButtons = document.querySelectorAll('#consultation-overlay .mode-button');
-
-        const initialActiveButton = document.querySelector('#consultation-overlay .mode-button.active') || 
-                                   (modeButtons.length > 0 ? modeButtons[0] : null);
-        if (initialActiveButton) {
-            logger.debug(`ImageUpload: Установка начального активного режима на '${initialActiveButton.dataset.mode}'`);
-            initialActiveButton.click();
-        } else {
-            logger.warn("ImageUpload: Не удалось установить начальный активный режим (кнопки не найдены или нет активной).");
-            if(singleAnalysisMode && compareAnalysisMode) { // Фоллбэк, если кнопки есть, но ни одна не активна
-                singleAnalysisMode.classList.remove('hidden');
-                compareAnalysisMode.classList.add('hidden');
-                if (modeButtons.length > 0) modeButtons[0].classList.add('active');
-                logger.debug("ImageUpload: Режим 'single' и первая кнопка активированы по умолчанию.");
-                document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: 'single' } }));
-            }
+        // Устанавливаем режим single по умолчанию
+        if (singleAnalysisMode && compareAnalysisMode) {
+            singleAnalysisMode.classList.remove('hidden');
+            compareAnalysisMode.classList.add('hidden');
+            logger.debug("ImageUpload: Режим 'single' установлен по умолчанию.");
         }
     }
 
@@ -270,32 +251,111 @@ window.MishuraApp.components.imageUpload = (function() {
         reader.readAsDataURL(file);
     }
     
+    function tryAlternativeMethods(input, slotIndex) {
+        console.log(`🔄 Запуск альтернативных методов для слота ${slotIndex}`);
+        
+        // Способ 1: focus + click
+        setTimeout(() => {
+            try {
+                console.log(`🔄 Способ 1 - focus + click для слота ${slotIndex}`);
+                input.focus();
+                input.click();
+                console.log(`✅ focus + click выполнен для слота ${slotIndex}`);
+            } catch (altError1) {
+                console.error(`❌ Способ 1 не сработал:`, altError1);
+            }
+        }, 100);
+        
+        // Способ 2: dispatchEvent с MouseEvent
+        setTimeout(() => {
+            try {
+                console.log(`🔄 Способ 2 - dispatchEvent для слота ${slotIndex}`);
+                const clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                });
+                input.dispatchEvent(clickEvent);
+                console.log(`✅ dispatchEvent выполнен для слота ${slotIndex}`);
+            } catch (altError2) {
+                console.error(`❌ Способ 2 не сработал:`, altError2);
+            }
+        }, 200);
+        
+        // Способ 3: Создаем временный label и кликаем по нему
+        setTimeout(() => {
+            try {
+                console.log(`🔄 Способ 3 - создаем label для слота ${slotIndex}`);
+                const tempLabel = document.createElement('label');
+                tempLabel.htmlFor = input.id || `temp-input-${slotIndex}`;
+                if (!input.id) input.id = `temp-input-${slotIndex}`;
+                
+                tempLabel.style.position = 'fixed';
+                tempLabel.style.left = '50%';
+                tempLabel.style.top = '50%';
+                tempLabel.style.width = '100px';
+                tempLabel.style.height = '50px';
+                tempLabel.style.zIndex = '10000';
+                tempLabel.style.backgroundColor = 'red';
+                tempLabel.style.color = 'white';
+                tempLabel.style.cursor = 'pointer';
+                tempLabel.style.display = 'flex';
+                tempLabel.style.alignItems = 'center';
+                tempLabel.style.justifyContent = 'center';
+                tempLabel.textContent = `Загрузить ${slotIndex}`;
+                
+                document.body.appendChild(tempLabel);
+                
+                // Автоматически удаляем через 3 секунды
+                setTimeout(() => {
+                    if (document.body.contains(tempLabel)) {
+                        document.body.removeChild(tempLabel);
+                        console.log(`⏰ Временный label удален автоматически для слота ${slotIndex}`);
+                    }
+                }, 3000);
+                
+                console.log(`✅ Временный label создан для слота ${slotIndex}. Кликните по красной кнопке.`);
+                
+            } catch (altError3) {
+                console.error(`❌ Способ 3 не сработал:`, altError3);
+            }
+        }, 300);
+    }
+
     function initCompareImageUpload() {
+        console.log(`🚀 initCompareImageUpload: Начало инициализации сравнения`);
         // Обновляем ссылку на контейнер слотов - это критично!
         imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
         
         if (!imageSlotsContainer) {
+            console.error(`❌ initCompareImageUpload: imageSlotsContainer НЕ НАЙДЕН!`);
             logger.warn("ImageUpload (Compare): Пропуск инициализации - imageSlotsContainer не найден.");
             return;
         }
         
         const slots = imageSlotsContainer.querySelectorAll('.image-slot');
         if (!slots.length) {
+            console.error(`❌ initCompareImageUpload: Слоты (.image-slot) НЕ НАЙДЕНЫ!`);
             logger.warn("ImageUpload (Compare): Слоты (.image-slot) не найдены в контейнере.");
             return;
         }
 
+        console.log(`✅ initCompareImageUpload: Найдено ${slots.length} слотов для инициализации`);
         logger.debug(`ImageUpload (Compare): Найдено ${slots.length} слотов для инициализации`);
 
         slots.forEach((slot, index) => {
             const slotIndex = parseInt(slot.dataset.slot, 10);
             const input = slot.querySelector('.compare-upload-input');
             
+            console.log(`🎰 Обработка слота ${index}, data-slot = ${slotIndex}, input найден = ${!!input}`);
+            
             if (!input) {
+                console.error(`❌ Слот ${slotIndex}: инпут НЕ НАЙДЕН!`);
                 logger.warn(`ImageUpload (Compare): Инпут для слота ${slotIndex} не найден.`);
                 return;
             }
 
+            console.log(`🔧 Устанавливаю обработчики для слота ${slotIndex}`);
             logger.debug(`ImageUpload (Compare): Инициализация слота ${slotIndex}`);
             
             // Очищаем все старые обработчики, полностью пересоздавая слот
@@ -305,28 +365,55 @@ window.MishuraApp.components.imageUpload = (function() {
             // Получаем ссылки на элементы нового слота
             const newInput = newSlot.querySelector('.compare-upload-input');
             
-            // Обработчик клика на слот
-            newSlot.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                logger.debug(`ImageUpload (Compare): Клик на слот ${slotIndex}, filled: ${this.classList.contains('filled')}`);
-                
-                if (!this.classList.contains('filled')) {
-                    logger.debug(`ImageUpload (Compare): Открываем диалог выбора файла для слота ${slotIndex}`);
-                    resetFileInput(newInput); 
-                    newInput.click();
+            // НОВЫЙ ПОДХОД: Создаем невидимый label, который покрывает весь слот
+            const slotLabel = document.createElement('label');
+            slotLabel.style.position = 'absolute';
+            slotLabel.style.top = '0';
+            slotLabel.style.left = '0';
+            slotLabel.style.right = '0';
+            slotLabel.style.bottom = '0';
+            slotLabel.style.cursor = 'pointer';
+            slotLabel.style.zIndex = '10';
+            slotLabel.style.backgroundColor = 'transparent';
+            
+            // Связываем label с input
+            if (!newInput.id) newInput.id = `compare-input-${slotIndex}`;
+            slotLabel.htmlFor = newInput.id;
+            
+            // Делаем слот относительно позиционированным
+            newSlot.style.position = 'relative';
+            
+            // Добавляем label в слот
+            newSlot.appendChild(slotLabel);
+            
+            console.log(`🏷️ Создан label для слота ${slotIndex}, связанный с input ${newInput.id}`);
+            
+            // Добавляем обработчик клика на label для блокировки заполненных слотов
+            slotLabel.addEventListener('click', function(e) {
+                if (newSlot.classList.contains('filled')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log(`⚠️ Слот ${slotIndex} уже заполнен, клик заблокирован`);
+                } else {
+                    console.log(`👆 Клик на label слота ${slotIndex} - передается на input`);
+                    resetFileInput(newInput); // Сбрасываем input перед открытием диалога
                 }
             });
             
+            console.log(`✅ Label настроен для слота ${slotIndex}, программные клики больше не нужны`);
+
             // Обработчик change для инпута 
             newInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
+                console.log(`📁 CHANGE событие для слота ${slotIndex}, файл:`, file ? file.name : 'нет');
                 logger.debug(`ImageUpload (Compare): Change event для слота ${slotIndex}, файл:`, file ? file.name : 'нет');
                 
                 if (file) {
+                    console.log(`✅ Файл выбран для слота ${slotIndex}: ${file.name}`);
                     logger.debug(`ImageUpload (Compare): Файл выбран для слота ${slotIndex}: ${file.name}`);
                     handleCompareImageSelection(file, slotIndex);
                 } else {
+                    console.log(`❌ Выбор файла отменен для слота ${slotIndex}`);
                     logger.debug(`ImageUpload (Compare): Выбор файла отменен для слота ${slotIndex}`);
                 }
             });

@@ -14,4 +14,12 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: WEBAPP_URL
-        sync: false 
+        sync: false
+      - key: CACHE_TTL_DAYS
+        value: 30
+      - key: MAX_CACHE_SIZE
+        value: 1000
+      - key: PORT
+        value: 8000
+      - key: HOST
+        value: 0.0.0.0 

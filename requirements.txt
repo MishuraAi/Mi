@@ -2,43 +2,43 @@
 # Зависимости для Telegram-бота с Gemini AI интеграцией
 
 # Telegram Bot API
-python-telegram-bot==20.3
+python-telegram-bot>=20.3,<21.0
 
 # Работа с переменными окружения
-python-dotenv==1.0.0
+python-dotenv>=1.0.0,<2.0.0
 
 # Google Gemini AI
-google-generativeai==0.3.0
+google-generativeai>=0.3.0,<0.4.0
 
 # Обработка изображений
-Pillow==10.0.0
+Pillow>=10.0.0,<11.0.0
 
 # Web приложение
-fastapi==0.104.1
-uvicorn==0.24.0
-aiofiles==23.2.1
-jinja2==3.1.2
+fastapi>=0.104.1,<0.105.0
+uvicorn>=0.24.0,<0.25.0
+aiofiles>=23.2.1,<24.0.0
+jinja2>=3.1.2,<3.2.0
 
 # HTTP клиент
-httpx==0.25.0
+httpx>=0.25.0,<0.26.0
 
 # Асинхронное программирование
-aiohttp==3.8.6
+aiohttp>=3.8.6,<3.9.0
 
 # Работа с JSON
-orjson==3.9.9
+orjson>=3.9.9,<4.0.0
 
 # Логирование
-structlog==23.2.0
+structlog>=23.2.0,<24.0.0
 
 # Валидация данных
-pydantic==2.4.2
+pydantic>=2.4.2,<3.0.0
 
 # Кэширование
-diskcache==5.6.3
+diskcache>=5.6.3,<6.0.0
 
 # Работа с датами
-python-dateutil==2.8.2
+python-dateutil>=2.8.2,<3.0.0
 
 # Утилиты для файлов
-pathlib2==2.3.7
+pathlib2>=2.3.7,<3.0.0

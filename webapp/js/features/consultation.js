@@ -237,6 +237,31 @@ window.MishuraApp.features.consultation = (function() {
     
     function handleConsultationResponse(response) {
         logger.info('Consultation: Ответ от сервера (обработка):', response);
+        
+        // Проверяем, является ли это ошибкой соединения
+        if (response && response.status === 'error') {
+            const errorMessage = response.message || 'Неизвестная ошибка сервера';
+            logger.error('Consultation: Ошибка API:', errorMessage, response);
+            if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMessage}`, 8000);
+            if (resultsContainer) resultsContainer.innerHTML = `<div class="error-message">
+                <h3>🔌 Проблема с подключением</h3>
+                <p>${errorMessage}</p>
+                ${response.error_type === 'connection_refused' ? '<p><strong>Решение:</strong> Запустите API сервер в отдельном терминале:<br><code>python api.py</code></p>' : ''}
+            </div>`;
+            
+            // Показываем окно результатов с ошибкой
+            if (modals) {
+                const consultationModal = document.getElementById('consultation-overlay');
+                if (consultationModal && consultationModal.classList.contains('active')) {
+                    modals.closeModalById('consultation-overlay');
+                    setTimeout(() => modals.openResultsModal(), 150);
+                } else {
+                    modals.openResultsModal();
+                }
+            }
+            return;
+        }
+        
         const adviceText = response && response.advice;
         
         if (!response || response.status !== 'success' || typeof adviceText !== 'string') {
@@ -244,6 +269,7 @@ window.MishuraApp.features.consultation = (function() {
             logger.error('Consultation: Ошибка в ответе сервера:', errorMessage, response);
             if (uiHelpers) uiHelpers.showToast(`Ошибка: ${errorMessage}`);
             if (resultsContainer) resultsContainer.innerHTML = `<p>Мишура не смогла дать совет: ${errorMessage}</p>`;
+            return;
         }
         currentConsultationData = adviceText;
         renderConsultationResults(adviceText);

@@ -23,7 +23,7 @@ window.MishuraApp.app = (function() {
         uiHelpers.init();
         
         // Инициализация API сервиса
-        apiService = window.MishuraApp.services.api;
+        apiService = window.MishuraApp.utils.api;
         if (!apiService) {
             logger.error('API сервис не найден');
             return;

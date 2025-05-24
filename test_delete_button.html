@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест кнопки удаления</title>
+    <style>
+        .image-slot {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px;
+            background: #f9f9f9;
+        }
+        
+        .image-slot.filled {
+            border-color: #00C2FF;
+            background: #e6f7ff;
+        }
+        
+        .delete-image {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 15;
+            transition: background-color 0.3s ease, transform 0.15s ease;
+        }
+        
+        .delete-image:hover {
+            background-color: rgba(255, 0, 0, 0.8);
+            transform: scale(1.1);
+        }
+        
+        .slot-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            cursor: pointer;
+            z-index: 10;
+            background-color: transparent;
+        }
+        
+        .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест кнопки удаления</h1>
+    
+    <div class="image-slot filled" data-slot="0">
+        <img class="preview-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%2300C2FF'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='white' font-size='14'%3EФОТО%3C/text%3E%3C/svg%3E" alt="Тестовое изображение">
+        <button class="delete-image" title="Удалить изображение">×</button>
+        <label class="slot-label" for="test-input"></label>
+        <input type="file" id="test-input" style="opacity: 0; position: absolute;">
+    </div>
+    
+    <p><strong>Инструкция:</strong></p>
+    <ol>
+        <li>Кликните по крестику (×) в правом верхнем углу</li>
+        <li>Изображение должно удалиться</li>
+        <li>Если кнопка не работает - проблема с z-index</li>
+    </ol>
+    
+    <div id="log"></div>
+    
+    <script>
+        const slot = document.querySelector('.image-slot');
+        const deleteBtn = document.querySelector('.delete-image');
+        const label = document.querySelector('.slot-label');
+        const log = document.getElementById('log');
+        
+        function addLog(message) {
+            log.innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+        
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            addLog('✅ Кнопка удаления работает!');
+            slot.innerHTML = '<span>Изображение удалено</span>';
+            slot.classList.remove('filled');
+        });
+        
+        label.addEventListener('click', function(e) {
+            if (e.target.classList.contains('delete-image')) {
+                addLog('🎯 Клик перехвачен кнопкой удаления');
+                return;
+            }
+            
+            if (slot.classList.contains('filled')) {
+                e.preventDefault();
+                addLog('⚠️ Слот заполнен - загрузка заблокирована');
+            } else {
+                addLog('📁 Открытие диалога выбора файла');
+            }
+        });
+        
+        addLog('🚀 Тест инициализирован. Кликните по кнопке × для проверки.');
+    </script>
+</body>
+</html> 

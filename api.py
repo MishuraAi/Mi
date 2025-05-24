@@ -33,10 +33,16 @@ import uvicorn
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 
-# Импорт новых модулей
-from monitoring import monitor_request, start_metrics_server
+# Импорт новых модулей (monitoring временно отключен)
+# from monitoring import monitor_request, start_metrics_server
 from validators import ImageAnalysisRequest, ImageComparisonRequest, UserFeedback, PaymentRequest
 from rate_limiter import default_rate_limit_middleware
+
+# Временная заглушка для monitor_request
+def monitor_request():
+    def decorator(func):
+        return func
+    return decorator
 
 # Попытка импорта модулей проекта
 try:
@@ -93,12 +99,12 @@ app = FastAPI(
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8001", "http://localhost:8001"],
+    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000", "http://127.0.0.1:8001", "http://localhost:8001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-logger.info("CORS middleware настроен с allow_origins=['http://127.0.0.1:8001', 'http://localhost:8001'].")
+logger.info("CORS middleware настроен с allow_origins для портов 8000 и 8001.")
 
 # Корневой маршрут для перенаправления на веб-приложение
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -413,10 +419,7 @@ async def debug_info():
         return JSONResponse(status_code=500, content={"error_message": f"Ошибка при сборе отладочной информации: {str(e)}"})
 
 if __name__ == "__main__":
-    # Запускаем сервер метрик на порту 8000
-    start_metrics_server(8000)
-    
-    # Запускаем основной сервер
+    # Запускаем основной сервер (metrics временно отключены)
     uvicorn.run(
         "api:app",
         host="0.0.0.0",

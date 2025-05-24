@@ -5,7 +5,7 @@ window.MishuraApp.utils.api = (function() {
     'use strict';
     
     let logger;
-    const API_BASE_URL = '/api';
+    const API_BASE_URL = 'http://localhost:8001/api';
     
     function init() {
         logger = window.MishuraApp.utils.logger;
@@ -48,10 +48,48 @@ window.MishuraApp.utils.api = (function() {
                 endpoint: `${API_BASE_URL}/analyze`
             });
             
-                        // Реальный API запрос к серверу            const formData = new FormData();            formData.append('image', imageData);            formData.append('mode', mode);                        if (occasion) {                formData.append('occasion', occasion);            }                        if (preferences) {                formData.append('preferences', preferences);            }                        const response = await fetch(`${API_BASE_URL}/analyze`, {                method: 'POST',                body: formData            });                        if (!response.ok) {                throw new Error(`HTTP error! status: ${response.status}`);            }                        return await response.json();
+            // Реальный API запрос к серверу
+            const formData = new FormData();
+            formData.append('image', imageData);
+            formData.append('mode', mode);
+            
+            if (occasion) {
+                formData.append('occasion', occasion);
+            }
+            
+            if (preferences) {
+                formData.append('preferences', preferences);
+            }
+            
+            const response = await fetch(`${API_BASE_URL}/analyze`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
         } catch (error) {
             logger.error('Ошибка при анализе изображения:', error);
-            throw error;
+            
+            // Fallback: Возвращаем информативное сообщение об ошибке вместо исключения
+            if (error.message.includes('fetch') || error.message.includes('Failed to fetch') || error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+                logger.warn('⚠️ API сервер недоступен. Возвращаю информационный ответ...');
+                return {
+                    status: 'error',
+                    message: 'API сервер не запущен. Для получения стилистических советов необходимо запустить сервер командой: python api.py',
+                    error_type: 'connection_refused'
+                };
+            }
+            
+            // Для других ошибок возвращаем общее сообщение
+            return {
+                status: 'error', 
+                message: `Ошибка подключения к серверу: ${error.message}`,
+                error_type: 'general_error'
+            };
         }
     }
     
@@ -67,7 +105,7 @@ window.MishuraApp.utils.api = (function() {
             const formData = new FormData();
             
             images.forEach((image, index) => {
-                formData.append(`image${index + 1}`, image);
+                formData.append('images', image);
                 console.log(`📎 Добавлено изображение ${index + 1}: ${image.name}`);
             });
             
@@ -94,7 +132,23 @@ window.MishuraApp.utils.api = (function() {
             return await response.json();
         } catch (error) {
             logger.error('Ошибка при сравнении изображений:', error);
-            throw error;
+            
+            // Fallback: Возвращаем информативное сообщение об ошибке вместо исключения
+            if (error.message.includes('fetch') || error.message.includes('Failed to fetch') || error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+                logger.warn('⚠️ API сервер недоступен. Возвращаю информационный ответ...');
+                return {
+                    status: 'error',
+                    message: 'API сервер не запущен. Для получения стилистических советов необходимо запустить сервер командой: python api.py',
+                    error_type: 'connection_refused'
+                };
+            }
+            
+            // Для других ошибок возвращаем общее сообщение
+            return {
+                status: 'error', 
+                message: `Ошибка подключения к серверу: ${error.message}`,
+                error_type: 'general_error'
+            };
         }
     }
     

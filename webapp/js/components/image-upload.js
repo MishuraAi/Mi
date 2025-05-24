@@ -25,14 +25,7 @@ window.MishuraApp.components.imageUpload = (function() {
     let uploadedImages = { single: null, compare: [null, null, null, null] };
     let isImageUploadInitialized = false;
     
-    function init() {
-        if (isImageUploadInitialized) {
-            // console.warn("ImageUpload: Повторная инициализация пропущена.");
-            return;
-        }
-        config = window.MishuraApp.config;
-        logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("ImageUpload(f):",...args), info: (...args)=>console.info("ImageUpload(f):",...args), warn: (...args)=>console.warn("ImageUpload(f):",...args), error: (...args)=>console.error("ImageUpload(f):",...args) };
-        uiHelpers = window.MishuraApp.utils.uiHelpers;
+        function init() {        if (isImageUploadInitialized) {            // console.warn("ImageUpload: Повторная инициализация пропущена.");            return;        }        config = window.MishuraApp.config;        logger = window.MishuraApp.utils.logger || { debug: (...args)=>console.debug("ImageUpload(f):",...args), info: (...args)=>console.info("ImageUpload(f):",...args), warn: (...args)=>console.warn("ImageUpload(f):",...args), error: (...args)=>console.error("ImageUpload(f):",...args) };        uiHelpers = window.MishuraApp.utils.uiHelpers;                // Добавляем CSS для исправления z-index кнопки удаления        const style = document.createElement('style');        style.textContent = '.image-slot .delete-image { z-index: 15 !important; }';        document.head.appendChild(style);
         
         logger.debug("Инициализация модуля загрузки изображений (v0.4.8)");
         initDOMElements(); // Сначала DOM
@@ -388,17 +381,7 @@ window.MishuraApp.components.imageUpload = (function() {
             
             console.log(`🏷️ Создан label для слота ${slotIndex}, связанный с input ${newInput.id}`);
             
-            // Добавляем обработчик клика на label для блокировки заполненных слотов
-            slotLabel.addEventListener('click', function(e) {
-                if (newSlot.classList.contains('filled')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log(`⚠️ Слот ${slotIndex} уже заполнен, клик заблокирован`);
-                } else {
-                    console.log(`👆 Клик на label слота ${slotIndex} - передается на input`);
-                    resetFileInput(newInput); // Сбрасываем input перед открытием диалога
-                }
-            });
+                        // Добавляем обработчик клика на label для блокировки заполненных слотов            slotLabel.addEventListener('click', function(e) {                // Проверяем, был ли клик по кнопке удаления                if (e.target.classList.contains('delete-image') || e.target.closest('.delete-image')) {                    // Не блокируем клики по кнопке удаления                    return;                }                                if (newSlot.classList.contains('filled')) {                    e.preventDefault();                    e.stopPropagation();                    console.log(`⚠️ Слот ${slotIndex} уже заполнен, клик заблокирован`);                } else {                    console.log(`👆 Клик на label слота ${slotIndex} - передается на input`);                    resetFileInput(newInput); // Сбрасываем input перед открытием диалога                }            });
             
             console.log(`✅ Label настроен для слота ${slotIndex}, программные клики больше не нужны`);
 

@@ -11,13 +11,7 @@
     <link rel="icon" type="image/png" href="images/single-mode-icon.svg">
     <!-- Обновленные пути к стилям -->
     <link rel="stylesheet" href="css/styles.css">
-    <style>
-        /* Предотвращение FOUC (Flash Of Unstyled Content) */
-        body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }
-        body.loaded { display: flex; opacity: 1; } /* display: flex для phone-container */
-        /* Предотвращаем FOUC */
-        .hidden { display: none; }
-    </style>
+        <style>        /* Предотвращение FOUC (Flash Of Unstyled Content) */        body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }        body.loaded { display: flex; opacity: 1; } /* display: flex для phone-container */        /* Предотвращаем FOUC */        .hidden { display: none; }                /* Исправление для кнопки удаления изображений - ПРИОРИТЕТНОЕ */        .image-slot .delete-image {            z-index: 15 !important;            pointer-events: auto !important;        }    </style>
 </head>
 <body>
     <div class="phone-container">
@@ -330,7 +324,6 @@
     <script src="js/utils/logger.js"></script>
     <script src="js/utils/ui-helpers.js"></script>
     <script src="js/utils/api.js"></script>
-    <script src="js/services/api.js"></script>
     <script src="js/components/modals.js"></script>
     <script src="js/components/image-upload.js"></script>
     <script src="js/features/consultation.js"></script>

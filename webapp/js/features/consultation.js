@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Консультации (consultation.js)
-ВЕРСИЯ: 0.4.7 (Добавлена поддержка режима сравнения в модальном окне)
+ВЕРСИЯ: 0.4.8 (Исправлен синтаксис функций управления кнопкой)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-24
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -41,7 +41,7 @@ window.MishuraApp.features.consultation = (function() {
 
         initDOMElements();
         initEventListeners();
-        logger.debug("Модуль консультаций инициализирован (v0.4.7)");
+        logger.debug("Модуль консультаций инициализирован (v0.4.8)");
     }
     
     function initDOMElements() {
@@ -116,7 +116,8 @@ window.MishuraApp.features.consultation = (function() {
                 updateCompareSubmitButtonState(); // Также обновляем кнопку для режима сравнения
             }
         });
-         document.addEventListener('modeChanged', function(e) {
+        
+        document.addEventListener('modeChanged', function(e) {
             currentMode = e.detail.mode; // Сохраняем текущий режим
             logger.debug(`Consultation (event modeChanged): режим ${currentMode}. Обновление кнопки.`);
             if (currentMode === 'single') {
@@ -127,9 +128,25 @@ window.MishuraApp.features.consultation = (function() {
         });
     }
     
-        function updateSingleModeSubmitButtonState() {        if (submitButton) {            if (currentMode === 'single') {                submitButton.disabled = !uploadedImage;                logger.debug(`Consultation: Кнопка submit (single mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'}`);            }            // Для режима 'compare' кнопка управляется через updateCompareSubmitButtonState        }    }
+    function updateSingleModeSubmitButtonState() {
+        if (submitButton) {
+            if (currentMode === 'single') {
+                submitButton.disabled = !uploadedImage;
+                logger.debug(`Consultation: Кнопка submit (single mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'}`);
+            }
+            // Для режима 'compare' кнопка управляется через updateCompareSubmitButtonState
+        }
+    }
 
-        function updateCompareSubmitButtonState() {        if (submitButton) {            if (currentMode === 'compare') {                const filledImages = uploadedCompareImages.filter(img => img !== null);                submitButton.disabled = filledImages.length < 2;                logger.debug(`Consultation: Кнопка submit (compare mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'} (изображений: ${filledImages.length})`);            }        }    }
+    function updateCompareSubmitButtonState() {
+        if (submitButton) {
+            if (currentMode === 'compare') {
+                const filledImages = uploadedCompareImages.filter(img => img !== null);
+                submitButton.disabled = filledImages.length < 2;
+                logger.debug(`Consultation: Кнопка submit (compare mode) ${submitButton.disabled ? 'деактивирована' : 'активирована'} (изображений: ${filledImages.length})`);
+            }
+        }
+    }
 
     function openConsultationModal() { // Вызывается из app.js
         logger.info('Consultation: вызов openConsultationModal()');
@@ -339,8 +356,6 @@ window.MishuraApp.features.consultation = (function() {
     // Публичная функция для обновления состояния кнопки сравнения
     function updateSubmitButtonState() {
         logger.debug('Consultation: Вызов updateSubmitButtonState() (публичная функция)');
-        const currentModeButton = document.querySelector('#consultation-overlay .mode-button.active');
-        const currentMode = currentModeButton ? currentModeButton.dataset.mode : 'single';
         if (currentMode === 'compare') {
             updateCompareSubmitButtonState();
         } else {

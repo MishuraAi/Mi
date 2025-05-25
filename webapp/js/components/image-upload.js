@@ -21,38 +21,94 @@ window.MishuraApp.components.imageUpload = (function() {
     let imageSlotsContainer;
     let modeButtons, singleAnalysisMode, compareAnalysisMode;
     
-    let isUploadingActive = false;    let uploadedImages = { single: null, compare: [null, null, null, null] };    let isImageUploadInitialized = false;        function init() {        if (isImageUploadInitialized) {            // console.warn("ImageUpload: Повторная инициализация пропущена.");            return;        }        config = window.MishuraApp.config;        logger = window.MishuraApp.utils.logger || {             debug: (...args)=>console.debug("ImageUpload(f):",...args),             info: (...args)=>console.info("ImageUpload(f):",...args),             warn: (...args)=>console.warn("ImageUpload(f):",...args),             error: (...args)=>console.error("ImageUpload(f):",...args)         };        uiHelpers = window.MishuraApp.utils.uiHelpers;                // Добавляем CSS для исправления z-index кнопки удаления        const style = document.createElement('style');        style.textContent = '.image-slot .delete-image { z-index: 15 !important; }';        document.head.appendChild(style);                logger.debug("Инициализация модуля загрузки изображений (v0.4.8)");
-        initDOMElements(); // Сначала DOM
-        initModeButtons();   // Потом режимы
-        initSingleImageUpload(); // Потом загрузчики
+    let isUploadingActive = false;
+    let uploadedImages = { single: null, compare: [null, null, null, null] };
+    let isImageUploadInitialized = false;
+    
+    function init() {
+        if (isImageUploadInitialized) {
+            logger.warn("ImageUpload: Повторная инициализация пропущена.");
+            return;
+        }
+
+        config = window.MishuraApp.config;
+        logger = window.MishuraApp.utils.logger || { 
+            debug: (...args) => console.debug("ImageUpload(f):", ...args), 
+            info: (...args) => console.info("ImageUpload(f):", ...args), 
+            warn: (...args) => console.warn("ImageUpload(f):", ...args), 
+            error: (...args) => console.error("ImageUpload(f):", ...args) 
+        };
+        uiHelpers = window.MishuraApp.utils.uiHelpers;
+
+        // Добавляем CSS для исправления z-index кнопки удаления
+        const style = document.createElement('style');
+        style.textContent = '.image-slot .delete-image { z-index: 15 !important; }';
+        document.head.appendChild(style);
+
+        logger.debug("Инициализация модуля загрузки изображений (v0.4.8)");
+        
+        // Инициализация в правильном порядке
+        if (!initDOMElements()) {
+            logger.error("ImageUpload: Критическая ошибка при инициализации DOM элементов");
+            return;
+        }
+        
+        initModeButtons();
+        initSingleImageUpload();
         initCompareImageUpload();
+        
         isImageUploadInitialized = true;
-        logger.info("Модуль загрузки изображений инициализирован (v0.4.8)");
+        logger.info("Модуль загрузки изображений успешно инициализирован");
     }
     
     function initDOMElements() {
         logger.debug("ImageUpload: Инициализация DOM элементов...");
-        singleUploadArea = document.getElementById('single-upload-area');
-        singleFileInput = document.getElementById('single-upload-input');
-        singlePreviewContainer = document.getElementById('single-preview-container');
-        singlePreviewImage = document.getElementById('single-preview-image');
-        singleDeleteButton = document.querySelector('#single-preview-container .delete-image[data-target="single"]');
         
+        // Инициализация элементов для одиночной загрузки
+        singleUploadArea = document.querySelector('#single-analysis-mode #single-upload-area');
+        singleFileInput = document.querySelector('#single-analysis-mode #single-upload-input');
+        singlePreviewContainer = document.querySelector('#single-analysis-mode #single-preview-container');
+        singlePreviewImage = document.querySelector('#single-analysis-mode #single-preview-image');
+        singleDeleteButton = document.querySelector('#single-analysis-mode .delete-image[data-target="single"]');
+        
+        // Инициализация элементов для режима сравнения
         imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
         
+        // Инициализация элементов переключения режимов
         modeButtons = document.querySelectorAll('#consultation-overlay .mode-button');
         singleAnalysisMode = document.getElementById('single-analysis-mode');
         compareAnalysisMode = document.getElementById('compare-analysis-mode');
 
-        const elementsToLog = {singleUploadArea, singleFileInput, singlePreviewContainer, singlePreviewImage, singleDeleteButton, imageSlotsContainer, modeButtonsLength: modeButtons.length, singleAnalysisMode, compareAnalysisMode};
-        for(const key in elementsToLog){
+        // Проверка наличия всех необходимых элементов
+        const elementsToLog = {
+            singleUploadArea, 
+            singleFileInput, 
+            singlePreviewContainer, 
+            singlePreviewImage, 
+            singleDeleteButton, 
+            imageSlotsContainer, 
+            modeButtonsLength: modeButtons.length, 
+            singleAnalysisMode, 
+            compareAnalysisMode
+        };
+
+        let missingElements = false;
+        for(const key in elementsToLog) {
             const element = elementsToLog[key];
-            if(element === null || (typeof element === 'number' && element === 0) || (typeof element === 'object' && !element && key !== 'modeButtonsLength')) { // Для modeButtonsLength 0 - это валидное состояние если их нет
-                 logger.warn(`ImageUpload DOM: Элемент или коллекция '${key}' не найден(а) или пуст(а).`);
+            if(element === null || (typeof element === 'number' && element === 0) || (typeof element === 'object' && !element && key !== 'modeButtonsLength')) {
+                logger.error(`ImageUpload DOM: Критическая ошибка - элемент '${key}' не найден!`);
+                missingElements = true;
             } else {
-                 logger.debug(`ImageUpload DOM: Элемент '${key}' найден.`);
+                logger.debug(`ImageUpload DOM: Элемент '${key}' успешно инициализирован.`);
             }
         }
+
+        if (missingElements) {
+            logger.error("ImageUpload: Критические DOM элементы не найдены. Инициализация может быть неполной.");
+            return false;
+        }
+
+        return true;
     }
     
     function initModeButtons() {
@@ -79,19 +135,24 @@ window.MishuraApp.components.imageUpload = (function() {
                 if (compareAnalysisMode) compareAnalysisMode.classList.remove('hidden');
                 resetSingleImageUpload();
                 logger.debug('ImageUpload: Переключение на режим compare, запуск инициализации...');
+                
                 // Реинициализируем compare режим с задержкой
                 setTimeout(() => {
                     console.log(`⏰ ImageUpload: Таймер сработал, запуск initCompareImageUpload...`);
                     logger.debug('ImageUpload: Запуск initCompareImageUpload...');
+                    
+                    // Обновляем ссылку на контейнер слотов
                     imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
                     if (imageSlotsContainer) {
                         console.log(`✅ ImageUpload: Найден контейнер слотов, слотов: ${imageSlotsContainer.querySelectorAll('.image-slot').length}`);
                         logger.debug(`ImageUpload: Найден контейнер слотов, слотов: ${imageSlotsContainer.querySelectorAll('.image-slot').length}`);
+                        
+                        // Инициализируем слоты
+                        initCompareImageUpload();
                     } else {
                         console.error(`❌ ImageUpload: Контейнер слотов НЕ НАЙДЕН!`);
                         logger.error('ImageUpload: Контейнер слотов НЕ НАЙДЕН!');
                     }
-                    initCompareImageUpload();
                 }, 250); // Увеличиваем задержку
             }
         });
@@ -529,14 +590,17 @@ window.MishuraApp.components.imageUpload = (function() {
         }
     }
         
-    function isValidImageFile(file) { /* ... как в версии 0.4.6 ... */ 
+    function isValidImageFile(file) {
         const validTypes = (config && config.appSettings && config.appSettings.supportedImageFormats) 
                            ? config.appSettings.supportedImageFormats.map(fmt => `image/${fmt.replace('jpg','jpeg')}`) 
                            : ['image/jpeg', 'image/png', 'image/webp'];
         const defaultMaxSize = 5 * 1024 * 1024; 
         const maxSize = (config && config.LIMITS && config.LIMITS.MAX_FILE_SIZE) ? config.LIMITS.MAX_FILE_SIZE : defaultMaxSize;
         
-        if (!file || !file.type) { logger.warn("isValidImageFile: Файл или тип не определены."); return false; }
+        if (!file || !file.type) { 
+            logger.warn("isValidImageFile: Файл или тип не определены."); 
+            return false; 
+        }
         if (!validTypes.includes(file.type.toLowerCase())) {
             logger.warn(`isValidImageFile: Недопустимый тип файла: ${file.type} для '${file.name}'. Допустимые: ${validTypes.join(', ')}`);
             if (uiHelpers) uiHelpers.showToast(`Тип файла '${file.name}' не поддерживается. Используйте: ${ (config && config.appSettings && config.appSettings.supportedImageFormats) ? config.appSettings.supportedImageFormats.join(', ').toUpperCase() : 'JPG, PNG, WEBP'}.`);
@@ -633,7 +697,7 @@ window.MishuraApp.components.imageUpload = (function() {
         logger.debug(`ImageUpload: Слот сравнения ${slotIndex} сброшен.`);
     }
     
-    function resetCompareImageUploads() { /* ... как в версии 0.4.6 ... */ 
+    function resetCompareImageUploads() {
         logger.debug('ImageUpload: Сброс всех слотов сравнения...');
         // Обновляем ссылку на контейнер перед сбросом
         imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
@@ -642,7 +706,7 @@ window.MishuraApp.components.imageUpload = (function() {
             slots.forEach(slot => resetSlot(parseInt(slot.dataset.slot, 10)));
         }
         const formContainer = document.getElementById('consultation-overlay');
-        if(formContainer){ /* ... скрыть поля, деактивировать кнопку ... */ 
+        if(formContainer){
             const occasionSel = formContainer.querySelector('.occasion-selector');
             const labels = formContainer.querySelectorAll('.input-label');
             const prefsInput = formContainer.querySelector('.preferences-input');
@@ -663,9 +727,9 @@ window.MishuraApp.components.imageUpload = (function() {
         init, 
         resetSingleImageUpload, 
         resetCompareImageUploads, 
-        resetSlot, // Оставляем публичным на всякий случай
+        resetSlot,
         isUploading, 
         getUploadedImages,
-        isInitialized: () => isImageUploadInitialized // Экспортируем флаг
+        isInitialized: () => isImageUploadInitialized
     };
 })();

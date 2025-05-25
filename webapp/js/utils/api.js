@@ -5,7 +5,7 @@ window.MishuraApp.utils.api = (function() {
     'use strict';
     
     let logger;
-    const API_BASE_URL = 'http://localhost:8001/api';
+    const API_BASE_URL = 'http://127.0.0.1:8001/api/v1';
     
     function init() {
         logger = window.MishuraApp.utils.logger;
@@ -45,7 +45,7 @@ window.MishuraApp.utils.api = (function() {
                 mode,
                 occasion, 
                 preferences,
-                endpoint: `${API_BASE_URL}/analyze`
+                endpoint: `${API_BASE_URL}/analyze-outfit`
             });
             
             // Реальный API запрос к серверу
@@ -61,9 +61,12 @@ window.MishuraApp.utils.api = (function() {
                 formData.append('preferences', preferences);
             }
             
-            const response = await fetch(`${API_BASE_URL}/analyze`, {
+            const response = await fetch(`${API_BASE_URL}/analyze-outfit`, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
             
             if (!response.ok) {
@@ -99,14 +102,16 @@ window.MishuraApp.utils.api = (function() {
                 images: images.map(img => img ? img.name : null),
                 occasion, 
                 preferences,
-                endpoint: `${API_BASE_URL}/compare`
+                endpoint: `${API_BASE_URL}/compare-outfits`
             });
             
             const formData = new FormData();
             
             images.forEach((image, index) => {
-                formData.append('images', image);
-                console.log(`📎 Добавлено изображение ${index + 1}: ${image.name}`);
+                if (image) {
+                    formData.append('images', image);
+                    console.log(`📎 Добавлено изображение ${index + 1}: ${image.name}`);
+                }
             });
             
             if (occasion) {
@@ -120,9 +125,12 @@ window.MishuraApp.utils.api = (function() {
             }
 
             // Реальный API запрос к серверу
-            const response = await fetch(`${API_BASE_URL}/compare`, {
+            const response = await fetch(`${API_BASE_URL}/compare-outfits`, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
             
             if (!response.ok) {
@@ -154,9 +162,12 @@ window.MishuraApp.utils.api = (function() {
     
     async function processCompareOutfits(formData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/compare`, {
+            const response = await fetch(`${API_BASE_URL}/compare-outfits`, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
             
             if (!response.ok) {

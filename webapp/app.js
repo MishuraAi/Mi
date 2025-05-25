@@ -1,276 +1,315 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Загрузчик приложения (app.js)
-ВЕРСИЯ: 0.4.5 (Улучшен вызов init модулей, настройка обработчиков кнопок)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-21
+КОМПОНЕНТ: Главное приложение (app.js)
+ВЕРСИЯ: 0.5.0 (Исправлены дублирования обработчиков, улучшена инициализация)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-25
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Загрузчик приложения, который инициализирует все модули в правильном порядке.
+Главный файл приложения, отвечающий за инициализацию всех модулей и координацию их работы.
 ==========================================================================================
 */
 
-document.addEventListener('DOMContentLoaded', function() {
-    'use strict';
-    
-    window.MishuraApp = window.MishuraApp || {};
-    ['utils', 'api', 'components', 'features'].forEach(ns => {
-        window.MishuraApp[ns] = window.MishuraApp[ns] || {};
-    });
-    
-    const appLoaderLogger = { 
-        debug: (...args) => console.debug("AppLoader:", ...args), 
-        info: (...args) => console.info("AppLoader:", ...args), 
-        warn: (...args) => console.warn("AppLoader:", ...args), 
-        error: (...args) => console.error("AppLoader:", ...args) 
-    };
-
-    function tryInitModule(modulePath, moduleFriendlyName) {
-        const parts = modulePath.split('.');
-        let moduleObject = window;
-        for (const part of parts) {
-            if (moduleObject && typeof moduleObject === 'object' && part in moduleObject) {
-                moduleObject = moduleObject[part];
-            } else {
-                appLoaderLogger.warn(`Модуль по пути '${modulePath}' не найден (ошибка на '${part}'). Инициализация ${moduleFriendlyName} пропускается.`);
-                return false;
-            }
-        }
-        
-        if (moduleObject && typeof moduleObject.init === 'function') {
-            try {
-                // Проверяем, есть ли флаг isInitialized и не был ли модуль уже инициализирован
-                if (typeof moduleObject.isInitialized === 'function' && moduleObject.isInitialized()) {
-                    appLoaderLogger.debug(`Модуль '${moduleFriendlyName}' (${modulePath}) уже был инициализирован. Повторный вызов init() пропускается.`);
-                    return true;
-                }
-                moduleObject.init(); 
-                // Логгер самого модуля должен сообщить об успехе.
-                // appLoaderLogger.info(`Модуль '${moduleFriendlyName}' (${modulePath}) вызвал init().`);
-                return true;
-            } catch (e) {
-                appLoaderLogger.error(`Ошибка при вызове init() для модуля '${moduleFriendlyName}' (${modulePath}):`, e.message, e.stack);
-                return false;
-            }
-        } else {
-            appLoaderLogger.warn(`Модуль '${moduleFriendlyName}' (${modulePath}) найден, но функция init отсутствует или не является функцией.`);
-            return false;
-        }
-    }
-
-    try {
-        appLoaderLogger.info("Инициализация приложения МИШУРА (v0.4.5)...");
-        
-        // Порядок важен!
-        tryInitModule('MishuraApp.config', 'Конфигурация');
-        tryInitModule('MishuraApp.utils.logger', 'Логгер');
-        
-        // Обновляем ссылку на логгер, если он был успешно инициализирован
-        const logger = (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.logger) 
-                        ? window.MishuraApp.utils.logger 
-                        : appLoaderLogger;
-
-        // Проверяем конфигурацию API после инициализации
-        if (window.MishuraApp.config) {
-            logger.info("Проверка конфигурации API:", {
-                apiUrl: window.MishuraApp.config.appSettings.apiUrl,
-                baseUrl: window.MishuraApp.config.apiSettings.baseUrl,
-                endpoints: window.MishuraApp.config.apiSettings.endpoints
-            });
-        } else {
-            logger.error("Конфигурация не найдена после инициализации!");
-        }
-
-        tryInitModule('MishuraApp.utils.deviceDetector', 'Определение устройства');
-        tryInitModule('MishuraApp.utils.uiHelpers', 'UI-хелперы');
-        
-        tryInitModule('MishuraApp.api.service', 'API-сервис'); 
-        
-        // Проверяем инициализацию API сервиса
-        if (window.MishuraApp.api && window.MishuraApp.api.service) {
-            logger.info("API сервис инициализирован:", {
-                isInitialized: window.MishuraApp.api.service.isInitialized ? window.MishuraApp.api.service.isInitialized() : 'метод не найден',
-                baseUrl: window.MishuraApp.api.service.getBaseUrl ? window.MishuraApp.api.service.getBaseUrl() : 'метод не найден'
-            });
-        } else {
-            logger.error("API сервис не найден после инициализации!");
-        }
-
-        tryInitModule('MishuraApp.components.navigation', 'Навигация');
-        tryInitModule('MishuraApp.components.modals', 'Модальные окна'); 
-        tryInitModule('MishuraApp.components.imageUpload', 'Загрузка изображений');
-        
-        tryInitModule('MishuraApp.features.consultation', 'Консультации');
-        tryInitModule('MishuraApp.features.comparison', 'Сравнение образов');
-        
-        tryInitModule('MishuraApp.main', 'Основной модуль'); 
-        
-        // Настройка обработчиков кнопок ПОСЛЕ инициализации всех модулей
-        setupGlobalButtonHandlers(logger);
-
-        logger.info("Инициализация всех модулей приложения МИШУРА успешно завершена.");
-        
-    } catch (error) {
-        appLoaderLogger.error("Критическая ошибка на верхнем уровне инициализации приложения МИШУРА:", error.message, error.stack);
-        const uiHelpers = window.MishuraApp.utils.uiHelpers;
-        if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-            uiHelpers.showToast('Критическая ошибка при запуске. Обновите страницу.', 5000);
-        } else {
-            alert('Произошла критическая ошибка при запуске приложения. Пожалуйста, обновите страницу.');
-        }
-    }
-});
-
-/**
- * Настройка обработчиков для глобальных кнопок, инициирующих открытие модальных окон.
- */
-function setupGlobalButtonHandlers(loggerInstance) {
-    const logger = loggerInstance || console;
-    logger.debug("App.js: Настройка обработчиков глобальных кнопок...");
-
-    const modals = window.MishuraApp.components.modals;
-    const consultationFeature = window.MishuraApp.features.consultation;
-    const uiHelpers = window.MishuraApp.utils.uiHelpers;
-
-    if (!modals) {
-        logger.error("App.js: Модуль modals не найден! Обработчики кнопок не могут быть настроены корректно.");
-        if (uiHelpers) uiHelpers.showToast("Ошибка интерфейса: функции модальных окон недоступны (A02).");
-        return;
-    }
-
-    // Проверяем инициализацию модуля консультаций
-    if (!consultationFeature) {
-        logger.error("App.js: Модуль consultation не найден! Функция консультаций недоступна.");
-        if (uiHelpers) uiHelpers.showToast("Ошибка: функция консультаций недоступна (A04).");
-        return;
-    }
-
-    // Проверяем инициализацию API сервиса
-    if (!window.MishuraApp.api || !window.MishuraApp.api.service) {
-        logger.error("App.js: API сервис не найден! Запросы не будут работать.");
-        if (uiHelpers) uiHelpers.showToast("Ошибка: API сервис недоступен (A05).");
-        return;
-    }
-
-    // Кнопка "Получить консультацию" (ID: consultation-button)
-    const consultationButton = document.getElementById('consultation-button');
-    if (consultationButton) {
-        // Удаляем старые обработчики, если есть (через клонирование)
-        const newConsultationButton = consultationButton.cloneNode(true);
-        consultationButton.parentNode.replaceChild(newConsultationButton, consultationButton);
-
-        newConsultationButton.addEventListener('click', function() {
-            logger.debug("App.js: Кнопка 'consultation-button' нажата.");
-            if (consultationFeature && typeof consultationFeature.openConsultationModal === 'function') {
-                consultationFeature.openConsultationModal(); // Делегируем открытие модулю consultation
-            } else if (typeof modals.openConsultationModal === 'function') { // Фоллбэк на прямое открытие через modals
-                logger.warn("App.js: consultationFeature.openConsultationModal не найден, используем modals.openConsultationModal().");
-                modals.openConsultationModal();
-            } else {
-                logger.error("App.js: Не найден метод для открытия модального окна консультации!");
-                if (uiHelpers) uiHelpers.showToast("Функция консультации временно недоступна (A03).");
-            }
-        });
-        logger.info("App.js: Обработчик для 'consultation-button' назначен.");
-    } else {
-        logger.warn("App.js: Кнопка 'consultation-button' не найдена в DOM.");
-    }
-
-    // Плавающая кнопка (FAB) (ID: fab-button)
-    const fabButton = document.getElementById('fab-button');
-    if (fabButton) {
-        const newFabButton = fabButton.cloneNode(true);
-        fabButton.parentNode.replaceChild(newFabButton, fabButton);
-
-        newFabButton.addEventListener('click', function() {
-            logger.debug("App.js: Кнопка 'fab-button' (FAB) нажата.");
-            if (consultationFeature && typeof consultationFeature.openConsultationModal === 'function') {
-                 consultationFeature.openConsultationModal();
-            } else if (typeof modals.openConsultationModal === 'function') {
-                logger.warn("App.js: consultationFeature.openConsultationModal не найден для FAB, используем modals.openConsultationModal().");
-                modals.openConsultationModal();
-            } else {
-                 logger.error("App.js: Не найден метод для открытия модального окна консультации через FAB!");
-                 if (uiHelpers) uiHelpers.showToast("Функция консультации временно недоступна (A05).");
-            }
-        });
-        logger.info("App.js: Обработчик для 'fab-button' назначен.");
-    } else {
-        logger.warn("App.js: Кнопка 'fab-button' не найдена в DOM.");
-    }
-    logger.debug("App.js: Настройка обработчиков глобальных кнопок завершена.");
-}
-
 window.MishuraApp = window.MishuraApp || {};
+
 window.MishuraApp.app = (function() {
     'use strict';
     
     let logger;
-    let currentPage = 'home';
+    let uiHelpers;
+    let apiService;
+    let modals;
+    let consultation;
+    let comparison;
+    let imageUpload;
+    let isAppInitialized = false;
     
     function init() {
-        logger = window.MishuraApp.utils.logger;
-        logger.debug('Инициализация главного модуля приложения');
-        
-        // Проверяем наличие всех необходимых модулей
-        if (!window.MishuraApp.components) {
-            logger.error('MishuraApp.components не инициализирован');
+        if (isAppInitialized) {
+            console.warn('App уже инициализирован, пропускаем повторную инициализацию');
             return;
         }
+
+        console.log('🚀 Начало инициализации приложения МИШУРА');
         
-        if (!window.MishuraApp.components.modals) {
-            logger.error('MishuraApp.components.modals не инициализирован');
-            return;
-        }
+        // Инициализация базовых модулей в правильном порядке
+        initializeLogger();
+        initializeUIHelpers();
+        initializeAPIService();
+        initializeModals();
+        initializeImageUpload();
+        initializeConsultation();
+        initializeComparison();
         
-        if (!window.MishuraApp.features) {
-            logger.error('MishuraApp.features не инициализирован');
-            return;
-        }
-        
-        if (!window.MishuraApp.features.consultation) {
-            logger.error('MishuraApp.features.consultation не инициализирован');
-            return;
-        }
-        
-        setupEventListeners();
+        // Настройка обработчиков событий
+        setupEventHandlers();
         setupNavigation();
         
+        isAppInitialized = true;
         logger.info('Главный модуль приложения успешно инициализирован');
     }
     
-    function setupEventListeners() {
-        // Обработчик кнопки консультации
-        const consultationButton = document.getElementById('consultation-button');
-        if (consultationButton) {
-            logger.debug('Найден элемент consultation-button, добавляю обработчик');
-            consultationButton.addEventListener('click', function() {
-                logger.debug('Кнопка консультации нажата');
-                if (window.MishuraApp.features.consultation && 
-                    typeof window.MishuraApp.features.consultation.openConsultationModal === 'function') {
-                    window.MishuraApp.features.consultation.openConsultationModal();
-                } else {
-                    logger.error('Модуль консультации не инициализирован или метод openConsultationModal не найден');
-                }
-            });
+    function initializeLogger() {
+        if (window.MishuraApp.utils && window.MishuraApp.utils.logger) {
+            logger = window.MishuraApp.utils.logger;
+            if (typeof logger.init === 'function') {
+                logger.init();
+            }
         } else {
-            logger.warn('Элемент consultation-button не найден в DOM');
+            logger = console;
+            console.warn('Logger не найден, используется console');
         }
-        
-        // Обработчики навигации
-        const navItems = document.querySelectorAll('.nav-item');
-        navItems.forEach(item => {
-            item.addEventListener('click', function(e) {
-                e.preventDefault();
-                const page = this.dataset.page;
-                if (page && page !== currentPage) {
-                    navigateTo(page);
-                }
-            });
-        });
     }
     
-    // ... existing code ...
+    function initializeUIHelpers() {
+        if (window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
+            uiHelpers = window.MishuraApp.utils.uiHelpers;
+            if (typeof uiHelpers.init === 'function') {
+                uiHelpers.init();
+            }
+            logger.debug('UI Helpers инициализированы');
+        } else {
+            logger.error('UI Helpers не найдены');
+        }
+    }
     
-    return { init };
+    function initializeAPIService() {
+        if (window.MishuraApp.utils && window.MishuraApp.utils.api) {
+            apiService = window.MishuraApp.utils.api;
+            if (typeof apiService.init === 'function') {
+                apiService.init();
+            }
+            logger.debug('API Service инициализирован');
+        } else {
+            logger.error('API Service не найден');
+        }
+    }
+    
+    function initializeModals() {
+        if (window.MishuraApp.components && window.MishuraApp.components.modals) {
+            modals = window.MishuraApp.components.modals;
+            if (typeof modals.init === 'function') {
+                modals.init();
+            }
+            logger.debug('Modals инициализированы');
+        } else {
+            logger.error('Modals не найдены');
+        }
+    }
+    
+    function initializeImageUpload() {
+        if (window.MishuraApp.components && window.MishuraApp.components.imageUpload) {
+            imageUpload = window.MishuraApp.components.imageUpload;
+            if (typeof imageUpload.init === 'function') {
+                imageUpload.init();
+            }
+            logger.debug('Image Upload инициализирован');
+        } else {
+            logger.error('Image Upload не найден');
+        }
+    }
+    
+    function initializeConsultation() {
+        if (window.MishuraApp.features && window.MishuraApp.features.consultation) {
+            consultation = window.MishuraApp.features.consultation;
+            if (typeof consultation.init === 'function') {
+                consultation.init();
+            }
+            logger.debug('Consultation инициализирован');
+        } else {
+            logger.error('Consultation не найден');
+        }
+    }
+    
+    function initializeComparison() {
+        if (window.MishuraApp.features && window.MishuraApp.features.comparison) {
+            comparison = window.MishuraApp.features.comparison;
+            if (typeof comparison.init === 'function') {
+                comparison.init();
+            }
+            logger.debug('Comparison инициализирован');
+        } else {
+            logger.error('Comparison не найден');
+        }
+    }
+    
+    function setModalMode(mode) {
+        logger.debug(`Установка режима модального окна: ${mode}`);
+        
+        const singleMode = document.getElementById('single-analysis-mode');
+        const compareMode = document.getElementById('compare-analysis-mode');
+        const dialogTitle = document.getElementById('consultation-dialog-title');
+        const dialogSubtitle = document.querySelector('#consultation-overlay .dialog-subtitle');
+        
+        if (mode === 'single') {
+            if (singleMode) singleMode.classList.remove('hidden');
+            if (compareMode) compareMode.classList.add('hidden');
+            if (dialogTitle) dialogTitle.textContent = 'Получить консультацию';
+            if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите фото одежды для анализа';
+        } else if (mode === 'compare') {
+            if (singleMode) singleMode.classList.add('hidden');
+            if (compareMode) compareMode.classList.remove('hidden');
+            if (dialogTitle) dialogTitle.textContent = 'Сравнить образы';
+            if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите от 2 до 4 фотографий для сравнения';
+        }
+        
+        // Отправляем событие для других модулей
+        document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
+        logger.debug(`Режим ${mode} установлен и событие отправлено`);
+    }
+    
+    function setupEventHandlers() {
+        logger.debug('Настройка обработчиков событий');
+        
+        // Обработчик для кнопки консультации (режим single)
+        const consultationButton = document.querySelector('.consultation-button');
+        if (consultationButton) {
+            // Удаляем все старые обработчики
+            const newButton = consultationButton.cloneNode(true);
+            consultationButton.parentNode.replaceChild(newButton, consultationButton);
+            
+            newButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                logger.debug('Нажата кнопка консультации (single mode)');
+                if (consultation && typeof consultation.openConsultationModal === 'function') {
+                    consultation.openConsultationModal();
+                    // Устанавливаем режим single с небольшой задержкой
+                    setTimeout(() => setModalMode('single'), 50);
+                } else {
+                    logger.error('Consultation module не найден');
+                }
+            });
+            
+            logger.debug('Обработчик для кнопки консультации настроен');
+        } else {
+            logger.warn('Кнопка консультации не найдена');
+        }
+        
+        // Обработчик для кнопки сравнения образов (режим compare)
+        const compareButton = document.querySelector('.compare-button');
+        if (compareButton) {
+            // Удаляем все старые обработчики
+            const newCompareButton = compareButton.cloneNode(true);
+            compareButton.parentNode.replaceChild(newCompareButton, compareButton);
+            
+            newCompareButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                logger.debug('Нажата кнопка сравнения образов (compare mode)');
+                if (consultation && typeof consultation.openConsultationModal === 'function') {
+                    consultation.openConsultationModal();
+                    // Устанавливаем режим compare с небольшой задержкой
+                    setTimeout(() => setModalMode('compare'), 50);
+                } else {
+                    logger.error('Consultation module не найден');
+                }
+            });
+            
+            logger.debug('Обработчик для кнопки сравнения настроен');
+        } else {
+            logger.warn('Кнопка сравнения образов не найдена');
+        }
+    }
+    
+    function setupNavigation() {
+        logger.debug('Настройка навигации');
+        
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            // Удаляем старые обработчики через клонирование
+            const newItem = item.cloneNode(true);
+            item.parentNode.replaceChild(newItem, item);
+            
+            newItem.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = this.dataset.page;
+                logger.debug(`Переход на страницу: ${page}`);
+                
+                // Скрываем все секции
+                document.querySelectorAll('.content-section').forEach(section => {
+                    section.classList.add('hidden');
+                });
+                
+                // Показываем выбранную секцию
+                const targetSection = document.getElementById(`${page}-section`);
+                if (targetSection) {
+                    targetSection.classList.remove('hidden');
+                } else {
+                    // Если секция не найдена, показываем главную
+                    const homeSection = document.getElementById('home-section');
+                    if (homeSection) {
+                        homeSection.classList.remove('hidden');
+                    }
+                    logger.warn(`Секция ${page}-section не найдена`);
+                }
+                
+                // Обновляем активный элемент навигации
+                document.querySelectorAll('.nav-item').forEach(navItem => navItem.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Убеждаемся, что навигация видна
+                const navBar = document.querySelector('.nav-bar');
+                if (navBar) {
+                    navBar.style.display = 'flex';
+                    navBar.style.visibility = 'visible';
+                }
+
+                // Уведомляем другие модули о смене страницы
+                document.dispatchEvent(new CustomEvent('navigationChanged', { 
+                    detail: { page: page } 
+                }));
+            });
+        });
+        
+        logger.debug('Навигация настроена');
+    }
+    
+    return {
+        init,
+        setModalMode
+    };
 })();
+
+// Инициализация при загрузке DOM
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🌟 DOM загружен, запуск МИШУРА');
+    
+    // Показываем страницу после небольшой задержки
+    setTimeout(() => {
+        document.body.classList.add('loaded');
+    }, 100);
+
+    // Инициализируем приложение
+    if (window.MishuraApp && window.MishuraApp.app) {
+        window.MishuraApp.app.init();
+    } else {
+        console.error('МИШУРА App не найден!');
+    }
+
+    // Эффекты для карточек
+    const featureCards = document.querySelectorAll('.feature-card, .main-button');
+    featureCards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            card.classList.add('shimmer-effect');
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            card.classList.remove('shimmer-effect');
+        });
+    });
+
+    // Плавная прокрутка для якорных ссылок
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            const href = this.getAttribute('href');
+            if (href && href !== '#' && href.length > 1) {
+                e.preventDefault();
+                const target = document.querySelector(href);
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        });
+    });
+});

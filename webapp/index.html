@@ -9,9 +9,18 @@
     <title>МИШУРА - Ваш персональный стилист</title>
     <link rel="icon" type="image/svg+xml" href="images/single-mode-icon.svg">
     <link rel="icon" type="image/png" href="images/single-mode-icon.svg">
-    <!-- Обновленные пути к стилям -->
     <link rel="stylesheet" href="css/styles.css">
-        <style>        /* Предотвращение FOUC (Flash Of Unstyled Content) */        body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }        body.loaded { display: flex; opacity: 1; } /* display: flex для phone-container */        /* Предотвращаем FOUC */        .hidden { display: none; }                /* Исправление для кнопки удаления изображений - ПРИОРИТЕТНОЕ */        .image-slot .delete-image {            z-index: 15 !important;            pointer-events: auto !important;        }    </style>
+    <style>
+        /* Предотвращение FOUC (Flash Of Unstyled Content) */
+        body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }
+        body.loaded { display: flex; opacity: 1; }
+        .hidden { display: none; }
+        /* Исправление для кнопки удаления изображений */
+        .image-slot .delete-image {
+            z-index: 15 !important;
+            pointer-events: auto !important;
+        }
+    </style>
 </head>
 <body>
     <div class="phone-container">
@@ -31,7 +40,7 @@
                 <!-- Главная страница -->
                 <div id="home-section" class="content-section">
                     <div class="main-buttons">
-                        <button class="main-button consultation-button">
+                        <button class="main-button" id="consultation-button">
                             <div class="main-button-icon">
                                 <svg class="heart-icon" viewBox="0 0 24 24">
                                     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
@@ -41,7 +50,7 @@
                             <div class="main-button-description">Получите персональные рекомендации от вашего стилиста</div>
                         </button>
                         
-                        <button class="main-button compare-button">
+                        <button class="main-button" id="compare-button">
                             <div class="main-button-icon">
                                 <svg class="compare-icon" viewBox="0 0 24 24">
                                     <path d="M9 3H7v2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h2v2h2V3zm0 6H7v6h2V9zm4-6h2v2h2c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2h-2v2h-2V3zm0 6h2v6h-2V9z"/>
@@ -123,19 +132,173 @@
                             <label for="compare-preferences-input" class="input-label">Ваши предпочтения:</label>
                             <textarea class="preferences-input" id="compare-preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
                             
-                                                        <button class="btn btn-primary" id="compare-submit" type="button">Сравнить образы</button>                        </div>                    </div>                </div>                <!-- Баланс -->                <div id="balance-section" class="content-section hidden">                    <div class="balance-container">                        <div class="balance-header">                            <h2 class="balance-title">Баланс консультаций</h2>                            <div class="current-balance">                                <span class="balance-label">Доступно консультаций:</span>                                <span class="balance-value" id="balance-value">0</span>                            </div>                        </div>                                                <div class="balance-content">                            <div class="balance-card">                                <h3 class="card-title">Пополнить баланс</h3>                                <div class="payment-options">                                    <button class="payment-btn card-payment" data-method="card">                                        <div class="payment-icon">                                            <svg viewBox="0 0 24 24">                                                <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>                                            </svg>                                        </div>                                        <span>Банковская карта</span>                                    </button>                                    <button class="payment-btn crypto-payment" data-method="crypto">                                        <div class="payment-icon">                                            <svg viewBox="0 0 24 24">                                                <path d="M17.06 11.57l.59-.59.59.59c1.56 1.56 1.56 4.09 0 5.66l-.59.59-.59-.59c-1.56-1.56-1.56-4.1 0-5.66zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zm-7 8L12 13.5 15.5 16 12 18.5 8.5 16z"/>                                            </svg>                                        </div>                                        <span>Криптовалюта</span>                                    </button>                                </div>                            </div>                                                        <div class="balance-card">                                <h3 class="card-title">Реферальная программа</h3>                                <div class="referral-section">                                    <div class="referral-input-group">                                        <input type="text" id="referral-code-input" class="referral-input" placeholder="Введите реферальный код">                                        <button class="btn btn-secondary" id="apply-referral">Применить</button>                                    </div>                                    <div class="referral-info">                                        <p>Ваш реферальный код: <strong id="user-referral-code">LOADING...</strong></p>                                        <p class="referral-description">Поделитесь кодом с друзьями и получите бонусные консультации!</p>                                    </div>                                </div>                            </div>                                                        <div class="balance-card">                                <h3 class="card-title">История транзакций</h3>                                <div class="transaction-history" id="transaction-history">                                    <div class="transaction-item">                                        <span class="transaction-type">Пополнение</span>                                        <span class="transaction-amount">+5</span>                                        <span class="transaction-date">24.05.2025</span>                                    </div>                                    <div class="transaction-item">                                        <span class="transaction-type">Консультация</span>                                        <span class="transaction-amount">-1</span>                                        <span class="transaction-date">23.05.2025</span>                                    </div>                                </div>                            </div>                        </div>                    </div>                </div>                <!-- Гардероб -->                <div id="wardrobe-section" class="content-section hidden">                    <div class="wardrobe-container">                        <div class="wardrobe-header">                            <h2 class="wardrobe-title">Мой гардероб</h2>                            <button class="btn btn-primary" id="add-wardrobe-item">                                <svg viewBox="0 0 24 24">                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>                                </svg>                                Добавить предмет                            </button>                        </div>                                                <div class="wardrobe-content">                            <div class="wardrobe-filters">                                <select class="wardrobe-filter" id="wardrobe-category-filter">                                    <option value="">Все категории</option>                                    <option value="верх">Верхняя одежда</option>                                    <option value="низ">Нижняя одежда</option>                                    <option value="обувь">Обувь</option>                                    <option value="аксессуары">Аксессуары</option>                                </select>                                <input type="text" class="wardrobe-search" id="wardrobe-search" placeholder="Поиск по названию...">                            </div>                                                        <div class="wardrobe-grid" id="wardrobe-grid">                                <!-- Здесь будут динамически добавляться предметы гардероба -->                                <div class="wardrobe-item-placeholder">                                    <div class="placeholder-icon">                                        <svg viewBox="0 0 24 24">                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>                                        </svg>                                    </div>                                    <p>Ваш гардероб пуст</p>                                    <p class="placeholder-subtitle">Добавьте первый предмет одежды</p>                                </div>                            </div>                        </div>                    </div>                </div>            </main>            <nav class="nav-bar">                <a href="#" class="nav-item active" data-page="home">                    <div class="nav-icon">                        <svg viewBox="0 0 24 24">                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>                        </svg>                    </div>                    <span class="nav-label">Главная</span>                </a>                <a href="#" class="nav-item" data-page="history">                    <div class="nav-icon">                        <svg viewBox="0 0 24 24">                            <path d="M13 3c-4.97 0-9 4.03-9 9H1l4 3.99L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.25 2.52.77-1.28-3.52-2.09V8z"/>                        </svg>                    </div>                    <span class="nav-label">История</span>                </a>                <a href="#" class="nav-item" data-page="balance">                    <div class="nav-icon">                        <svg viewBox="0 0 24 24">                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"/>                        </svg>                    </div>                    <span class="nav-label">Баланс</span>                </a>                <a href="#" class="nav-item" data-page="wardrobe">                    <div class="nav-icon">                        <svg viewBox="0 0 24 24">                            <path d="M22 2v20l-6-6-6 6-6-6-6 6V2h24zm-11 5H7v2h4V7zm6 0h-4v2h4V7zm-6 4H7v2h4v-2zm6 0h-4v2h4v-2z"/>                        </svg>                    </div>                    <span class="nav-label">Гардероб</span>                </a>            </nav>
-        </div> </div> <div class="overlay" id="consultation-overlay" role="dialog" aria-labelledby="consultation-dialog-title" aria-modal="true">
+                            <button class="btn btn-primary" id="compare-submit" type="button">Сравнить образы</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Баланс -->
+                <div id="balance-section" class="content-section hidden">
+                    <div class="balance-container">
+                        <div class="balance-header">
+                            <h2 class="balance-title">Баланс консультаций</h2>
+                            <div class="current-balance">
+                                <span class="balance-label">Доступно консультаций:</span>
+                                <span class="balance-value" id="balance-value">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="balance-content">
+                            <div class="balance-card">
+                                <h3 class="card-title">Пополнить баланс</h3>
+                                <div class="payment-options">
+                                    <button class="payment-btn card-payment" data-method="card">
+                                        <div class="payment-icon">
+                                            <svg viewBox="0 0 24 24">
+                                                <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                                            </svg>
+                                        </div>
+                                        <span>Банковская карта</span>
+                                    </button>
+                                    <button class="payment-btn crypto-payment" data-method="crypto">
+                                        <div class="payment-icon">
+                                            <svg viewBox="0 0 24 24">
+                                                <path d="M17.06 11.57l.59-.59.59.59c1.56 1.56 1.56 4.09 0 5.66l-.59.59-.59-.59c-1.56-1.56-1.56-4.1 0-5.66zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zm-7 8L12 13.5 15.5 16 12 18.5 8.5 16z"/>
+                                            </svg>
+                                        </div>
+                                        <span>Криптовалюта</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="balance-card">
+                                <h3 class="card-title">Реферальная программа</h3>
+                                <div class="referral-section">
+                                    <div class="referral-input-group">
+                                        <input type="text" id="referral-code-input" class="referral-input" placeholder="Введите реферальный код">
+                                        <button class="btn btn-secondary" id="apply-referral">Применить</button>
+                                    </div>
+                                    <div class="referral-info">
+                                        <p>Ваш реферальный код: <strong id="user-referral-code">LOADING...</strong></p>
+                                        <p class="referral-description">Поделитесь кодом с друзьями и получите бонусные консультации!</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="balance-card">
+                                <h3 class="card-title">История транзакций</h3>
+                                <div class="transaction-history" id="transaction-history">
+                                    <div class="transaction-item">
+                                        <span class="transaction-type">Пополнение</span>
+                                        <span class="transaction-amount">+5</span>
+                                        <span class="transaction-date">24.05.2025</span>
+                                    </div>
+                                    <div class="transaction-item">
+                                        <span class="transaction-type">Консультация</span>
+                                        <span class="transaction-amount">-1</span>
+                                        <span class="transaction-date">23.05.2025</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Гардероб -->
+                <div id="wardrobe-section" class="content-section hidden">
+                    <div class="wardrobe-container">
+                        <div class="wardrobe-header">
+                            <h2 class="wardrobe-title">Мой гардероб</h2>
+                            <button class="btn btn-primary" id="add-wardrobe-item">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                Добавить предмет
+                            </button>
+                        </div>
+                        
+                        <div class="wardrobe-content">
+                            <div class="wardrobe-filters">
+                                <select class="wardrobe-filter" id="wardrobe-category-filter">
+                                    <option value="">Все категории</option>
+                                    <option value="верх">Верхняя одежда</option>
+                                    <option value="низ">Нижняя одежда</option>
+                                    <option value="обувь">Обувь</option>
+                                    <option value="аксессуары">Аксессуары</option>
+                                </select>
+                                <input type="text" class="wardrobe-search" id="wardrobe-search" placeholder="Поиск по названию...">
+                            </div>
+                            
+                            <div class="wardrobe-grid" id="wardrobe-grid">
+                                <!-- Здесь будут динамически добавляться предметы гардероба -->
+                                <div class="wardrobe-item-placeholder">
+                                    <div class="placeholder-icon">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                                        </svg>
+                                    </div>
+                                    <p>Ваш гардероб пуст</p>
+                                    <p class="placeholder-subtitle">Добавьте первый предмет одежды</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <nav class="nav-bar">
+                <a href="#" class="nav-item active" data-page="home">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">Главная</span>
+                </a>
+                <a href="#" class="nav-item" data-page="history">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M13 3c-4.97 0-9 4.03-9 9H1l4 3.99L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.25 2.52.77-1.28-3.52-2.09V8z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">История</span>
+                </a>
+                <a href="#" class="nav-item" data-page="balance">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">Баланс</span>
+                </a>
+                <a href="#" class="nav-item" data-page="wardrobe">
+                    <div class="nav-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M22 2v20l-6-6-6 6-6-6-6 6V2h24zm-11 5H7v2h4V7zm6 0h-4v2h4V7zm-6 4H7v2h4v-2zm6 0h-4v2h4v-2z"/>
+                        </svg>
+                    </div>
+                    <span class="nav-label">Гардероб</span>
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div class="overlay" id="consultation-overlay" role="dialog" aria-labelledby="consultation-dialog-title" aria-modal="true">
         <div class="dialog">
             <div class="dialog-header">
                 <div class="dialog-title" id="consultation-dialog-title">Получить консультацию</div>
                 <div class="dialog-subtitle">Загрузите фото одежды для анализа</div>
             </div>
             <div class="dialog-content">
-                <!-- Добавляем форму консультации с id -->
                 <form id="consultation-form">
                     <div id="single-analysis-mode" class="analysis-mode" role="tabpanel">
                         <div class="upload-area" id="single-upload-area" role="button" tabindex="0" aria-label="Загрузить одно фото">
-                            <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
+                            <div class="upload-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="36" height="36">
+                                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                </svg>
+                            </div>
                             <div class="upload-text">Нажмите, чтобы выбрать фото<br>или перетащите файл сюда</div>
                             <input type="file" id="single-upload-input" class="upload-input" accept="image/*">
                         </div>
@@ -144,33 +307,42 @@
                             <div class="delete-image" data-target="single" role="button" tabindex="0" aria-label="Удалить изображение">✕</div>
                         </div>
                     </div>
+
                     <div id="compare-analysis-mode" class="analysis-mode hidden" role="tabpanel">
                         <div class="compare-container">
                             <div class="image-slots" aria-label="Слоты для сравнения изображений">
                                 <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения">
                                     <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 1">
                                     <input type="file" class="compare-upload-input" accept="image/*" data-slot="0">
                                 </div>
                                 <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
                                     <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 2">
                                     <input type="file" class="compare-upload-input" accept="image/*" data-slot="1">
                                 </div>
                                 <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
                                     <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 3">
                                     <input type="file" class="compare-upload-input" accept="image/*" data-slot="2">
                                 </div>
                                 <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
                                     <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24"><use href="#upload-svg-icon"></use></svg>
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 4">
                                     <input type="file" class="compare-upload-input" accept="image/*" data-slot="3">
@@ -179,13 +351,20 @@
                             <div class="upload-text">Загрузите от 2 до 4 фотографий для сравнения</div>
                         </div>
                     </div>
+
                     <label for="occasion-selector" class="input-label hidden">Выберите повод:</label>
                     <select class="occasion-selector" id="occasion-selector" aria-label="Выберите повод">
-                        <option value="повседневный">Повседневный</option> <option value="деловой">Деловой</option> <option value="вечеринка">Вечеринка</option> <option value="свидание">Свидание</option> <option value="спорт">Спорт/Активный отдых</option> <option value="особый случай">Особый случай</option>
+                        <option value="повседневный">Повседневный</option>
+                        <option value="деловой">Деловой</option>
+                        <option value="вечеринка">Вечеринка</option>
+                        <option value="свидание">Свидание</option>
+                        <option value="спорт">Спорт/Активный отдых</option>
+                        <option value="особый случай">Особый случай</option>
                     </select>
+
                     <label for="preferences-input" class="input-label hidden">Ваши предпочтения:</label>
                     <textarea class="preferences-input" id="preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
-                    <!-- Добавляем кнопку отправки формы с id submit-consultation -->
+
                     <div class="dialog-footer">
                         <button class="btn btn-primary" id="submit-consultation" type="submit">Проанализировать</button>
                         <button class="btn btn-secondary" id="consultation-cancel" type="button">Отмена</button>
@@ -197,80 +376,12 @@
 
     <div class="overlay" id="results-overlay" role="dialog" aria-labelledby="results-dialog-title" aria-modal="true">
         <div class="dialog">
-            <div class="dialog-header"><div class="dialog-title" id="results-dialog-title">Результаты анализа от Мишуры</div></div>
+            <div class="dialog-header">
+                <div class="dialog-title" id="results-dialog-title">Результаты анализа от Мишуры</div>
+            </div>
             <div class="dialog-content" id="results-container" aria-live="polite"></div>
-            <div class="dialog-footer"><button class="btn btn-primary" id="results-close" role="button">Закрыть</button></div>
-        </div>
-    </div>
-    
-    <div class="overlay" id="try-on-overlay" role="dialog" aria-labelledby="tryon-dialog-title" aria-modal="true">
-        <div class="dialog">
-            <div class="dialog-header">
-                <div class="dialog-title" id="tryon-dialog-title">Виртуальная примерка</div>
-                <div class="dialog-subtitle">Эта функция находится в разработке</div>
-            </div>
-            <div class="dialog-content">
-                <!-- Добавляем индикатор загрузки -->
-                <div id="try-on-loading" class="loading-indicator" style="display: none;">
-                    <div class="spinner"></div>
-                    <div id="try-on-loading-text" class="loading-text">Проверка фото...</div>
-                </div>
-                <div class="try-on-container">
-                    <div class="upload-section">
-                        <div class="section-title">1. Ваше фото (в полный рост)</div>
-                        <div class="upload-area tryon-upload-area" id="your-photo-upload-area" role="button" tabindex="0" aria-label="Загрузить ваше фото">
-                            <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
-                            <div class="upload-text">Нажмите для выбора вашего фото<br>или перетащите файл сюда</div>
-                            <input type="file" id="your-photo-input" class="upload-input" accept="image/*">
-                        </div>
-                        <div class="image-preview-container" id="your-photo-container">
-                            <img id="your-photo-preview" class="image-preview" alt="Предпросмотр вашего фото">
-                            <div class="delete-image" data-target="your-photo" role="button" tabindex="0" aria-label="Удалить ваше фото">✕</div>
-                        </div>
-                    </div>
-                    <div class="upload-section">
-                        <div class="section-title">2. Фото предмета одежды/образа</div>
-                        <div class="upload-area tryon-upload-area" id="outfit-photo-upload-area" role="button" tabindex="0" aria-label="Загрузить фото одежды">
-                            <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="36" height="36"><use href="#upload-svg-icon"></use></svg></div>
-                            <div class="upload-text">Нажмите для выбора фото одежды<br>или перетащите файл сюда</div>
-                            <input type="file" id="outfit-photo-input" class="upload-input" accept="image/*">
-                        </div>
-                        <div class="image-preview-container" id="outfit-photo-container">
-                            <img id="outfit-photo-preview" class="image-preview" alt="Предпросмотр фото одежды">
-                            <div class="delete-image" data-target="outfit-photo" role="button" tabindex="0" aria-label="Удалить фото одежды">✕</div>
-                        </div>
-                    </div>
-                    <div class="upload-section">
-                        <label for="try-on-style-selector" class="input-label">Стиль примерки:</label>
-                        <select class="occasion-selector" id="try-on-style-selector" aria-label="Выберите стиль примерки">
-                            <option value="default">Стандартный</option>
-                            <option value="casual">Повседневный</option>
-                            <option value="business">Деловой</option>
-                            <option value="evening">Вечерний</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
             <div class="dialog-footer">
-                <button class="btn btn-primary" id="try-on-button-submit" role="button">Примерить</button>
-                <button class="btn btn-secondary" id="try-on-cancel" role="button">Отмена</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="overlay" id="try-on-result-overlay" role="dialog" aria-labelledby="tryon-result-dialog-title" aria-modal="true">
-        <div class="dialog">
-            <div class="dialog-header">
-                <div class="dialog-title" id="tryon-result-dialog-title">Результат примерки</div>
-                 <div class="dialog-subtitle">Эта функция в разработке</div>
-            </div>
-            <div class="dialog-content" id="try-on-result-container" aria-live="polite">
-                <img id="try-on-result-image" class="image-preview" alt="Результат виртуальной примерки (в разработке)">
-                 <div class="result-description">Здесь будет результат вашей виртуальной примерки.</div>
-            </div>
-            <div class="dialog-footer">
-                <button class="btn btn-primary" id="try-on-result-download" role="button">Скачать (в разработке)</button>
-                <button class="btn btn-secondary" id="try-on-result-close" role="button">Закрыть</button>
+                <button class="btn btn-primary" id="results-close" role="button">Закрыть</button>
             </div>
         </div>
     </div>
@@ -286,89 +397,99 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <!-- SVG иконки -->
-    <svg style="display: none;">
-        <symbol id="upload-svg-icon" viewBox="0 0 24 24">
-            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-        </symbol>
-    </svg>
-
-    <!-- Скрипты -->
+    <!-- Скрипты - загружаем в правильном порядке -->
+    <script src="js/config.js"></script>
     <script src="js/utils/logger.js"></script>
+    <script src="js/utils/device-detect.js"></script>
     <script src="js/utils/ui-helpers.js"></script>
     <script src="js/utils/api.js"></script>
     <script src="js/components/modals.js"></script>
+    <script src="js/components/navigation.js"></script>
     <script src="js/components/image-upload.js"></script>
     <script src="js/features/consultation.js"></script>
     <script src="js/features/comparison.js"></script>
     <script src="js/app.js"></script>
+
     <script>
-        // Инициализация приложения после загрузки DOM
+        // Единая инициализация приложения
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Начало инициализации МИШУРА');
+            
             // Показываем контент после загрузки
             document.body.classList.add('loaded');
             
-            // Инициализируем все модули
-            if (window.MishuraApp) {
-                // Инициализируем утилиты
-                if (window.MishuraApp.utils) {
+            // Инициализируем модули в правильном порядке
+            try {
+                // 1. Конфигурация
+                if (window.MishuraApp && window.MishuraApp.config) {
+                    window.MishuraApp.config.init();
+                    console.log('✅ Config инициализирован');
+                }
+                
+                // 2. Утилиты
+                if (window.MishuraApp && window.MishuraApp.utils) {
                     if (window.MishuraApp.utils.logger) {
                         window.MishuraApp.utils.logger.init();
+                        console.log('✅ Logger инициализирован');
+                    }
+                    if (window.MishuraApp.utils.deviceDetector) {
+                        window.MishuraApp.utils.deviceDetector.init();
+                        console.log('✅ DeviceDetector инициализирован');
                     }
                     if (window.MishuraApp.utils.uiHelpers) {
                         window.MishuraApp.utils.uiHelpers.init();
+                        console.log('✅ UIHelpers инициализирован');
                     }
                     if (window.MishuraApp.utils.api) {
                         window.MishuraApp.utils.api.init();
+                        console.log('✅ API инициализирован');
                     }
                 }
                 
-                // Инициализируем компоненты
-                if (window.MishuraApp.components) {
+                // 3. Компоненты
+                if (window.MishuraApp && window.MishuraApp.components) {
                     if (window.MishuraApp.components.modals) {
                         window.MishuraApp.components.modals.init();
-                    }
-                    if (window.MishuraApp.components.imageUpload) {
-                        window.MishuraApp.components.imageUpload.init();
+                        console.log('✅ Modals инициализирован');
                     }
                     if (window.MishuraApp.components.navigation) {
                         window.MishuraApp.components.navigation.init();
+                        console.log('✅ Navigation инициализирован');
+                    }
+                    if (window.MishuraApp.components.imageUpload) {
+                        window.MishuraApp.components.imageUpload.init();
+                        console.log('✅ ImageUpload инициализирован');
                     }
                 }
                 
-                // Инициализируем фичи
-                if (window.MishuraApp.features) {
+                // 4. Фичи
+                if (window.MishuraApp && window.MishuraApp.features) {
                     if (window.MishuraApp.features.consultation) {
                         window.MishuraApp.features.consultation.init();
+                        console.log('✅ Consultation инициализирован');
                     }
                     if (window.MishuraApp.features.comparison) {
                         window.MishuraApp.features.comparison.init();
+                        console.log('✅ Comparison инициализирован');
                     }
                 }
                 
-                // Инициализируем приложение
-                if (window.MishuraApp.app) {
+                // 5. Главное приложение
+                if (window.MishuraApp && window.MishuraApp.app) {
                     window.MishuraApp.app.init();
-                } else {
-                    console.error('MishuraApp.app не инициализирован');
+                    console.log('✅ App инициализирован');
                 }
-            } else {
-                console.error('MishuraApp не инициализирован');
-            }
-            
-            // Дополнительная отладка для страницы сравнения
-            setTimeout(() => {
-                const compareSection = document.getElementById('compare-section');
-                const compareSlots = document.querySelectorAll('#compare-section .image-slot');
-                console.log('DEBUG: compareSection =', compareSection);
-                console.log('DEBUG: compareSlots.length =', compareSlots.length);
                 
-                // Проверяем каждый слот
-                compareSlots.forEach((slot, index) => {
-                    const input = slot.querySelector('.compare-upload-input');
-                    console.log(`DEBUG: слот ${index}, input =`, input);
-                });
-            }, 1000);
+                console.log('🎉 МИШУРА полностью инициализирован');
+                
+            } catch (error) {
+                console.error('❌ Ошибка при инициализации МИШУРА:', error);
+                if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
+                    window.MishuraApp.utils.uiHelpers.showToast('Ошибка при запуске приложения. Обновите страницу.', 5000);
+                } else {
+                    alert('Произошла ошибка при запуске приложения. Пожалуйста, обновите страницу.');
+                }
+            }
         });
     </script>
 </body>

@@ -153,8 +153,32 @@ window.MishuraApp.components.imageUpload = (function() {
             }, 100);
         }
     }
+<<<<<<< HEAD
     
     function initSingleMode() {
+=======
+
+    function resetFileInput(inputElement) {
+        if (inputElement) {
+            try {
+                inputElement.value = "";
+                logger.debug(`ImageUpload: Инпут успешно сброшен`);
+            } catch (ex) {
+                logger.error(`ImageUpload: Ошибка при сбросе инпута:`, ex);
+            }
+        }
+    }
+
+    function isTelegramWebApp() {
+        return (
+            typeof window.Telegram !== 'undefined' &&
+            window.Telegram.WebApp &&
+            typeof window.Telegram.WebApp.showAttachmentMenu === 'function'
+        );
+    }
+
+    function initSingleImageUpload() {
+>>>>>>> 56565f00dd23f6b20eb16abb8700a1bd10c78b9c
         if (!singleUploadArea || !singleFileInput) {
             logger.warn("Single режим: элементы не найдены");
             return;
@@ -162,6 +186,7 @@ window.MishuraApp.components.imageUpload = (function() {
 
         logger.debug("Инициализация single режима");
         
+<<<<<<< HEAD
         // Удаляем старые обработчики
         singleUploadArea.onclick = null;
         singleFileInput.onchange = null;
@@ -178,6 +203,41 @@ window.MishuraApp.components.imageUpload = (function() {
             } catch (err) {
                 logger.error('Ошибка открытия диалога выбора файла:', err);
                 showToast('Ошибка открытия диалога выбора файла');
+=======
+        singleUploadArea.addEventListener('click', function(e) {
+            e.preventDefault();
+            logger.debug("ImageUpload (Single): Клик на область загрузки");
+            if (isTelegramWebApp()) {
+                try {
+                    window.Telegram.WebApp.showAttachmentMenu();
+                    window.Telegram.WebApp.onEvent('attachment', function(data) {
+                        if (data && data.files && data.files.length > 0 && data.files[0].url) {
+                            fetch(data.files[0].url)
+                                .then(res => res.blob())
+                                .then(blob => {
+                                    const file = new File([blob], 'photo.jpg', { type: blob.type });
+                                    handleSingleImageSelection(file);
+                                })
+                                .catch(() => {
+                                    if (uiHelpers) uiHelpers.showToast('Ошибка загрузки файла через Telegram');
+                                });
+                        } else {
+                            if (uiHelpers) uiHelpers.showToast('Файл не выбран');
+                        }
+                    });
+                } catch (err) {
+                    logger.error('Ошибка Telegram AttachmentMenu:', err);
+                    if (uiHelpers) uiHelpers.showToast('Ошибка загрузки через Telegram');
+                }
+            } else {
+                try {
+                    resetFileInput(singleFileInput);
+                    singleFileInput.click();
+                } catch (err) {
+                    logger.error('Ошибка открытия input type=file:', err);
+                    if (uiHelpers) uiHelpers.showToast('Ошибка открытия выбора файла');
+                }
+>>>>>>> 56565f00dd23f6b20eb16abb8700a1bd10c78b9c
             }
         });
         

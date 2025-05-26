@@ -104,6 +104,7 @@ window.MishuraApp.components.modals = (function() {
         
         // Показываем нужное модальное окно
         overlay.classList.add('active');
+        overlay.querySelector('.dialog')?.classList.add('active');
         document.body.classList.add('modal-open');
     }
     

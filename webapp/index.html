@@ -426,18 +426,6 @@
                 console.error('МИШУРА App не найден!');
             }
 
-            // Эффекты для карточек
-            const featureCards = document.querySelectorAll('.feature-card, .main-button');
-            featureCards.forEach(card => {
-                card.addEventListener('mouseenter', () => {
-                    card.classList.add('shimmer-effect');
-                });
-                
-                card.addEventListener('mouseleave', () => {
-                    card.classList.remove('shimmer-effect');
-                });
-            });
-
             // Плавная прокрутка для якорных ссылок
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
@@ -455,5 +443,8 @@
             });
         });
     </script>
+
+    <!-- Luxury gold shimmer -->
+    <div class="luxury-shimmer"></div>
 </body>
 </html>

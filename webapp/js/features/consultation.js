@@ -317,21 +317,13 @@ window.MishuraApp.features.consultation = (function() {
         }
     }
         
-    function renderConsultationResults(adviceText) { // Общий
-        if (!resultsContainer) return logger.warn("Consultation: resultsContainer не найден для отображения результатов.");
-        resultsContainer.innerHTML = ''; 
-        
-        if (uiHelpers && typeof uiHelpers.parseMarkdownToHtml === 'function') {
-            const parsedHtml = uiHelpers.parseMarkdownToHtml(adviceText);
-            resultsContainer.innerHTML = parsedHtml;
-            
-            // Добавляем обработчик для прокрутки к началу после рендеринга
-            setTimeout(() => {
-                resultsContainer.scrollTop = 0;
-            }, 100);
-        } else {
-            resultsContainer.innerHTML = adviceText; 
-            logger.warn("Consultation: uiHelpers.parseMarkdownToHtml не найден, результат вставлен как есть.");
+    function renderConsultationResults(adviceText) {
+        if (resultsContainer) {
+            resultsContainer.innerHTML = adviceText;
+            resultsContainer.classList.add('active');
+            if (window.MishuraApp && window.MishuraApp.app && typeof window.MishuraApp.app.activateLuxuryBlocks === 'function') {
+                window.MishuraApp.app.activateLuxuryBlocks();
+            }
         }
     }
     

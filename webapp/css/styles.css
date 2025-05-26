@@ -392,14 +392,61 @@ body {
    ================== */
 @media (max-width: 400px) {
     .phone-container {
-        width: 100%;
+        width: 100vw;
+        min-width: 0;
+        max-width: 100vw;
         height: 100vh;
         border-radius: 0;
         padding: 0;
     }
-    
     .app-container {
         border-radius: 0;
+        padding: 0;
+    }
+    .main-buttons {
+        max-width: 100vw;
+        width: 100vw;
+        padding: 0 4vw;
+    }
+    .main-button {
+        font-size: 15px;
+        padding: 16px 10px;
+        border-radius: 12px;
+        width: 100%;
+        min-width: 0;
+        margin-bottom: 12px;
+    }
+    .main-button-title {
+        font-size: 15px;
+    }
+    .main-button-description {
+        font-size: 11px;
+    }
+    .dialog {
+        width: 98vw;
+        max-width: 98vw;
+        padding: 10px;
+        border-radius: 10px;
+    }
+    .content-section {
+        padding: 10px 2vw;
+    }
+}
+@media (max-width: 350px) {
+    .main-button {
+        font-size: 13px;
+        padding: 10px 4px;
+        border-radius: 8px;
+    }
+    .main-button-title {
+        font-size: 13px;
+    }
+    .main-button-description {
+        font-size: 9px;
+    }
+    .dialog {
+        padding: 4px;
+        border-radius: 6px;
     }
 }
 
@@ -1777,6 +1824,7 @@ body.modal-open {
     margin-top: 16px;
 }
 
+<<<<<<< HEAD
 /* ==================
    МОБИЛЬНАЯ ОПТИМИЗАЦИЯ (фикс)
    ================== */
@@ -1866,4 +1914,61 @@ body.modal-open {
         width: 0 !important;
         background: transparent !important;
     }
+=======
+.content-section, .tip-card, .history-item, .balance-card, .results-container {
+    opacity: 0;
+    transform: translateY(40px) scale(0.98);
+    animation: luxuryFadeIn 0.7s cubic-bezier(.4,2,.3,1) forwards;
+}
+
+.content-section.active, .tip-card.active, .history-item.active, .balance-card.active, .results-container.active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+@keyframes luxuryFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(40px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.luxury-shimmer {
+    position: fixed;
+    top: 0; left: 0; right: 0; height: 6px;
+    background: linear-gradient(90deg, transparent, #D4AF37 40%, #fffbe6 50%, #D4AF37 60%, transparent);
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+    z-index: 1000;
+    box-shadow: 0 0 24px 8px #D4AF3744;
+    pointer-events: none;
+}
+
+.gold-accent, .main-button, .btn, .dialog, .balance-card, .tip-card, .history-item, .results-container {
+    box-shadow: 0 2px 24px 0 #D4AF3744, 0 0 0 2px #D4AF37 inset;
+    border-color: #D4AF37 !important;
+}
+
+.btn-primary, .main-button {
+    background: linear-gradient(90deg, #1A1A1A 0%, #222 60%, #D4AF37 100%);
+    color: #fff;
+    border: 1.5px solid #D4AF37;
+    box-shadow: 0 2px 24px 0 #D4AF3744, 0 0 0 2px #D4AF37 inset;
+    transition: box-shadow 0.3s, border-color 0.3s, background 0.3s;
+}
+
+.btn-primary:hover, .main-button:hover {
+    background: linear-gradient(90deg, #222 0%, #D4AF37 100%);
+    box-shadow: 0 4px 32px 0 #D4AF37AA, 0 0 0 2px #D4AF37 inset;
+    border-color: #FFD700;
+    color: #fffbe6;
+}
+
+.luxury-shimmer, .shimmer-effect {
+    pointer-events: none !important;
+>>>>>>> 56565f00dd23f6b20eb16abb8700a1bd10c78b9c
 }

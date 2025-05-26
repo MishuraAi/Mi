@@ -253,8 +253,31 @@ window.MishuraApp.app = (function() {
         logger.debug('Навигация настроена');
     }
     
+    function showSection(sectionId) {
+        document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active'));
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.classList.add('active');
+        }
+    }
+    
+    function activateLuxuryBlocks() {
+        document.querySelectorAll('.tip-card, .history-item, .balance-card, .results-container').forEach(el => {
+            if (!el.classList.contains('active')) {
+                setTimeout(() => el.classList.add('active'), 100);
+            }
+        });
+    }
+    
     return {
         init,
-        setModalMode
+        setModalMode,
+        activateLuxuryBlocks
     };
 })();
+
+window.addEventListener('DOMContentLoaded', () => {
+    if (window.MishuraApp && window.MishuraApp.app && typeof window.MishuraApp.app.activateLuxuryBlocks === 'function') {
+        window.MishuraApp.app.activateLuxuryBlocks();
+    }
+});

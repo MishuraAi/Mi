@@ -413,83 +413,46 @@
     <script>
         // Единая инициализация приложения
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Начало инициализации МИШУРА');
+            console.log('🚀 DOM загружен, запуск МИШУРА');
             
             // Показываем контент после загрузки
             document.body.classList.add('loaded');
             
-            // Инициализируем модули в правильном порядке
-            try {
-                // 1. Конфигурация
-                if (window.MishuraApp && window.MishuraApp.config) {
-                    window.MishuraApp.config.init();
-                    console.log('✅ Config инициализирован');
-                }
-                
-                // 2. Утилиты
-                if (window.MishuraApp && window.MishuraApp.utils) {
-                    if (window.MishuraApp.utils.logger) {
-                        window.MishuraApp.utils.logger.init();
-                        console.log('✅ Logger инициализирован');
-                    }
-                    if (window.MishuraApp.utils.deviceDetector) {
-                        window.MishuraApp.utils.deviceDetector.init();
-                        console.log('✅ DeviceDetector инициализирован');
-                    }
-                    if (window.MishuraApp.utils.uiHelpers) {
-                        window.MishuraApp.utils.uiHelpers.init();
-                        console.log('✅ UIHelpers инициализирован');
-                    }
-                    if (window.MishuraApp.utils.api) {
-                        window.MishuraApp.utils.api.init();
-                        console.log('✅ API инициализирован');
-                    }
-                }
-                
-                // 3. Компоненты
-                if (window.MishuraApp && window.MishuraApp.components) {
-                    if (window.MishuraApp.components.modals) {
-                        window.MishuraApp.components.modals.init();
-                        console.log('✅ Modals инициализирован');
-                    }
-                    if (window.MishuraApp.components.navigation) {
-                        window.MishuraApp.components.navigation.init();
-                        console.log('✅ Navigation инициализирован');
-                    }
-                    if (window.MishuraApp.components.imageUpload) {
-                        window.MishuraApp.components.imageUpload.init();
-                        console.log('✅ ImageUpload инициализирован');
-                    }
-                }
-                
-                // 4. Фичи
-                if (window.MishuraApp && window.MishuraApp.features) {
-                    if (window.MishuraApp.features.consultation) {
-                        window.MishuraApp.features.consultation.init();
-                        console.log('✅ Consultation инициализирован');
-                    }
-                    if (window.MishuraApp.features.comparison) {
-                        window.MishuraApp.features.comparison.init();
-                        console.log('✅ Comparison инициализирован');
-                    }
-                }
-                
-                // 5. Главное приложение
-                if (window.MishuraApp && window.MishuraApp.app) {
-                    window.MishuraApp.app.init();
-                    console.log('✅ App инициализирован');
-                }
-                
-                console.log('🎉 МИШУРА полностью инициализирован');
-                
-            } catch (error) {
-                console.error('❌ Ошибка при инициализации МИШУРА:', error);
-                if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
-                    window.MishuraApp.utils.uiHelpers.showToast('Ошибка при запуске приложения. Обновите страницу.', 5000);
-                } else {
-                    alert('Произошла ошибка при запуске приложения. Пожалуйста, обновите страницу.');
-                }
+            // Инициализируем приложение только один раз
+            if (window.MishuraApp && window.MishuraApp.app) {
+                window.MishuraApp.app.init();
+                console.log('🎉 МИШУРА инициализирован');
+            } else {
+                console.error('МИШУРА App не найден!');
             }
+
+            // Эффекты для карточек
+            const featureCards = document.querySelectorAll('.feature-card, .main-button');
+            featureCards.forEach(card => {
+                card.addEventListener('mouseenter', () => {
+                    card.classList.add('shimmer-effect');
+                });
+                
+                card.addEventListener('mouseleave', () => {
+                    card.classList.remove('shimmer-effect');
+                });
+            });
+
+            // Плавная прокрутка для якорных ссылок
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const href = this.getAttribute('href');
+                    if (href && href !== '#' && href.length > 1) {
+                        e.preventDefault();
+                        const target = document.querySelector(href);
+                        if (target) {
+                            target.scrollIntoView({
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+                });
+            });
         });
     </script>
 </body>

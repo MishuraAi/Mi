@@ -1,0 +1,13 @@
+@media (max-width: 600px) {
+  .consultation-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  .consultation-buttons button {
+    width: 90%;
+    max-width: 300px;
+  }
+}

@@ -587,3 +587,39 @@ if (singleUploadArea && singleFileInput) {
         singleFileInput.click();
     });
 }
+
+const singleUploadArea = document.getElementById('single-upload-area');
+const singleFileInput = document.getElementById('single-upload-input');
+
+if (singleUploadArea && singleFileInput) {
+    singleUploadArea.addEventListener('click', () => {
+        singleFileInput.click();
+    });
+}
+
+const singleUploadArea = document.getElementById('single-upload-area');
+const singleFileInput = document.getElementById('single-upload-input');
+
+if (singleUploadArea && singleFileInput) {
+    singleUploadArea.addEventListener('click', () => {
+        singleFileInput.click();
+    });
+}
+
+const singleUploadArea = document.getElementById('single-upload-area');
+const singleFileInput = document.getElementById('single-upload-input');
+
+if (singleUploadArea && singleFileInput) {
+    singleUploadArea.addEventListener('click', () => {
+        singleFileInput.click();
+    });
+}
+
+const singleUploadArea = document.getElementById('single-upload-area');
+const singleFileInput = document.getElementById('single-upload-input');
+
+if (singleUploadArea && singleFileInput) {
+    singleUploadArea.addEventListener('click', () => {
+        singleFileInput.click();
+    });
+}

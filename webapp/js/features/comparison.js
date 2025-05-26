@@ -355,6 +355,17 @@ if (!window.MishuraApp.features.comparison) {
             updateFormVisibility();
         }
         
+        function renderComparisonResults(resultText) {
+            const resultsContainer = document.getElementById('results-container');
+            if (resultsContainer) {
+                resultsContainer.innerHTML = resultText;
+                resultsContainer.classList.add('active');
+                if (window.MishuraApp && window.MishuraApp.app && typeof window.MishuraApp.app.activateLuxuryBlocks === 'function') {
+                    window.MishuraApp.app.activateLuxuryBlocks();
+                }
+            }
+        }
+        
         return {
             init,
             reset,

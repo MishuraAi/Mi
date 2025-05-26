@@ -1776,3 +1776,56 @@ body.modal-open {
     width: 100%;
     margin-top: 16px;
 }
+
+.content-section, .tip-card, .history-item, .balance-card, .results-container {
+    opacity: 0;
+    transform: translateY(40px) scale(0.98);
+    animation: luxuryFadeIn 0.7s cubic-bezier(.4,2,.3,1) forwards;
+}
+
+.content-section.active, .tip-card.active, .history-item.active, .balance-card.active, .results-container.active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+@keyframes luxuryFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(40px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.luxury-shimmer {
+    position: fixed;
+    top: 0; left: 0; right: 0; height: 6px;
+    background: linear-gradient(90deg, transparent, #D4AF37 40%, #fffbe6 50%, #D4AF37 60%, transparent);
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+    z-index: 1000;
+    box-shadow: 0 0 24px 8px #D4AF3744;
+    pointer-events: none;
+}
+
+.gold-accent, .main-button, .btn, .dialog, .balance-card, .tip-card, .history-item, .results-container {
+    box-shadow: 0 2px 24px 0 #D4AF3744, 0 0 0 2px #D4AF37 inset;
+    border-color: #D4AF37 !important;
+}
+
+.btn-primary, .main-button {
+    background: linear-gradient(90deg, #1A1A1A 0%, #222 60%, #D4AF37 100%);
+    color: #fff;
+    border: 1.5px solid #D4AF37;
+    box-shadow: 0 2px 24px 0 #D4AF3744, 0 0 0 2px #D4AF37 inset;
+    transition: box-shadow 0.3s, border-color 0.3s, background 0.3s;
+}
+
+.btn-primary:hover, .main-button:hover {
+    background: linear-gradient(90deg, #222 0%, #D4AF37 100%);
+    box-shadow: 0 4px 32px 0 #D4AF37AA, 0 0 0 2px #D4AF37 inset;
+    border-color: #FFD700;
+    color: #fffbe6;
+}

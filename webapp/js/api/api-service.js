@@ -20,7 +20,7 @@ if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized
         'use strict';
         
         let configModule, loggerModule; // Избегаем прямого использования config, logger до их инициализации
-        let apiBaseUrl = 'http://localhost:8001/api/v1'; // Дефолт, если конфиг не загружен
+        let apiBaseUrl = 'https://style-ai-bot.onrender.com/api'; // Дефолт теперь публичный Render
         let isInitializedLocal = false;
         
         function getLogger() {

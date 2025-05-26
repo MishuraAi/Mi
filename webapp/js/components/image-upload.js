@@ -166,7 +166,11 @@ window.MishuraApp.components.imageUpload = (function() {
     }
 
     function isTelegramWebApp() {
-        return typeof window.Telegram !== 'undefined' && window.Telegram.WebApp;
+        return (
+            typeof window.Telegram !== 'undefined' &&
+            window.Telegram.WebApp &&
+            typeof window.Telegram.WebApp.showAttachmentMenu === 'function'
+        );
     }
 
     function initSingleImageUpload() {
@@ -177,24 +181,22 @@ window.MishuraApp.components.imageUpload = (function() {
 
         logger.debug("ImageUpload (Single): Инициализация одиночной загрузки");
         
-        // Обработчик клика на область загрузки
         singleUploadArea.addEventListener('click', function(e) {
             e.preventDefault();
             logger.debug("ImageUpload (Single): Клик на область загрузки");
             if (isTelegramWebApp()) {
-                logger.debug("ImageUpload: Открытие Telegram AttachmentMenu");
                 try {
                     window.Telegram.WebApp.showAttachmentMenu();
                     window.Telegram.WebApp.onEvent('attachment', function(data) {
-                        if (data && data.files && data.files.length > 0) {
-                            // В некоторых случаях Telegram возвращает base64, в других — blob URL
-                            // Здесь нужно реализовать обработку base64 или blob
-                            // Для примера: если data.files[0].url — это blob URL
+                        if (data && data.files && data.files.length > 0 && data.files[0].url) {
                             fetch(data.files[0].url)
                                 .then(res => res.blob())
                                 .then(blob => {
                                     const file = new File([blob], 'photo.jpg', { type: blob.type });
                                     handleSingleImageSelection(file);
+                                })
+                                .catch(() => {
+                                    if (uiHelpers) uiHelpers.showToast('Ошибка загрузки файла через Telegram');
                                 });
                         } else {
                             if (uiHelpers) uiHelpers.showToast('Файл не выбран');
@@ -205,8 +207,13 @@ window.MishuraApp.components.imageUpload = (function() {
                     if (uiHelpers) uiHelpers.showToast('Ошибка загрузки через Telegram');
                 }
             } else {
-                resetFileInput(singleFileInput);
-                singleFileInput.click();
+                try {
+                    resetFileInput(singleFileInput);
+                    singleFileInput.click();
+                } catch (err) {
+                    logger.error('Ошибка открытия input type=file:', err);
+                    if (uiHelpers) uiHelpers.showToast('Ошибка открытия выбора файла');
+                }
             }
         });
         

@@ -277,5 +277,7 @@ window.MishuraApp.app = (function() {
 })();
 
 window.addEventListener('DOMContentLoaded', () => {
-    activateLuxuryBlocks();
+    if (window.MishuraApp && window.MishuraApp.app && typeof window.MishuraApp.app.activateLuxuryBlocks === 'function') {
+        window.MishuraApp.app.activateLuxuryBlocks();
+    }
 });

@@ -1829,3 +1829,7 @@ body.modal-open {
     border-color: #FFD700;
     color: #fffbe6;
 }
+
+.luxury-shimmer, .shimmer-effect {
+    pointer-events: none !important;
+}

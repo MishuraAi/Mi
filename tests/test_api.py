@@ -100,4 +100,57 @@ def test_rate_limiting():
     assert response.status_code == 429
     data = response.json()
     assert data["status"] == "error"
-    assert "Too many requests" in data["message"] 
+    assert "Too many requests" in data["message"]
+
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run FastAPI API (api.py)",
+      "program": "${workspaceFolder}/api.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Simple API Demo (api_simple.py)",
+      "program": "${workspaceFolder}/api_simple.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Telegram Bot (bot.py)",
+      "program": "${workspaceFolder}/bot.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Webapp Static Server (webapp/server.py)",
+      "program": "${workspaceFolder}/webapp/server.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Demo Data Init (init_demo_data.py)",
+      "program": "${workspaceFolder}/init_demo_data.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Setup Webhook (setup_webhook.py)",
+      "program": "${workspaceFolder}/setup_webhook.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    }
+  ]
+}

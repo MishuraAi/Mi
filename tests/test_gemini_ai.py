@@ -62,4 +62,60 @@ def test_optimize_image(test_image):
     # Проверяем, что оптимизированное изображение можно открыть
     optimized_img = Image.open(BytesIO(optimized))
     assert optimized_img.size[0] <= 1024
-    assert optimized_img.size[1] <= 1024 
+    assert optimized_img.size[1] <= 1024
+
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run FastAPI API (api.py)",
+      "program": "${workspaceFolder}/api.py",
+      "args": [
+        "run"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Simple API Demo (api_simple.py)",
+      "program": "${workspaceFolder}/api_simple.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Telegram Bot (bot.py)",
+      "program": "${workspaceFolder}/bot.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Webapp Static Server (webapp/server.py)",
+      "program": "${workspaceFolder}/webapp/server.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Demo Data Init (init_demo_data.py)",
+      "program": "${workspaceFolder}/init_demo_data.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Run Setup Webhook (setup_webhook.py)",
+      "program": "${workspaceFolder}/setup_webhook.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    }
+  ]
+}

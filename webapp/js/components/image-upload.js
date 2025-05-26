@@ -153,32 +153,8 @@ window.MishuraApp.components.imageUpload = (function() {
             }, 100);
         }
     }
-<<<<<<< HEAD
     
     function initSingleMode() {
-=======
-
-    function resetFileInput(inputElement) {
-        if (inputElement) {
-            try {
-                inputElement.value = "";
-                logger.debug(`ImageUpload: Инпут успешно сброшен`);
-            } catch (ex) {
-                logger.error(`ImageUpload: Ошибка при сбросе инпута:`, ex);
-            }
-        }
-    }
-
-    function isTelegramWebApp() {
-        return (
-            typeof window.Telegram !== 'undefined' &&
-            window.Telegram.WebApp &&
-            typeof window.Telegram.WebApp.showAttachmentMenu === 'function'
-        );
-    }
-
-    function initSingleImageUpload() {
->>>>>>> 56565f00dd23f6b20eb16abb8700a1bd10c78b9c
         if (!singleUploadArea || !singleFileInput) {
             logger.warn("Single режим: элементы не найдены");
             return;
@@ -186,7 +162,6 @@ window.MishuraApp.components.imageUpload = (function() {
 
         logger.debug("Инициализация single режима");
         
-<<<<<<< HEAD
         // Удаляем старые обработчики
         singleUploadArea.onclick = null;
         singleFileInput.onchange = null;
@@ -203,51 +178,18 @@ window.MishuraApp.components.imageUpload = (function() {
             } catch (err) {
                 logger.error('Ошибка открытия диалога выбора файла:', err);
                 showToast('Ошибка открытия диалога выбора файла');
-=======
-        singleUploadArea.addEventListener('click', function(e) {
-            e.preventDefault();
-            logger.debug("ImageUpload (Single): Клик на область загрузки");
-            if (isTelegramWebApp()) {
-                try {
-                    window.Telegram.WebApp.showAttachmentMenu();
-                    window.Telegram.WebApp.onEvent('attachment', function(data) {
-                        if (data && data.files && data.files.length > 0 && data.files[0].url) {
-                            fetch(data.files[0].url)
-                                .then(res => res.blob())
-                                .then(blob => {
-                                    const file = new File([blob], 'photo.jpg', { type: blob.type });
-                                    handleSingleImageSelection(file);
-                                })
-                                .catch(() => {
-                                    if (uiHelpers) uiHelpers.showToast('Ошибка загрузки файла через Telegram');
-                                });
-                        } else {
-                            if (uiHelpers) uiHelpers.showToast('Файл не выбран');
-                        }
-                    });
-                } catch (err) {
-                    logger.error('Ошибка Telegram AttachmentMenu:', err);
-                    if (uiHelpers) uiHelpers.showToast('Ошибка загрузки через Telegram');
-                }
-            } else {
-                try {
-                    resetFileInput(singleFileInput);
-                    singleFileInput.click();
-                } catch (err) {
-                    logger.error('Ошибка открытия input type=file:', err);
-                    if (uiHelpers) uiHelpers.showToast('Ошибка открытия выбора файла');
-                }
->>>>>>> 56565f00dd23f6b20eb16abb8700a1bd10c78b9c
             }
         });
         
         // Изменение файла
         singleFileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) {
-                logger.debug(`Single файл выбран: ${file.name}`);
-                handleSingleImageUpload(file);
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                alert('Пожалуйста, выберите изображение!');
+                return;
             }
+            handleSingleImageUpload(file);
         });
         
         // Drag & Drop
@@ -363,49 +305,26 @@ window.MishuraApp.components.imageUpload = (function() {
         });
     }
     
-    function handleSingleImageUpload(file) {
-        if (!isValidImageFile(file)) return;
+    async function handleSingleImageUpload(file) {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('occasion', 'повседневный стиль'); // или возьмите из формы
+        formData.append('preferences', '');
 
-        logger.debug(`Обработка single изображения: ${file.name}`);
-        isUploadingActive = true;
-        
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                if (singlePreviewImage && singlePreviewContainer && singleUploadArea) {
-                    singlePreviewImage.src = e.target.result;
-                    singlePreviewImage.style.display = 'block';
-                    singlePreviewContainer.style.display = 'block';
-                    singlePreviewContainer.classList.remove('hidden');
-                    singleUploadArea.classList.add('hidden');
-                    
-                    uploadedImages.single = file;
-                    
-                    showFormElements();
-                    
-                    // Отправляем событие
-                    document.dispatchEvent(new CustomEvent('singleImageUploaded', { 
-                        detail: { file: file } 
-                    }));
-                    
-                    logger.info(`Single изображение успешно загружено: ${file.name}`);
-                    showToast('Изображение загружено успешно');
-                }
-            } catch (err) {
-                logger.error('Ошибка при отображении изображения:', err);
-                showToast('Ошибка при обработке изображения');
-            } finally {
-                isUploadingActive = false;
+        try {
+            const response = await fetch(`${apiUrl}/analyze-outfit`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (response.ok) {
+                // обработка успешного ответа
+            } else {
+                alert(data.message || 'Ошибка загрузки');
             }
-        };
-        
-        reader.onerror = () => {
-            logger.error('Ошибка чтения файла');
-            showToast('Ошибка при чтении файла');
-            isUploadingActive = false;
-        };
-        
-        reader.readAsDataURL(file);
+        } catch (err) {
+            alert('Ошибка соединения с сервером');
+        }
     }
     
     function handleCompareImageUpload(file, slotIndex) {
@@ -659,3 +578,12 @@ window.MishuraApp.components.imageUpload = (function() {
         isInitialized: () => isImageUploadInitialized
     };
 })();
+
+const singleUploadArea = document.getElementById('single-upload-area');
+const singleFileInput = document.getElementById('single-upload-input');
+
+if (singleUploadArea && singleFileInput) {
+    singleUploadArea.addEventListener('click', () => {
+        singleFileInput.click();
+    });
+}

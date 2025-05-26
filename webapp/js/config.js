@@ -30,7 +30,7 @@ window.MishuraApp.config = (function() {
         //   apiUrl: 'https://ВАШ_РЕАЛЬНЫЙ_ДОМЕН_API/api/v1',
         //
         // ТЕКУЩЕЕ ЗНАЧЕНИЕ (ЗАМЕНИТЕ ПРИ НЕОБХОДИМОСТИ):
-        apiUrl: 'https://style-ai-bot.onrender.com/api', // Используем публичный адрес Render
+        apiUrl: 'https://style-ai-bot.onrender.com/webapp', // исправьте на ваш реальный адрес, если нужно
         // ================================================================================
         defaultLanguage: 'ru',
         debugMode: true, 

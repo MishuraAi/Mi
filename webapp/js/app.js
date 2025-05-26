@@ -276,6 +276,11 @@ window.MishuraApp.app = (function() {
     };
 })();
 
+document.addEventListener('DOMContentLoaded', () => {
+    window.MishuraApp.app.init();
+    initializeImageUpload();
+});
+
 window.addEventListener('DOMContentLoaded', () => {
     if (window.MishuraApp && window.MishuraApp.app && typeof window.MishuraApp.app.activateLuxuryBlocks === 'function') {
         window.MishuraApp.app.activateLuxuryBlocks();

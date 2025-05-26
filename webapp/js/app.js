@@ -1,3 +1,15 @@
+/*
+==========================================================================================
+ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
+КОМПОНЕНТ: Главное приложение (app.js)
+ВЕРСИЯ: 0.5.1 (Исправлены обработчики событий)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-26
+
+НАЗНАЧЕНИЕ ФАЙЛА:
+Главный файл приложения, отвечающий за инициализацию всех модулей и координацию их работы.
+==========================================================================================
+*/
+
 window.MishuraApp = window.MishuraApp || {};
 
 window.MishuraApp.app = (function() {
@@ -8,60 +20,122 @@ window.MishuraApp.app = (function() {
     let apiService;
     let modals;
     let consultation;
+    let comparison;
+    let imageUpload;
+    let isAppInitialized = false;
     
     function init() {
-        // Инициализация логгера
-        logger = window.MishuraApp.utils.logger;
-        logger.debug('Инициализация главного модуля приложения');
-        
-        // Инициализация UI хелперов
-        uiHelpers = window.MishuraApp.utils.uiHelpers;
-        if (!uiHelpers) {
-            logger.error('UI хелперы не найдены');
+        if (isAppInitialized) {
+            console.warn('App уже инициализирован, пропускаем повторную инициализацию');
             return;
         }
-        uiHelpers.init();
+
+        console.log('🚀 Начало инициализации приложения МИШУРА');
         
-        // Инициализация API сервиса
-        apiService = window.MishuraApp.utils.api;
-        if (!apiService) {
-            logger.error('API сервис не найден');
-            return;
+        // Инициализация базовых модулей в правильном порядке
+        initializeLogger();
+        initializeUIHelpers();
+        initializeAPIService();
+        initializeModals();
+        initializeImageUpload();
+        initializeConsultation();
+        initializeComparison();
+        
+        // Настройка обработчиков событий ПОСЛЕ инициализации всех модулей
+        setTimeout(() => {
+            setupEventHandlers();
+            setupNavigation();
+        }, 100);
+        
+        isAppInitialized = true;
+        logger.info('Главный модуль приложения успешно инициализирован');
+    }
+    
+    function initializeLogger() {
+        if (window.MishuraApp.utils && window.MishuraApp.utils.logger) {
+            logger = window.MishuraApp.utils.logger;
+            if (typeof logger.init === 'function') {
+                logger.init();
+            }
+        } else {
+            logger = console;
+            console.warn('Logger не найден, используется console');
         }
-        apiService.init();
-        
-        // Инициализация модальных окон
-        modals = window.MishuraApp.components.modals;
-        if (!modals) {
-            logger.error('Модуль модальных окон не найден');
-            return;
+    }
+    
+    function initializeUIHelpers() {
+        if (window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
+            uiHelpers = window.MishuraApp.utils.uiHelpers;
+            if (typeof uiHelpers.init === 'function') {
+                uiHelpers.init();
+            }
+            logger.debug('UI Helpers инициализированы');
+        } else {
+            logger.error('UI Helpers не найдены');
         }
-        modals.init();
-        
-        // Инициализация модуля консультаций
-        consultation = window.MishuraApp.features.consultation;
-        if (!consultation) {
-            logger.error('Модуль консультаций не найден');
-            return;
+    }
+    
+    function initializeAPIService() {
+        if (window.MishuraApp.utils && window.MishuraApp.utils.api) {
+            apiService = window.MishuraApp.utils.api;
+            if (typeof apiService.init === 'function') {
+                apiService.init();
+            }
+            logger.debug('API Service инициализирован');
+        } else {
+            logger.error('API Service не найден');
         }
-        consultation.init();
-        
-        // Инициализация модуля сравнения
-        const comparison = window.MishuraApp.features.comparison;
-        if (!comparison) {
-            logger.error('Модуль сравнения не найден');
-            return;
+    }
+    
+    function initializeModals() {
+        if (window.MishuraApp.components && window.MishuraApp.components.modals) {
+            modals = window.MishuraApp.components.modals;
+            if (typeof modals.init === 'function') {
+                modals.init();
+            }
+            logger.debug('Modals инициализированы');
+        } else {
+            logger.error('Modals не найдены');
         }
-        comparison.init();
-        
-        // Настройка обработчиков событий
-        setupEventHandlers();
-        
-        logger.info('Главный модуль приложения инициализирован');
+    }
+    
+    function initializeImageUpload() {
+        if (window.MishuraApp.components && window.MishuraApp.components.imageUpload) {
+            imageUpload = window.MishuraApp.components.imageUpload;
+            if (typeof imageUpload.init === 'function') {
+                imageUpload.init();
+            }
+            logger.debug('Image Upload инициализирован');
+        } else {
+            logger.error('Image Upload не найден');
+        }
+    }
+    
+    function initializeConsultation() {
+        if (window.MishuraApp.features && window.MishuraApp.features.consultation) {
+            consultation = window.MishuraApp.features.consultation;
+            if (typeof consultation.init === 'function') {
+                consultation.init();
+            }
+            logger.debug('Consultation инициализирован');
+        } else {
+            logger.error('Consultation не найден');
+        }
+    }
+    
+    function initializeComparison() {
+        if (window.MishuraApp.features && window.MishuraApp.features.comparison) {
+            comparison = window.MishuraApp.features.comparison;
+            if (typeof comparison.init === 'function') {
+                comparison.init();
+            }
+            logger.debug('Comparison инициализирован');
+        } else {
+            logger.error('Comparison не найден');
+        }
     }
     
     function setModalMode(mode) {
-        console.log(`🔧 setModalMode вызвана с режимом: ${mode}`);
         logger.debug(`Установка режима модального окна: ${mode}`);
         
         const singleMode = document.getElementById('single-analysis-mode');
@@ -69,67 +143,70 @@ window.MishuraApp.app = (function() {
         const dialogTitle = document.getElementById('consultation-dialog-title');
         const dialogSubtitle = document.querySelector('#consultation-overlay .dialog-subtitle');
         
-        console.log(`🔍 DOM элементы:`, {
-            singleMode: !!singleMode, 
-            compareMode: !!compareMode,
-            dialogTitle: !!dialogTitle,
-            dialogSubtitle: !!dialogSubtitle
-        });
-        
         if (mode === 'single') {
             if (singleMode) singleMode.classList.remove('hidden');
             if (compareMode) compareMode.classList.add('hidden');
             if (dialogTitle) dialogTitle.textContent = 'Получить консультацию';
             if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите фото одежды для анализа';
-            console.log(`✅ Режим single установлен`);
         } else if (mode === 'compare') {
             if (singleMode) singleMode.classList.add('hidden');
             if (compareMode) compareMode.classList.remove('hidden');
             if (dialogTitle) dialogTitle.textContent = 'Сравнить образы';
             if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите от 2 до 4 фотографий для сравнения';
-            console.log(`✅ Режим compare установлен`);
         }
         
-        // Эмулируем событие изменения режима для совместимости
-        console.log(`📡 Отправляем событие modeChanged с режимом: ${mode}`);
+        // Отправляем событие для других модулей
         document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
-        console.log(`📡 Событие modeChanged отправлено`);
+        logger.debug(`Режим ${mode} установлен и событие отправлено`);
     }
     
     function setupEventHandlers() {
-        // Обработчик для кнопки консультации
-        const consultationButton = document.querySelector('.consultation-button');
+        logger.debug('Настройка обработчиков событий');
+        
+        // Обработчик для кнопки консультации (режим single)
+        const consultationButton = document.getElementById('consultation-button');
         if (consultationButton) {
             consultationButton.addEventListener('click', function(e) {
                 e.preventDefault();
-                logger.debug('Нажата кнопка консультации');
-                consultation.openConsultationModal();
-                // Устанавливаем режим после небольшой задержки
-                setTimeout(() => {
-                    setModalMode('single');
-                }, 100);
+                logger.debug('Нажата кнопка консультации (single mode)');
+                if (consultation && typeof consultation.openConsultationModal === 'function') {
+                    consultation.openConsultationModal();
+                    // Устанавливаем режим single с небольшой задержкой
+                    setTimeout(() => setModalMode('single'), 50);
+                } else {
+                    logger.error('Consultation module не найден');
+                }
             });
+            
+            logger.debug('Обработчик для кнопки консультации настроен');
         } else {
-            logger.warn('Кнопка консультации не найдена');
+            logger.warn('Кнопка консультации не найдена по ID');
         }
         
-        // Обработчик для кнопки сравнения образов
-        const compareButton = document.querySelector('.compare-button');
+        // Обработчик для кнопки сравнения образов (режим compare)
+        const compareButton = document.getElementById('compare-button');
         if (compareButton) {
             compareButton.addEventListener('click', function(e) {
                 e.preventDefault();
-                logger.debug('Нажата кнопка сравнения образов');
-                consultation.openConsultationModal();
-                // Устанавливаем режим после небольшой задержки
-                setTimeout(() => {
-                    setModalMode('compare');
-                }, 100);
+                logger.debug('Нажата кнопка сравнения образов (compare mode)');
+                if (consultation && typeof consultation.openConsultationModal === 'function') {
+                    consultation.openConsultationModal();
+                    // Устанавливаем режим compare с небольшой задержкой
+                    setTimeout(() => setModalMode('compare'), 50);
+                } else {
+                    logger.error('Consultation module не найден');
+                }
             });
+            
+            logger.debug('Обработчик для кнопки сравнения настроен');
         } else {
-            logger.warn('Кнопка сравнения образов не найдена');
+            logger.warn('Кнопка сравнения образов не найдена по ID');
         }
+    }
+    
+    function setupNavigation() {
+        logger.debug('Настройка навигации');
         
-        // Обработчики для навигации
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(item => {
             item.addEventListener('click', function(e) {
@@ -142,11 +219,10 @@ window.MishuraApp.app = (function() {
                     section.classList.add('hidden');
                 });
                 
-                // Показываем выбранную секцию или главную
+                // Показываем выбранную секцию
                 const targetSection = document.getElementById(`${page}-section`);
                 if (targetSection) {
                     targetSection.classList.remove('hidden');
-                    logger.debug(`Секция ${page}-section отображена`);
                 } else {
                     // Если секция не найдена, показываем главную
                     const homeSection = document.getElementById('home-section');
@@ -157,10 +233,10 @@ window.MishuraApp.app = (function() {
                 }
                 
                 // Обновляем активный элемент навигации
-                navItems.forEach(navItem => navItem.classList.remove('active'));
+                document.querySelectorAll('.nav-item').forEach(navItem => navItem.classList.remove('active'));
                 this.classList.add('active');
                 
-                // Убеждаемся, что навигация всегда видна
+                // Убеждаемся, что навигация видна
                 const navBar = document.querySelector('.nav-bar');
                 if (navBar) {
                     navBar.style.display = 'flex';
@@ -168,57 +244,17 @@ window.MishuraApp.app = (function() {
                 }
 
                 // Уведомляем другие модули о смене страницы
-                logger.debug(`Отправка события navigationChanged для страницы: ${page}`);
                 document.dispatchEvent(new CustomEvent('navigationChanged', { 
                     detail: { page: page } 
                 }));
-                logger.debug(`Событие navigationChanged отправлено`);
             });
         });
+        
+        logger.debug('Навигация настроена');
     }
     
     return {
-        init
+        init,
+        setModalMode
     };
 })();
-
-// Убираем дублирующийся код навигации
-document.addEventListener('DOMContentLoaded', () => {
-    // Инициализация приложения
-    if (window.MishuraApp && window.MishuraApp.app) {
-        window.MishuraApp.app.init();
-        
-        // Показываем страницу после инициализации
-        document.body.classList.add('loaded');
-    }
-
-    // Feature cards hover effect
-    const featureCards = document.querySelectorAll('.feature-card');
-    
-    featureCards.forEach(card => {
-        card.addEventListener('mouseenter', () => {
-            card.classList.add('shimmer-effect');
-        });
-        
-        card.addEventListener('mouseleave', () => {
-            card.classList.remove('shimmer-effect');
-        });
-    });
-
-    // Add smooth scrolling
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            const href = this.getAttribute('href');
-            // Проверяем, что href не пустой и не равен только "#"
-            if (href && href !== '#' && href.length > 1) {
-                e.preventDefault();
-                const target = document.querySelector(href);
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth'
-                    });
-                }
-            }
-        });
-    });
-}); 

@@ -2,8 +2,8 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Управление модальными окнами (modals.js)
-ВЕРСИЯ: 0.4.7 (Надежная привязка обработчиков отмены, логирование ID)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-21
+ВЕРСИЯ: 0.4.8 (Исправлена проверка модальных окон)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-26
 
 НАЗНАЧЕНИЕ ФАЙЛА:
 Обеспечивает функциональность открытия и закрытия модальных окон приложения.
@@ -22,8 +22,6 @@ window.MishuraApp.components.modals = (function() {
     // Ссылки на модальные окна
     let consultationOverlay;
     let resultsOverlay;
-    let tryOnOverlay;
-    let tryOnResultOverlay;
     
     function init() {
         logger = window.MishuraApp.utils.logger;
@@ -34,12 +32,13 @@ window.MishuraApp.components.modals = (function() {
         // Получаем ссылки на модальные окна
         consultationOverlay = document.getElementById('consultation-overlay');
         resultsOverlay = document.getElementById('results-overlay');
-        tryOnOverlay = document.getElementById('try-on-overlay');
-        tryOnResultOverlay = document.getElementById('try-on-result-overlay');
         
-        // Проверяем наличие всех модальных окон
-        if (!consultationOverlay || !resultsOverlay || !tryOnOverlay || !tryOnResultOverlay) {
-            logger.error('Не все модальные окна найдены в DOM');
+        // Проверяем наличие основных модальных окон
+        if (!consultationOverlay || !resultsOverlay) {
+            logger.error('Основные модальные окна не найдены в DOM', {
+                consultationOverlay: !!consultationOverlay,
+                resultsOverlay: !!resultsOverlay
+            });
             return;
         }
         
@@ -53,9 +52,7 @@ window.MishuraApp.components.modals = (function() {
         // Кнопки закрытия для каждого модального окна
         const closeButtons = {
             'consultation-cancel': consultationOverlay,
-            'results-close': resultsOverlay,
-            'try-on-cancel': tryOnOverlay,
-            'try-on-result-close': tryOnResultOverlay
+            'results-close': resultsOverlay
         };
         
         // Настраиваем обработчики для каждой кнопки
@@ -78,13 +75,15 @@ window.MishuraApp.components.modals = (function() {
         });
         
         // Закрытие по клику вне модального окна
-        [consultationOverlay, resultsOverlay, tryOnOverlay, tryOnResultOverlay].forEach(overlay => {
-            overlay.addEventListener('click', function(e) {
-                if (e.target === overlay) {
-                    logger.debug('Клик вне модального окна');
-                    closeModal(overlay);
-                }
-            });
+        [consultationOverlay, resultsOverlay].forEach(overlay => {
+            if (overlay) {
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) {
+                        logger.debug('Клик вне модального окна');
+                        closeModal(overlay);
+                    }
+                });
+            }
         });
     }
     
@@ -97,7 +96,7 @@ window.MishuraApp.components.modals = (function() {
         logger.debug(`Открытие модального окна: ${overlay.id}`);
         
         // Скрываем все модальные окна
-        [consultationOverlay, resultsOverlay, tryOnOverlay, tryOnResultOverlay].forEach(modal => {
+        [consultationOverlay, resultsOverlay].forEach(modal => {
             if (modal && modal !== overlay) {
                 modal.classList.remove('active');
             }
@@ -129,15 +128,23 @@ window.MishuraApp.components.modals = (function() {
         closeModal,
         openConsultationModal: function() {
             logger.debug('Открытие модального окна консультации');
-            openModal(consultationOverlay);
-            // Инициируем событие для других модулей
-            document.dispatchEvent(new CustomEvent('modalOpened', {
-                detail: { modalId: 'consultation-overlay' }
-            }));
+            if (consultationOverlay) {
+                openModal(consultationOverlay);
+                // Инициируем событие для других модулей
+                document.dispatchEvent(new CustomEvent('modalOpened', {
+                    detail: { modalId: 'consultation-overlay' }
+                }));
+            } else {
+                logger.error('Модальное окно консультации не найдено');
+            }
         },
         openResultsModal: function() {
             logger.debug('Открытие модального окна результатов');
-            openModal(resultsOverlay);
+            if (resultsOverlay) {
+                openModal(resultsOverlay);
+            } else {
+                logger.error('Модальное окно результатов не найдено');
+            }
         },
         closeModalById: function(overlayId) {
             let overlay;

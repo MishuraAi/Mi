@@ -5,7 +5,7 @@ window.MishuraApp.utils.api = (function() {
     'use strict';
     
     let logger;
-    const API_BASE_URL = 'http://127.0.0.1:8001/api/v1';
+    const API_BASE_URL = 'http://127.0.0.1:8001/api';
     
     function init() {
         logger = window.MishuraApp.utils.logger;
@@ -45,7 +45,7 @@ window.MishuraApp.utils.api = (function() {
                 mode,
                 occasion, 
                 preferences,
-                endpoint: `${API_BASE_URL}/analyze-outfit`
+                endpoint: `${API_BASE_URL}/analyze`
             });
             
             // Реальный API запрос к серверу
@@ -61,7 +61,7 @@ window.MishuraApp.utils.api = (function() {
                 formData.append('preferences', preferences);
             }
             
-            const response = await fetch(`${API_BASE_URL}/analyze-outfit`, {
+            const response = await fetch(`${API_BASE_URL}/analyze`, {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -102,7 +102,7 @@ window.MishuraApp.utils.api = (function() {
                 images: images.map(img => img ? img.name : null),
                 occasion, 
                 preferences,
-                endpoint: `${API_BASE_URL}/compare-outfits`
+                endpoint: `${API_BASE_URL}/compare`
             });
             
             const formData = new FormData();
@@ -125,7 +125,7 @@ window.MishuraApp.utils.api = (function() {
             }
 
             // Реальный API запрос к серверу
-            const response = await fetch(`${API_BASE_URL}/compare-outfits`, {
+            const response = await fetch(`${API_BASE_URL}/compare`, {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -162,7 +162,7 @@ window.MishuraApp.utils.api = (function() {
     
     async function processCompareOutfits(formData) {
         try {
-            const response = await fetch(`${API_BASE_URL}/compare-outfits`, {
+            const response = await fetch(`${API_BASE_URL}/compare`, {
                 method: 'POST',
                 body: formData,
                 headers: {

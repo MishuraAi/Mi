@@ -2,11 +2,14 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Загрузка изображений (image-upload.js)
-ВЕРСИЯ: 0.5.0 (ИСПРАВЛЕНА ЗАГРУЗКА ФОТОГРАФИЙ)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-25
+ВЕРСИЯ: 0.6.0 (ИСПРАВЛЕНЫ ВСЕ ПРОБЛЕМЫ ЗАГРУЗКИ)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-26
 
-НАЗНАЧЕНИЕ ФАЙЛА:
-Обеспечивает функциональность загрузки и отображения изображений для консультации.
+ИСПРАВЛЕНИЯ:
+- Улучшена инициализация DOM элементов
+- Исправлена обработка событий загрузки
+- Добавлена надежная проверка элементов
+- Исправлены проблемы с режимами single/compare
 ==========================================================================================
 */
 
@@ -17,10 +20,13 @@ window.MishuraApp.components.imageUpload = (function() {
     
     let config, logger, uiHelpers;
     
+    // DOM элементы для single режима
     let singleUploadArea, singleFileInput, singlePreviewContainer, singlePreviewImage, singleDeleteButton;
-    let imageSlotsContainer;
-    let modeButtons, singleAnalysisMode, compareAnalysisMode;
     
+    // DOM элементы для compare режима  
+    let imageSlotsContainer, compareSlots = [];
+    
+    // Состояние
     let isUploadingActive = false;
     let uploadedImages = { single: null, compare: [null, null, null, null] };
     let isImageUploadInitialized = false;
@@ -28,286 +34,225 @@ window.MishuraApp.components.imageUpload = (function() {
     
     function init() {
         if (isImageUploadInitialized) {
+            console.log('ImageUpload: Уже инициализирован, пропускаем');
             return;
         }
 
-        config = window.MishuraApp.config;
-        logger = window.MishuraApp.utils.logger || { 
-            debug: (...args) => console.debug("ImageUpload:", ...args), 
-            info: (...args) => console.info("ImageUpload:", ...args), 
-            warn: (...args) => console.warn("ImageUpload:", ...args), 
-            error: (...args) => console.error("ImageUpload:", ...args) 
-        };
+        logger = window.MishuraApp.utils.logger || createFallbackLogger();
         uiHelpers = window.MishuraApp.utils.uiHelpers;
 
-        logger.debug("Инициализация модуля загрузки изображений (v0.5.0 - ИСПРАВЛЕНА ЗАГРУЗКА)");
+        logger.debug("Инициализация модуля загрузки изображений (v0.6.0 - ИСПРАВЛЕНО)");
         
-        if (!initDOMElements()) {
-            logger.error("ImageUpload: Критическая ошибка при инициализации DOM элементов");
-            return;
-        }
-        
-        initModeButtons();
-        initSingleImageUpload();
-        initCompareImageUpload();
-        
-        isImageUploadInitialized = true;
-        logger.info("Модуль загрузки изображений успешно инициализирован");
+        // Пробуем инициализировать DOM элементы с задержками
+        setTimeout(() => {
+            if (initDOMElements()) {
+                initEventHandlers();
+                isImageUploadInitialized = true;
+                logger.info("Модуль загрузки изображений успешно инициализирован");
+            } else {
+                // Пробуем еще раз через секунду
+                setTimeout(() => {
+                    if (initDOMElements()) {
+                        initEventHandlers();
+                        isImageUploadInitialized = true;
+                        logger.info("Модуль загрузки изображений инициализирован (повторная попытка)");
+                    }
+                }, 1000);
+            }
+        }, 100);
+    }
+    
+    function createFallbackLogger() {
+        return {
+            debug: (...args) => console.debug("ImageUpload:", ...args),
+            info: (...args) => console.info("ImageUpload:", ...args),
+            warn: (...args) => console.warn("ImageUpload:", ...args),
+            error: (...args) => console.error("ImageUpload:", ...args)
+        };
     }
     
     function initDOMElements() {
-        logger.debug("ImageUpload: Инициализация DOM элементов...");
+        logger.debug("Поиск DOM элементов...");
         
-        // Инициализация элементов для одиночной загрузки
-        singleUploadArea = document.querySelector('#single-analysis-mode #single-upload-area');
-        singleFileInput = document.querySelector('#single-analysis-mode #single-upload-input');
-        singlePreviewContainer = document.querySelector('#single-analysis-mode #single-preview-container');
-        singlePreviewImage = document.querySelector('#single-analysis-mode #single-preview-image');
+        // Элементы для single режима
+        singleUploadArea = document.querySelector('#single-upload-area');
+        singleFileInput = document.querySelector('#single-upload-input');
+        singlePreviewContainer = document.querySelector('#single-preview-container');
+        singlePreviewImage = document.querySelector('#single-preview-image');
         singleDeleteButton = document.querySelector('#single-analysis-mode .delete-image[data-target="single"]');
         
-        // Инициализация элементов для режима сравнения
+        // Элементы для compare режима
         imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
         
-        // Инициализация элементов переключения режимов
-        singleAnalysisMode = document.getElementById('single-analysis-mode');
-        compareAnalysisMode = document.getElementById('compare-analysis-mode');
+        logger.debug("Найденные элементы:", {
+            singleUploadArea: !!singleUploadArea,
+            singleFileInput: !!singleFileInput,
+            singlePreviewContainer: !!singlePreviewContainer,
+            singlePreviewImage: !!singlePreviewImage,
+            singleDeleteButton: !!singleDeleteButton,
+            imageSlotsContainer: !!imageSlotsContainer
+        });
 
-        const elementsToLog = {
-            singleUploadArea: !!singleUploadArea, 
-            singleFileInput: !!singleFileInput, 
-            singlePreviewContainer: !!singlePreviewContainer, 
-            singlePreviewImage: !!singlePreviewImage, 
-            singleDeleteButton: !!singleDeleteButton, 
-            imageSlotsContainer: !!imageSlotsContainer, 
-            singleAnalysisMode: !!singleAnalysisMode, 
-            compareAnalysisMode: !!compareAnalysisMode
-        };
-
-        logger.debug("ImageUpload DOM элементы:", elementsToLog);
-
-        // Проверяем наличие критических элементов с более мягкой логикой
-        let missingCritical = false;
+        // Проверяем критически важные элементы
+        const hasSingleElements = singleUploadArea && singleFileInput;
+        const hasCompareElements = imageSlotsContainer;
         
-        // Для режима single
-        if (!singleUploadArea || !singleFileInput) {
-            logger.error("ImageUpload: Критические элементы для одиночной загрузки не найдены");
-            if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
-                window.MishuraApp.utils.uiHelpers.showToast('Ошибка: элементы загрузки фото не найдены!', 5000);
-            }
-            missingCritical = true;
+        if (!hasSingleElements) {
+            logger.error("Критические элементы single режима не найдены");
+            return false;
         }
         
-        // Для режима compare
-        if (!imageSlotsContainer) {
-            logger.error("ImageUpload: Контейнер для сравнения не найден");
-            if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
-                window.MishuraApp.utils.uiHelpers.showToast('Ошибка: контейнер для сравнения не найден!', 5000);
-            }
-            missingCritical = true;
+        if (!hasCompareElements) {
+            logger.error("Контейнер compare режима не найден"); 
+            return false;
         }
 
-        // Если что-то не найдено, пробуем переинициализировать через небольшую задержку
-        if (missingCritical) {
-            logger.warn("ImageUpload: Попытка повторной инициализации через 500мс");
-            setTimeout(() => {
-                if (!isImageUploadInitialized) {
-                    initDOMElements();
-                }
-            }, 500);
+        // Инициализируем compare слоты
+        if (imageSlotsContainer) {
+            compareSlots = imageSlotsContainer.querySelectorAll('.image-slot');
+            logger.debug(`Найдено ${compareSlots.length} слотов для сравнения`);
         }
 
-        return !missingCritical;
+        return true;
     }
     
-    function initModeButtons() {
-        logger.debug("ImageUpload: Инициализация переключения режимов");
+    function initEventHandlers() {
+        logger.debug("Инициализация обработчиков событий");
         
-        // Слушаем события изменения режима
-        document.addEventListener('modeChanged', function(e) {
-            const mode = e.detail.mode;
-            logger.debug(`ImageUpload: Получено событие modeChanged: '${mode}'`);
-            currentMode = mode;
-            
-            if (mode === 'single') {
-                if (singleAnalysisMode) singleAnalysisMode.classList.remove('hidden');
-                if (compareAnalysisMode) compareAnalysisMode.classList.add('hidden');
-                resetCompareImageUploads();
-                logger.debug('ImageUpload: Режим single активирован');
-            } else if (mode === 'compare') {
-                if (singleAnalysisMode) singleAnalysisMode.classList.add('hidden');
-                if (compareAnalysisMode) compareAnalysisMode.classList.remove('hidden');
-                resetSingleImageUpload();
-                logger.debug('ImageUpload: Режим compare активирован');
-                
-                // Реинициализируем compare режим
-                setTimeout(() => {
-                    initCompareImageUpload();
-                }, 100);
-            }
+        // Обработчики режимов
+        document.addEventListener('modeChanged', handleModeChange);
+        
+        // Single режим
+        initSingleMode();
+        
+        // Compare режим  
+        initCompareMode();
+        
+        // Обработчики событий загрузки
+        document.addEventListener('singleImageUploaded', (e) => {
+            logger.debug('Событие: одиночное изображение загружено');
         });
         
-        // Устанавливаем режим single по умолчанию
-        if (singleAnalysisMode && compareAnalysisMode) {
-            singleAnalysisMode.classList.remove('hidden');
-            compareAnalysisMode.classList.add('hidden');
-            currentMode = 'single';
+        document.addEventListener('compareImageUploaded', (e) => {
+            logger.debug(`Событие: изображение сравнения загружено в слот ${e.detail.slot}`);
+        });
+    }
+    
+    function handleModeChange(e) {
+        const mode = e.detail.mode;
+        currentMode = mode;
+        logger.debug(`Смена режима на: ${mode}`);
+        
+        if (mode === 'single') {
+            resetCompareMode();
+        } else if (mode === 'compare') {
+            resetSingleMode();
+            // Переинициализируем compare режим
+            setTimeout(() => {
+                initCompareMode();
+            }, 100);
         }
     }
-
-    function resetFileInput(inputElement) {
-        if (inputElement) {
-            try {
-                inputElement.value = "";
-                logger.debug(`ImageUpload: Инпут успешно сброшен`);
-            } catch (ex) {
-                logger.error(`ImageUpload: Ошибка при сбросе инпута:`, ex);
-            }
-        }
-    }
-
-    function initSingleImageUpload() {
+    
+    function initSingleMode() {
         if (!singleUploadArea || !singleFileInput) {
-            logger.warn("ImageUpload (Single): Пропуск инициализации - элементы не найдены");
+            logger.warn("Single режим: элементы не найдены");
             return;
         }
 
-        logger.debug("ImageUpload (Single): Инициализация одиночной загрузки");
+        logger.debug("Инициализация single режима");
         
-        // Обработчик клика на область загрузки
-        singleUploadArea.addEventListener('click', function(e) {
+        // Удаляем старые обработчики
+        singleUploadArea.onclick = null;
+        singleFileInput.onchange = null;
+        
+        // Клик по области загрузки
+        singleUploadArea.addEventListener('click', (e) => {
             e.preventDefault();
-            logger.debug("ImageUpload (Single): Клик на область загрузки");
-            resetFileInput(singleFileInput);
-            singleFileInput.click();
+            e.stopPropagation();
+            logger.debug("Клик по области загрузки (single)");
+            
+            try {
+                singleFileInput.value = '';
+                singleFileInput.click();
+            } catch (err) {
+                logger.error('Ошибка открытия диалога выбора файла:', err);
+                showToast('Ошибка открытия диалога выбора файла');
+            }
         });
         
-        // Обработчик изменения файла
-        singleFileInput.addEventListener('change', function(event) {
-            const file = event.target.files[0];
+        // Изменение файла
+        singleFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
             if (file) {
-                logger.debug(`ImageUpload (Single): Файл выбран: ${file.name}`);
-                handleSingleImageSelection(file);
+                logger.debug(`Single файл выбран: ${file.name}`);
+                handleSingleImageUpload(file);
             }
         });
         
         // Drag & Drop
-        singleUploadArea.addEventListener('dragover', function(e) {
+        singleUploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             singleUploadArea.classList.add('dragover');
         });
         
-        singleUploadArea.addEventListener('dragleave', function() {
+        singleUploadArea.addEventListener('dragleave', () => {
             singleUploadArea.classList.remove('dragover');
         });
         
-        singleUploadArea.addEventListener('drop', function(e) {
+        singleUploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             singleUploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                logger.debug(`ImageUpload (Single): Файл перетащен: ${e.dataTransfer.files[0].name}`);
-                handleSingleImageSelection(e.dataTransfer.files[0]);
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                logger.debug(`Single файл перетащен: ${files[0].name}`);
+                handleSingleImageUpload(files[0]);
             }
         });
 
-        // Обработчик кнопки удаления
+        // Кнопка удаления
         if (singleDeleteButton) {
-            singleDeleteButton.addEventListener('click', function(e) {
+            singleDeleteButton.onclick = null;
+            singleDeleteButton.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                logger.debug("ImageUpload (Single): Нажата кнопка удаления");
-                resetSingleImageUpload();
+                logger.debug("Удаление single изображения");
+                resetSingleMode();
             });
-        } else {
-            logger.warn("ImageUpload (Single): Кнопка удаления не найдена");
-            if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
-                window.MishuraApp.utils.uiHelpers.showToast('Ошибка: кнопка удаления не найдена!', 5000);
-            }
         }
     }
     
-    function handleSingleImageSelection(file) {
-        logger.debug(`ImageUpload (Single): Обработка изображения: ${file.name}`);
-        if (!isValidImageFile(file)) return;
-
-        isUploadingActive = true;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            if (singlePreviewImage && singlePreviewContainer && singleUploadArea) {
-                singlePreviewImage.src = e.target.result;
-                singlePreviewImage.style.display = 'block';
-                singlePreviewContainer.style.display = 'block';
-                singlePreviewContainer.classList.remove('hidden');
-                singleUploadArea.classList.add('hidden');
-                uploadedImages.single = file;
-                
-                showFormElements();
-                
-                logger.info(`ImageUpload (Single): Изображение ${file.name} загружено`);
-                document.dispatchEvent(new CustomEvent('singleImageUploaded', { detail: { file: file } }));
-                
-                resetFileInput(singleFileInput);
-            }
-            isUploadingActive = false;
-        };
-        reader.onerror = function(error) {
-            logger.error("ImageUpload (Single): Ошибка FileReader:", error);
-            if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла');
-            isUploadingActive = false;
-        };
-        reader.readAsDataURL(file);
-    }
-    
-    function initCompareImageUpload() {
-        // Обновляем ссылку на контейнер слотов
-        imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
-        
+    function initCompareMode() {
         if (!imageSlotsContainer) {
-            logger.warn("ImageUpload (Compare): Контейнер слотов не найден");
+            logger.warn("Compare режим: контейнер не найден");
             return;
         }
         
-        const slots = imageSlotsContainer.querySelectorAll('.image-slot');
-        if (!slots.length) {
-            logger.warn("ImageUpload (Compare): Слоты не найдены");
-            return;
-        }
+        compareSlots = imageSlotsContainer.querySelectorAll('.image-slot');
+        logger.debug(`Инициализация compare режима: ${compareSlots.length} слотов`);
 
-        logger.debug(`ImageUpload (Compare): Инициализация ${slots.length} слотов`);
-
-        slots.forEach((slot, index) => {
+        compareSlots.forEach((slot, index) => {
             initCompareSlot(slot, index);
         });
     }
     
     function initCompareSlot(slot, slotIndex) {
-        const input = slot.querySelector('.compare-upload-input');
+        const input = slot.querySelector('.compare-upload-input, input[type="file"]');
         
         if (!input) {
-            logger.warn(`ImageUpload (Compare): Input не найден для слота ${slotIndex}`);
+            logger.warn(`Compare слот ${slotIndex}: input не найден`);
             return;
         }
 
-        logger.debug(`ImageUpload (Compare): Инициализация слота ${slotIndex}`);
+        logger.debug(`Инициализация compare слота ${slotIndex}`);
         
-        // Вместо клонирования используем более безопасный подход
-        const oldHandlers = {
-            click: slot.onclick,
-            change: input.onchange,
-            dragover: slot.ondragover,
-            dragleave: slot.ondragleave,
-            drop: slot.ondrop
-        };
-        
-        // Очищаем старые обработчики
+        // Удаляем старые обработчики
         slot.onclick = null;
         input.onchange = null;
-        slot.ondragover = null;
-        slot.ondragleave = null;
-        slot.ondrop = null;
         
-        // Обработчик клика на слот
-        slot.addEventListener('click', function(e) {
-            // Проверяем, что клик не по кнопке удаления
+        // Клик по слоту
+        slot.addEventListener('click', (e) => {
             if (e.target.classList.contains('delete-image') || e.target.closest('.delete-image')) {
                 return;
             }
@@ -315,74 +260,112 @@ window.MishuraApp.components.imageUpload = (function() {
             if (!slot.classList.contains('filled')) {
                 e.preventDefault();
                 e.stopPropagation();
-                logger.debug(`ImageUpload (Compare): Клик по слоту ${slotIndex}`);
-                resetFileInput(input);
-                input.click();
+                logger.debug(`Клик по compare слоту ${slotIndex}`);
+                
+                try {
+                    input.value = '';
+                    input.click();
+                } catch (err) {
+                    logger.error('Ошибка открытия диалога:', err);
+                }
             }
         });
         
-        // Обработчик изменения файла
-        input.addEventListener('change', function(e) {
+        // Изменение файла
+        input.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
-                logger.debug(`ImageUpload (Compare): Файл выбран для слота ${slotIndex}: ${file.name}`);
-                handleCompareImageSelection(file, slotIndex);
+                logger.debug(`Compare файл выбран для слота ${slotIndex}: ${file.name}`);
+                handleCompareImageUpload(file, slotIndex);
             }
         });
 
         // Drag & Drop
-        slot.addEventListener('dragover', function(e) {
+        slot.addEventListener('dragover', (e) => {
             e.preventDefault();
             if (!slot.classList.contains('filled')) {
                 slot.classList.add('dragover');
             }
         });
         
-        slot.addEventListener('dragleave', function() {
+        slot.addEventListener('dragleave', () => {
             slot.classList.remove('dragover');
         });
         
-        slot.addEventListener('drop', function(e) {
+        slot.addEventListener('drop', (e) => {
             e.preventDefault();
             slot.classList.remove('dragover');
-            if (!slot.classList.contains('filled') && e.dataTransfer.files.length) {
-                logger.debug(`ImageUpload (Compare): Файл перетащен для слота ${slotIndex}`);
-                handleCompareImageSelection(e.dataTransfer.files[0], slotIndex);
+            
+            if (!slot.classList.contains('filled') && e.dataTransfer.files.length > 0) {
+                logger.debug(`Compare файл перетащен в слот ${slotIndex}`);
+                handleCompareImageUpload(e.dataTransfer.files[0], slotIndex);
             }
         });
     }
     
-    function handleCompareImageSelection(file, slotIndex) {
-        logger.debug(`ImageUpload (Compare): Обработка изображения для слота ${slotIndex}: ${file.name}`);
+    function handleSingleImageUpload(file) {
         if (!isValidImageFile(file)) return;
 
+        logger.debug(`Обработка single изображения: ${file.name}`);
         isUploadingActive = true;
-        const reader = new FileReader();
         
-        // Добавляем таймаут для предотвращения зависания
-        const timeoutId = setTimeout(() => {
-            if (isUploadingActive) {
-                logger.error("ImageUpload (Compare): Таймаут при чтении файла");
-                isUploadingActive = false;
-                if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла: превышено время ожидания');
-            }
-        }, 10000); // 10 секунд таймаут
-
-        reader.onload = function(e) {
-            clearTimeout(timeoutId); // Очищаем таймаут при успешной загрузке
-            
-            const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
-            if (!slot) {
-                logger.error(`ImageUpload (Compare): Слот ${slotIndex} не найден`);
-                isUploadingActive = false;
-                return;
-            }
-
+        const reader = new FileReader();
+        reader.onload = (e) => {
             try {
+                if (singlePreviewImage && singlePreviewContainer && singleUploadArea) {
+                    singlePreviewImage.src = e.target.result;
+                    singlePreviewImage.style.display = 'block';
+                    singlePreviewContainer.style.display = 'block';
+                    singlePreviewContainer.classList.remove('hidden');
+                    singleUploadArea.classList.add('hidden');
+                    
+                    uploadedImages.single = file;
+                    
+                    showFormElements();
+                    
+                    // Отправляем событие
+                    document.dispatchEvent(new CustomEvent('singleImageUploaded', { 
+                        detail: { file: file } 
+                    }));
+                    
+                    logger.info(`Single изображение успешно загружено: ${file.name}`);
+                    showToast('Изображение загружено успешно');
+                }
+            } catch (err) {
+                logger.error('Ошибка при отображении изображения:', err);
+                showToast('Ошибка при обработке изображения');
+            } finally {
+                isUploadingActive = false;
+            }
+        };
+        
+        reader.onerror = () => {
+            logger.error('Ошибка чтения файла');
+            showToast('Ошибка при чтении файла');
+            isUploadingActive = false;
+        };
+        
+        reader.readAsDataURL(file);
+    }
+    
+    function handleCompareImageUpload(file, slotIndex) {
+        if (!isValidImageFile(file)) return;
+
+        logger.debug(`Обработка compare изображения для слота ${slotIndex}: ${file.name}`);
+        isUploadingActive = true;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
+                if (!slot) {
+                    logger.error(`Слот ${slotIndex} не найден`);
+                    return;
+                }
+
                 const previewImg = slot.querySelector('.preview-image');
                 const uploadIcon = slot.querySelector('.upload-icon');
-                let deleteBtn = slot.querySelector('.delete-image');
-
+                
                 if (previewImg) {
                     previewImg.src = e.target.result;
                     previewImg.style.display = 'block';
@@ -393,158 +376,147 @@ window.MishuraApp.components.imageUpload = (function() {
                 }
 
                 // Создаем кнопку удаления
+                let deleteBtn = slot.querySelector('.delete-image');
                 if (!deleteBtn) {
                     deleteBtn = document.createElement('button');
                     deleteBtn.className = 'delete-image';
                     deleteBtn.innerHTML = '×';
-                    deleteBtn.title = 'Удалить изображение';
-                    deleteBtn.style.position = 'absolute';
-                    deleteBtn.style.top = '5px';
-                    deleteBtn.style.right = '5px';
-                    deleteBtn.style.zIndex = '20';
-                    deleteBtn.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                    deleteBtn.style.color = 'white';
-                    deleteBtn.style.border = 'none';
-                    deleteBtn.style.borderRadius = '50%';
-                    deleteBtn.style.width = '20px';
-                    deleteBtn.style.height = '20px';
-                    deleteBtn.style.cursor = 'pointer';
+                    deleteBtn.style.cssText = `
+                        position: absolute;
+                        top: 5px;
+                        right: 5px;
+                        z-index: 20;
+                        background: rgba(0, 0, 0, 0.7);
+                        color: white;
+                        border: none;
+                        border-radius: 50%;
+                        width: 20px;
+                        height: 20px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 12px;
+                    `;
                     slot.appendChild(deleteBtn);
                     
-                    deleteBtn.addEventListener('click', function(e) {
+                    deleteBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        logger.debug(`ImageUpload (Compare): Удаление изображения из слота ${slotIndex}`);
-                        resetSlot(slotIndex);
+                        logger.debug(`Удаление изображения из слота ${slotIndex}`);
+                        resetCompareSlot(slotIndex);
                     });
                 }
 
                 slot.classList.add('filled');
                 uploadedImages.compare[slotIndex] = file;
                 
-                const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
-                logger.debug(`ImageUpload (Compare): Заполнено слотов: ${filledSlotsCount}`);
+                const filledCount = uploadedImages.compare.filter(img => img !== null).length;
+                logger.debug(`Compare: заполнено ${filledCount} слотов`);
                 
-                if (filledSlotsCount >= 2) {
+                if (filledCount >= 2) {
                     showFormElements();
                 }
                 
-                logger.info(`ImageUpload (Compare): Изображение ${file.name} загружено в слот ${slotIndex}`);
-                document.dispatchEvent(new CustomEvent('compareImageUploaded', { detail: { file: file, slot: slotIndex } }));
+                // Отправляем событие
+                document.dispatchEvent(new CustomEvent('compareImageUploaded', { 
+                    detail: { file: file, slot: slotIndex } 
+                }));
                 
-                resetFileInput(slot.querySelector('input[type="file"]'));
-            } catch (error) {
-                logger.error("ImageUpload (Compare): Ошибка при обработке изображения:", error);
-                if (uiHelpers) uiHelpers.showToast('Ошибка при обработке изображения');
+                logger.info(`Compare изображение загружено в слот ${slotIndex}: ${file.name}`);
+                showToast(`Изображение ${filledCount} загружено`);
+                
+            } catch (err) {
+                logger.error('Ошибка при обработке compare изображения:', err);
+                showToast('Ошибка при обработке изображения');
             } finally {
                 isUploadingActive = false;
             }
         };
         
-        reader.onerror = function(error) {
-            clearTimeout(timeoutId); // Очищаем таймаут при ошибке
-            logger.error("ImageUpload (Compare): Ошибка FileReader:", error);
-            if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла');
+        reader.onerror = () => {
+            logger.error('Ошибка чтения compare файла');
+            showToast('Ошибка при чтении файла');
             isUploadingActive = false;
         };
         
-        try {
-            reader.readAsDataURL(file);
-        } catch (error) {
-            clearTimeout(timeoutId);
-            logger.error("ImageUpload (Compare): Ошибка при чтении файла:", error);
-            if (uiHelpers) uiHelpers.showToast('Ошибка при чтении файла');
-            isUploadingActive = false;
-        }
-    }
-    
-    function showFormElements() {
-        const formContainer = document.getElementById('consultation-overlay');
-        if (formContainer) {
-            const occasionSel = formContainer.querySelector('.occasion-selector');
-            const labels = formContainer.querySelectorAll('.input-label');
-            const prefsInput = formContainer.querySelector('.preferences-input');
-            const submitBtn = formContainer.querySelector('#submit-consultation');
-            
-            if (occasionSel) {
-                occasionSel.classList.remove('hidden');
-                occasionSel.disabled = false;
-            }
-            labels.forEach(l => l.classList.remove('hidden'));
-            if (prefsInput) {
-                prefsInput.classList.remove('hidden');
-                prefsInput.disabled = false;
-            }
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('disabled');
-                submitBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    logger.debug("ImageUpload: Нажата кнопка отправки формы");
-                    // Здесь можно добавить логику отправки формы
-                });
-            } else {
-                logger.warn("ImageUpload: Кнопка отправки формы не найдена");
-                if (window.MishuraApp && window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
-                    window.MishuraApp.utils.uiHelpers.showToast('Ошибка: кнопка отправки формы не найдена!', 5000);
-                }
-            }
-        }
-    }
-    
-    function hideFormElements() {
-        const formContainer = document.getElementById('consultation-overlay');
-        if (formContainer) {
-            const occasionSel = formContainer.querySelector('.occasion-selector');
-            const labels = formContainer.querySelectorAll('.input-label');
-            const prefsInput = formContainer.querySelector('.preferences-input');
-            const submitBtn = formContainer.querySelector('#submit-consultation');
-            
-            if (occasionSel) {
-                occasionSel.classList.add('hidden');
-                occasionSel.disabled = true;
-            }
-            labels.forEach(l => l.classList.add('hidden'));
-            if (prefsInput) {
-                prefsInput.classList.add('hidden');
-                prefsInput.disabled = true;
-            }
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.classList.add('disabled');
-            }
-        }
+        reader.readAsDataURL(file);
     }
     
     function isValidImageFile(file) {
         const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = 10 * 1024 * 1024; // 10MB
         
         if (!file || !file.type) {
-            logger.warn("isValidImageFile: Файл или тип не определены");
+            showToast('Файл не определен');
             return false;
         }
         
         if (!validTypes.includes(file.type.toLowerCase())) {
-            logger.warn(`isValidImageFile: Недопустимый тип файла: ${file.type}`);
-            if (uiHelpers) uiHelpers.showToast(`Тип файла не поддерживается. Используйте: JPG, PNG, WEBP`);
+            showToast('Поддерживаются только JPG, PNG, WEBP форматы');
             return false;
         }
         
         if (file.size > maxSize) {
-            const fileSizeMB = (file.size / (1024*1024)).toFixed(1);
-            logger.warn(`isValidImageFile: Файл слишком большой: ${fileSizeMB}MB`);
-            if (uiHelpers) uiHelpers.showToast(`Файл слишком большой (${fileSizeMB}МБ). Максимум 5МБ`);
+            const sizeMB = (file.size / (1024*1024)).toFixed(1);
+            showToast(`Файл слишком большой (${sizeMB}МБ). Максимум 10МБ`);
             return false;
         }
         
         return true;
     }
     
-    function resetSingleImageUpload() {
-        logger.debug('ImageUpload: Сброс одиночного изображения');
+    function showFormElements() {
+        const occasionSelector = document.querySelector('#consultation-overlay .occasion-selector');
+        const preferencesInput = document.querySelector('#consultation-overlay .preferences-input');
+        const submitButton = document.querySelector('#consultation-overlay #submit-consultation');
+        const labels = document.querySelectorAll('#consultation-overlay .input-label');
         
-        resetFileInput(singleFileInput);
+        if (occasionSelector) {
+            occasionSelector.classList.remove('hidden');
+            occasionSelector.style.display = 'block';
+        }
+        if (preferencesInput) {
+            preferencesInput.classList.remove('hidden');
+            preferencesInput.style.display = 'block';
+        }
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.classList.remove('disabled');
+        }
+        labels.forEach(label => {
+            label.classList.remove('hidden');
+            label.style.display = 'block';
+        });
+        
+        logger.debug("Элементы формы показаны");
+    }
+    
+    function hideFormElements() {
+        const occasionSelector = document.querySelector('#consultation-overlay .occasion-selector');
+        const preferencesInput = document.querySelector('#consultation-overlay .preferences-input');
+        const submitButton = document.querySelector('#consultation-overlay #submit-consultation');
+        const labels = document.querySelectorAll('#consultation-overlay .input-label');
+        
+        if (occasionSelector) {
+            occasionSelector.classList.add('hidden');
+        }
+        if (preferencesInput) {
+            preferencesInput.classList.add('hidden');
+        }
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.classList.add('disabled');
+        }
+        labels.forEach(label => {
+            label.classList.add('hidden');
+        });
+    }
+    
+    function resetSingleMode() {
+        logger.debug('Сброс single режима');
+        
+        if (singleFileInput) singleFileInput.value = '';
         
         if (singlePreviewContainer) {
             singlePreviewContainer.classList.add('hidden');
@@ -563,80 +535,67 @@ window.MishuraApp.components.imageUpload = (function() {
         hideFormElements();
         
         document.dispatchEvent(new CustomEvent('singleImageRemoved'));
-        logger.debug('ImageUpload: Одиночное изображение сброшено');
     }
     
-    function resetSlot(slotIndex) {
-        logger.debug(`ImageUpload: Сброс слота ${slotIndex}`);
+    function resetCompareSlot(slotIndex) {
+        logger.debug(`Сброс compare слота ${slotIndex}`);
         
         const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
-        if (!slot) {
-            logger.error(`ImageUpload: Слот ${slotIndex} не найден для сброса`);
-            return;
-        }
+        if (!slot) return;
         
         const img = slot.querySelector('.preview-image');
+        const deleteBtn = slot.querySelector('.delete-image');
+        const uploadIcon = slot.querySelector('.upload-icon');
+        const input = slot.querySelector('input[type="file"]');
+        
         if (img) {
             img.src = '';
             img.style.display = 'none';
         }
-        
-        const deleteBtn = slot.querySelector('.delete-image');
         if (deleteBtn) deleteBtn.remove();
-        
-        const uploadIcon = slot.querySelector('.upload-icon');
         if (uploadIcon) uploadIcon.style.display = 'flex';
+        if (input) input.value = '';
         
         slot.classList.remove('filled');
-        
-        const input = slot.querySelector('.compare-upload-input');
-        resetFileInput(input);
-        
         uploadedImages.compare[slotIndex] = null;
         
-        const filledSlotsCount = document.querySelectorAll('#compare-analysis-mode .image-slot.filled').length;
-        if (filledSlotsCount < 2) {
+        const filledCount = uploadedImages.compare.filter(img => img !== null).length;
+        if (filledCount < 2) {
             hideFormElements();
         }
         
-        document.dispatchEvent(new CustomEvent('compareImageRemoved', { detail: { slot: slotIndex } }));
-        logger.debug(`ImageUpload: Слот ${slotIndex} сброшен`);
+        document.dispatchEvent(new CustomEvent('compareImageRemoved', { 
+            detail: { slot: slotIndex } 
+        }));
     }
     
-    function resetCompareImageUploads() {
-        logger.debug('ImageUpload: Сброс всех слотов сравнения');
+    function resetCompareMode() {
+        logger.debug('Сброс compare режима');
         
-        imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
-        if (imageSlotsContainer) {
-            const slots = imageSlotsContainer.querySelectorAll('.image-slot');
-            slots.forEach(slot => {
-                const slotIndex = parseInt(slot.dataset.slot, 10);
-                if (!isNaN(slotIndex)) {
-                    resetSlot(slotIndex);
-                }
-            });
+        for (let i = 0; i < 4; i++) {
+            resetCompareSlot(i);
         }
         
         hideFormElements();
         document.dispatchEvent(new CustomEvent('allCompareImagesRemoved'));
-        logger.debug('ImageUpload: Все слоты сравнения сброшены');
     }
     
-    function isUploading() { 
-        return isUploadingActive; 
+    function showToast(message) {
+        if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+            uiHelpers.showToast(message);
+        } else {
+            console.log('Toast:', message);
+        }
     }
     
-    function getUploadedImages() { 
-        return uploadedImages; 
-    }
-    
+    // Публичный API
     return { 
         init, 
-        resetSingleImageUpload, 
-        resetCompareImageUploads, 
-        resetSlot,
-        isUploading, 
-        getUploadedImages,
+        resetSingleImageUpload: resetSingleMode,
+        resetCompareImageUploads: resetCompareMode, 
+        resetSlot: resetCompareSlot,
+        isUploading: () => isUploadingActive, 
+        getUploadedImages: () => uploadedImages,
         isInitialized: () => isImageUploadInitialized
     };
 })();

@@ -392,14 +392,61 @@ body {
    ================== */
 @media (max-width: 400px) {
     .phone-container {
-        width: 100%;
+        width: 100vw;
+        min-width: 0;
+        max-width: 100vw;
         height: 100vh;
         border-radius: 0;
         padding: 0;
     }
-    
     .app-container {
         border-radius: 0;
+        padding: 0;
+    }
+    .main-buttons {
+        max-width: 100vw;
+        width: 100vw;
+        padding: 0 4vw;
+    }
+    .main-button {
+        font-size: 15px;
+        padding: 16px 10px;
+        border-radius: 12px;
+        width: 100%;
+        min-width: 0;
+        margin-bottom: 12px;
+    }
+    .main-button-title {
+        font-size: 15px;
+    }
+    .main-button-description {
+        font-size: 11px;
+    }
+    .dialog {
+        width: 98vw;
+        max-width: 98vw;
+        padding: 10px;
+        border-radius: 10px;
+    }
+    .content-section {
+        padding: 10px 2vw;
+    }
+}
+@media (max-width: 350px) {
+    .main-button {
+        font-size: 13px;
+        padding: 10px 4px;
+        border-radius: 8px;
+    }
+    .main-button-title {
+        font-size: 13px;
+    }
+    .main-button-description {
+        font-size: 9px;
+    }
+    .dialog {
+        padding: 4px;
+        border-radius: 6px;
     }
 }
 

@@ -531,11 +531,14 @@ window.MishuraApp.components.imageUpload = (function() {
         document.dispatchEvent(new CustomEvent('allCompareImagesRemoved'));
     }
     
-    function showToast(message) {
-        if (uiHelpers && typeof uiHelpers.showToast === 'function') {
-            uiHelpers.showToast(message);
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        if (toast) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
         } else {
-            alert(message);
+            alert(msg);
         }
     }
     
@@ -550,3 +553,16 @@ window.MishuraApp.components.imageUpload = (function() {
         isInitialized: () => isImageUploadInitialized
     };
 })();
+
+// Автоматическая инициализация загрузки фото при загрузке страницы
+if (typeof window !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof initSingleImageUpload === 'function') {
+            try {
+                initSingleImageUpload();
+            } catch (e) {
+                if (window.logger) logger.error('Ошибка инициализации image-upload:', e);
+            }
+        }
+    });
+}

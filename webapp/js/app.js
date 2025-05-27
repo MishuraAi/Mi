@@ -2,8 +2,8 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Главное приложение (app.js)
-ВЕРСИЯ: 0.5.3 (Исправлено многократное добавление обработчиков событий с помощью data-атрибутов)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-26
+ВЕРСИЯ: 1.0.0 (СОЗДАН ЗАНОВО)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-27
 
 НАЗНАЧЕНИЕ ФАЙЛА:
 Главный файл приложения, отвечающий за инициализацию всех модулей и координацию их работы.
@@ -22,46 +22,44 @@ window.MishuraApp.app = (function() {
     let consultation;
     let comparison;
     let imageUpload;
-    let isAppInitialized = false; // Флаг для всего app.js init
+    let isAppInitialized = false;
     
     function init() {
         if (isAppInitialized) {
-            // console.warn('App.js: Повторная инициализация app.js пропущена.');
+            console.warn('App.js: Повторная инициализация app.js пропущена.');
             return;
         }
 
-        console.log('🚀 Начало инициализации приложения МИШУРА (app.js)');
+        console.log('🚀 Начало инициализации приложения МИШУРА (app.js v1.0.0)');
         
-        initializeLogger(); // Логгер первым
-        initializeConfig(); 
+        // Инициализируем модули по порядку
+        initializeLogger();
+        initializeConfig();
         initializeUIHelpers();
-        initializeAPIService(); 
+        initializeAPIService();
         initializeModals();
         initializeImageUpload();
         initializeConsultation();
         initializeComparison();
         
-        // Таймаут для setupEventHandlers и setupNavigation остается,
-        // на случай если DOM элементы, к которым они привязываются,
-        // создаются/модифицируются другими модулями асинхронно.
+        // Настраиваем обработчики событий
         setTimeout(() => {
             setupEventHandlers();
             setupNavigation();
-        }, 100); 
+        }, 100);
         
         isAppInitialized = true;
         logger.info('Главный модуль приложения (app.js) успешно инициализирован');
     }
     
     function initializeLogger() {
-        if (window.MishuraApp.utils && window.MishuraApp.utils.logger) {
+        if (window.MishuraApp.utils && window.MishураApp.utils.logger) {
             logger = window.MishuraApp.utils.logger;
-            // Проверяем, есть ли у логгера флаг инициализации, чтобы не вызывать init повторно
             if (typeof logger.init === 'function' && (!logger.isInitialized || !logger.isInitialized())) {
                 logger.init();
             }
         } else {
-            logger = console; // Fallback
+            logger = console;
             logger.warn('App.js: Logger не найден, используется console.');
         }
     }
@@ -141,7 +139,7 @@ window.MishuraApp.app = (function() {
     function initializeComparison() {
         if (window.MishuraApp.features && window.MishuraApp.features.comparison) {
             comparison = window.MishuraApp.features.comparison;
-            if (typeof comparison.init === 'function' && (!comparison.isInitializedInternal || !comparison.isInitializedInternal())) {
+            if (typeof comparison.init === 'function' && (!comparison.isInitialized || !comparison.isInitialized())) {
                 comparison.init();
             }
             if(logger) logger.debug('App.js: Comparison инициализирован.');
@@ -174,7 +172,7 @@ window.MishuraApp.app = (function() {
         if(logger) logger.debug(`App.js: Режим ${mode} установлен и событие отправлено`);
     }
     
-    // --- Обработчики событий для кнопок ---
+    // Обработчики событий для кнопок
     function consultationButtonClickHandler(e) {
         e.preventDefault();
         logger.debug('App.js: Нажата кнопка консультации (single mode) - ID: consultation-button');
@@ -196,10 +194,9 @@ window.MishuraApp.app = (function() {
             logger.error('App.js: Consultation module не найден для открытия модального окна (compare)');
         }
     }
-    // --- Конец обработчиков событий для кнопок ---
 
     function setupEventHandlers() {
-        if(logger) logger.debug('App.js: Настройка обработчиков событий (с проверкой флага mishuraHandlerAttached)');
+        if(logger) logger.debug('App.js: Настройка обработчиков событий');
         
         const consultationButton = document.getElementById('consultation-button');
         if (consultationButton) {
@@ -207,8 +204,6 @@ window.MishuraApp.app = (function() {
                 consultationButton.addEventListener('click', consultationButtonClickHandler);
                 consultationButton.dataset.mishuraHandlerAttached = 'true';
                 logger.debug('App.js: Обработчик для кнопки консультации НАСТРОЕН');
-            } else {
-                // logger.debug('App.js: Обработчик для кнопки консультации уже был настроен');
             }
         } else {
             logger.warn('App.js: Кнопка консультации (ID: consultation-button) не найдена');
@@ -220,8 +215,6 @@ window.MishuraApp.app = (function() {
                 compareButton.addEventListener('click', compareButtonClickHandler);
                 compareButton.dataset.mishuraHandlerAttached = 'true';
                 logger.debug('App.js: Обработчик для кнопки сравнения НАСТРОЕН');
-            } else {
-                // logger.debug('App.js: Обработчик для кнопки сравнения уже был настроен');
             }
         } else {
             logger.warn('App.js: Кнопка сравнения образов (ID: compare-button) не найдена');
@@ -230,7 +223,7 @@ window.MishuraApp.app = (function() {
     
     function navItemClickHandler(e) {
         e.preventDefault();
-        const page = this.dataset.page; // 'this' будет элементом, на котором сработало событие
+        const page = this.dataset.page;
         logger.debug(`App.js: Переход на страницу: ${page}`);
         
         document.querySelectorAll('.content-section').forEach(section => {
@@ -263,7 +256,7 @@ window.MishuraApp.app = (function() {
     }
 
     function setupNavigation() {
-        if(logger) logger.debug('App.js: Настройка навигации (с проверкой флага mishuraNavHandlerAttached)');
+        if(logger) logger.debug('App.js: Настройка навигации');
         
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(item => {
@@ -272,12 +265,12 @@ window.MishuraApp.app = (function() {
                 item.dataset.mishuraNavHandlerAttached = 'true';
             }
         });
-        if(logger) logger.debug('App.js: Навигация настроена (или уже была настроена)');
+        if(logger) logger.debug('App.js: Навигация настроена');
     }
     
     return {
         init,
         setModalMode,
-        isInitialized: () => isAppInitialized // Экспортируем флаг для возможной проверки извне
+        isInitialized: () => isAppInitialized
     };
 })();

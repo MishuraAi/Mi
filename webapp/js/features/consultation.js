@@ -31,8 +31,11 @@ window.MishuraApp.features.consultation = (function() {
         imageUpload = window.MishuraApp.components.imageUpload;
         
         // Инициализация API сервиса
-        if (window.MishuraApp.utils && window.MishuraApp.utils.api) {
-            apiService = window.MishuraApp.utils.api;
+        if (window.MishuraApp.api && window.MishuraApp.api.service) {
+            apiService = window.MishuraApp.api.service;
+            if (typeof apiService.init === 'function' && (!apiService.isInitialized || !apiService.isInitialized())) {
+                apiService.init(window.MishuraApp.config);
+            }
             logger.info("Consultation: API сервис успешно инициализирован");
         } else {
             logger.error("Consultation: API сервис НЕ НАЙДЕН! Запросы не будут работать.");
@@ -176,8 +179,12 @@ window.MishuraApp.features.consultation = (function() {
         }
         
         if (!apiService || typeof apiService.analyzeImage !== 'function') {
-            logger.error('Consultation (single): КРИТИЧЕСКАЯ ОШИБКА - apiService или analyzeImage недоступен!');
-            if (uiHelpers) { uiHelpers.hideLoading(); uiHelpers.showToast('Ошибка: Сервис API недоступен (C02/C03).');}
+            const errorMsg = !apiService ? 'API сервис не инициализирован' : 'Метод analyzeImage не найден';
+            logger.error(`Consultation (single): КРИТИЧЕСКАЯ ОШИБКА - ${errorMsg}`);
+            if (uiHelpers) { 
+                uiHelpers.hideLoading(); 
+                uiHelpers.showToast(`Ошибка: ${errorMsg} (C02/C03).`, 5000);
+            }
             return;
         }
 

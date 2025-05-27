@@ -1,159 +1,282 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: API сервис (service.js)
-ВЕРСИЯ: 0.5.2 (Более строгое управление инициализацией, улучшенное логирование ошибок fetch)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-21
+КОМПОНЕНТ: API утилиты (utils/api.js)
+ВЕРСИЯ: 1.0.0
+ДАТА ОБНОВЛЕНИЯ: 2025-05-27
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Предоставляет интерфейс для взаимодействия с серверным API.
+Связующее звено между компонентами приложения и API сервисом.
 ==========================================================================================
 */
 
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.api = window.MishuraApp.api || {};
+window.MishuraApp.utils = window.MishuraApp.utils || {};
 
-if (window.MishuraApp.api.service && window.MishuraApp.api.service.isInitialized && window.MishuraApp.api.service.isInitialized()) {
-    // console.warn("API сервис (api.service) уже был инициализирован. Повторная инициализация пропускается.");
-} else {
-    window.MishuraApp.api.service = (function() {
-        'use strict';
+window.MishuraApp.utils.api = (function() {
+    'use strict';
+    
+    let logger;
+    let apiService;
+    let config;
+    let isInitialized = false;
+    
+    function init() {
+        if (isInitialized) return;
         
-        let configModule, loggerModule; // Избегаем прямого использования config, logger до их инициализации
-        let apiBaseUrl = 'https://style-ai-bot.onrender.com/api'; // Дефолт теперь публичный Render
-        let isInitializedLocal = false;
+        logger = window.MishuraApp.utils.logger || console;
+        config = window.MishuraApp.config;
         
-        function getLogger() {
-            return window.MishuraApp?.logger || console;
+        // Получаем ссылку на основной API сервис
+        if (window.MishuraApp.api && window.MishuraApp.api.service) {
+            apiService = window.MishuraApp.api.service;
+            logger.debug('Utils API: Связь с API сервисом установлена');
+        } else {
+            logger.error('Utils API: API сервис не найден!');
         }
-
-        function init(config) {
-            if (config && config.apiSettings) {
-                configModule = config;
-                if (config.apiSettings.baseUrl) {
-                    apiBaseUrl = config.apiSettings.baseUrl;
-                }
+        
+        isInitialized = true;
+        logger.info('Utils API инициализирован');
+    }
+    
+    /**
+     * Анализ одиночного изображения
+     */
+    async function analyzeImage(imageFile, mode = 'single', occasion = 'повседневный', preferences = '') {
+        if (!apiService) {
+            init();
+        }
+        
+        try {
+            logger.debug('Utils API: Отправка изображения на анализ', {
+                fileName: imageFile.name,
+                fileSize: imageFile.size,
+                mode: mode,
+                occasion: occasion
+            });
+            
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            formData.append('mode', mode);
+            formData.append('occasion', occasion);
+            formData.append('preferences', preferences);
+            
+            const response = await apiService.processStylistConsultation(formData);
+            
+            logger.debug('Utils API: Ответ получен', response);
+            
+            // Преобразуем ответ в ожидаемый формат
+            if (response && response.analysis) {
+                return {
+                    status: 'success',
+                    advice: response.analysis
+                };
+            } else if (response && response.advice) {
+                return {
+                    status: 'success',
+                    advice: response.advice
+                };
+            } else {
+                throw new Error('Неверный формат ответа от сервера');
             }
-            isInitializedLocal = true;
+            
+        } catch (error) {
+            logger.error('Utils API: Ошибка при анализе изображения:', error);
+            
+            // Проверяем тип ошибки
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                return {
+                    status: 'error',
+                    message: 'Не удается подключиться к серверу. Проверьте соединение с интернетом.',
+                    error_type: 'connection_error'
+                };
+            }
+            
+            return {
+                status: 'error',
+                message: error.message || 'Произошла ошибка при анализе изображения',
+                error_type: 'general_error'
+            };
+        }
+    }
+    
+    /**
+     * Сравнение нескольких изображений
+     */
+    async function compareImages(imageFiles, occasion = 'повседневный', preferences = '') {
+        if (!apiService) {
+            init();
         }
         
-        function processStylistConsultation(formData) {
-            if (!isInitializedLocal) init(); 
-            const currentLogger = getLogger();
-            currentLogger.debug('API_Service: Отправка запроса на /analyze-outfit');
-            const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.consultation)
-                             ? configModule.apiSettings.endpoints.consultation
-                             : '/analyze-outfit';
-            const url = `${apiBaseUrl}${endpoint}`;
-            currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
-            return fetchWithTimeout(url, { 
-                method: 'POST', 
-                body: formData,
-                headers: {
-                    'Accept': 'application/json'
-                }
-            }, 60000); // Увеличиваем таймаут до 60 секунд для обработки изображений
-        }
-
-        function processCompareOutfits(formData) {
-            if (!isInitializedLocal) init();
-            const currentLogger = getLogger();
-            currentLogger.debug('API_Service: Отправка запроса на /compare-outfits');
-            const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.compare)
-                             ? configModule.apiSettings.endpoints.compare
-                             : '/compare-outfits';
-            const url = `${apiBaseUrl}${endpoint}`;
-            currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
-            return fetchWithTimeout(url, { 
-                method: 'POST', 
-                body: formData,
-                headers: {
-                    'Accept': 'application/json'
+        try {
+            logger.debug('Utils API: Отправка изображений на сравнение', {
+                count: imageFiles.length,
+                occasion: occasion
+            });
+            
+            const formData = new FormData();
+            
+            // Добавляем все изображения
+            imageFiles.forEach((file, index) => {
+                if (file) {
+                    formData.append(`image${index + 1}`, file);
                 }
             });
+            
+            formData.append('occasion', occasion);
+            formData.append('preferences', preferences);
+            formData.append('mode', 'compare');
+            
+            const response = await apiService.processCompareOutfits(formData);
+            
+            logger.debug('Utils API: Ответ сравнения получен', response);
+            
+            // Преобразуем ответ в ожидаемый формат
+            if (response && response.comparison) {
+                return {
+                    status: 'success',
+                    advice: response.comparison
+                };
+            } else if (response && response.advice) {
+                return {
+                    status: 'success',
+                    advice: response.advice
+                };
+            } else {
+                throw new Error('Неверный формат ответа от сервера');
+            }
+            
+        } catch (error) {
+            logger.error('Utils API: Ошибка при сравнении изображений:', error);
+            
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                return {
+                    status: 'error',
+                    message: 'Не удается подключиться к серверу. Проверьте соединение с интернетом.',
+                    error_type: 'connection_error'
+                };
+            }
+            
+            return {
+                status: 'error',
+                message: error.message || 'Произошла ошибка при сравнении изображений',
+                error_type: 'general_error'
+            };
+        }
+    }
+    
+    /**
+     * Получение истории консультаций
+     */
+    async function getConsultationHistory(userId) {
+        if (!apiService) {
+            init();
         }
         
-        function processTryOn(formData) {
-            if (!isInitializedLocal) init();
-            const currentLogger = getLogger();
-            currentLogger.debug('API_Service: Отправка запроса на /virtual-fitting');
-            const endpoint = (configModule && configModule.apiSettings && configModule.apiSettings.endpoints && configModule.apiSettings.endpoints.virtualFitting)
-                                ? configModule.apiSettings.endpoints.virtualFitting
-                                : '/virtual-fitting'; 
-            const url = `${apiBaseUrl}${endpoint}`;
-            currentLogger.debug(`API_Service: Полный URL запроса: ${url}`);
-            
-            // Проверяем, что formData содержит необходимые файлы
-            const personImage = formData.get('person_image');
-            const outfitImage = formData.get('outfit_image');
-            
-            if (!personImage || !outfitImage) {
-                throw new Error('Необходимо предоставить оба изображения');
-            }
-            
-            // Проверяем, что файлы действительно являются файлами
-            if (!(personImage instanceof File) || !(outfitImage instanceof File)) {
-                throw new Error('Загруженные данные не являются файлами');
-            }
-            
-            // Проверяем размер файлов
-            const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-            if (personImage.size > MAX_FILE_SIZE) {
-                throw new Error('Размер фотографии человека превышает 10MB');
-            }
-            if (outfitImage.size > MAX_FILE_SIZE) {
-                throw new Error('Размер фотографии одежды превышает 10MB');
-            }
-            
-            // Проверяем тип файлов
-            if (!personImage.type.startsWith('image/') || !outfitImage.type.startsWith('image/')) {
-                throw new Error('Загруженные файлы должны быть изображениями');
-            }
-            
-            return fetchWithTimeout(url, { 
-                method: 'POST', 
-                body: formData,
-                headers: {
-                    'Accept': 'application/json'
+        try {
+            const response = await apiService.fetchWithTimeout(
+                `${apiService.getBaseUrl()}/history/${userId}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
                 }
-            }, 60000); // Увеличиваем таймаут до 60 секунд для обработки изображений
+            );
+            
+            return {
+                status: 'success',
+                data: response.history || []
+            };
+            
+        } catch (error) {
+            logger.error('Utils API: Ошибка при получении истории:', error);
+            return {
+                status: 'error',
+                message: 'Не удалось загрузить историю',
+                data: []
+            };
+        }
+    }
+    
+    /**
+     * Получение баланса пользователя
+     */
+    async function getUserBalance(userId) {
+        if (!apiService) {
+            init();
         }
         
-        async function fetchWithTimeout(url, options, timeout = 30000) {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
-            
-            try {
-                const response = await fetch(url, {
-                    ...options,
-                    signal: controller.signal,
-                    mode: 'cors',
-                    credentials: 'include'
-                });
-                clearTimeout(id);
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        try {
+            const response = await apiService.fetchWithTimeout(
+                `${apiService.getBaseUrl()}/balance/${userId}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
                 }
-                
-                return response.json();
-            } catch (error) {
-                clearTimeout(id);
-                const currentLogger = getLogger();
-                currentLogger.error(`API_Service: Ошибка запроса к ${url}: ${error.message}`);
-                throw error;
-            }
+            );
+            
+            return {
+                status: 'success',
+                balance: response.balance || 0
+            };
+            
+        } catch (error) {
+            logger.error('Utils API: Ошибка при получении баланса:', error);
+            return {
+                status: 'error',
+                message: 'Не удалось загрузить баланс',
+                balance: 0
+            };
         }
-                
-        return {
-            init,
-            isInitialized: () => isInitializedLocal,
-            getBaseUrl: () => apiBaseUrl,
-            processStylistConsultation,
-            processCompareOutfits,
-            processTryOn,
-            fetchWithTimeout
-        };
-    })();
-}
+    }
+    
+    /**
+     * Проверка доступности API
+     */
+    async function checkApiHealth() {
+        if (!apiService) {
+            init();
+        }
+        
+        try {
+            const response = await apiService.fetchWithTimeout(
+                `${apiService.getBaseUrl()}/health`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                },
+                5000 // 5 секунд таймаут для health check
+            );
+            
+            return {
+                status: 'success',
+                available: true,
+                version: response.version || 'unknown'
+            };
+            
+        } catch (error) {
+            logger.error('Utils API: Сервер недоступен:', error);
+            return {
+                status: 'error',
+                available: false,
+                message: 'API сервер недоступен'
+            };
+        }
+    }
+    
+    // Публичный API
+    return {
+        init,
+        analyzeImage,
+        compareImages,
+        getConsultationHistory,
+        getUserBalance,
+        checkApiHealth,
+        isInitialized: () => isInitialized
+    };
+})();

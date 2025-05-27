@@ -36,7 +36,18 @@ if (!window.MishuraApp.features.comparison) {
                 error: (...args) => console.error("Comparison:", ...args) 
             };
             uiHelpers = window.MishuraApp.utils.uiHelpers;
-            apiService = window.MishuraApp.utils.api;
+            
+            // Инициализация API сервиса
+            if (window.MishuraApp.api && window.MishuraApp.api.service) {
+                apiService = window.MishuraApp.api.service;
+                if (typeof apiService.init === 'function' && (!apiService.isInitialized || !apiService.isInitialized())) {
+                    apiService.init(window.MishuraApp.config);
+                }
+                logger.info("Comparison: API сервис успешно инициализирован");
+            } else {
+                logger.error("Comparison: API сервис НЕ НАЙДЕН! Запросы не будут работать.");
+                if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис API не загружен (C00).", 5000);
+            }
             
             logger.debug("Инициализация модуля сравнения образов");
             

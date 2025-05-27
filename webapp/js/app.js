@@ -2,7 +2,7 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Главное приложение (app.js)
-ВЕРСИЯ: 1.0.0 (СОЗДАН ЗАНОВО)
+ВЕРСИЯ: 1.1.0 (ИСПРАВЛЕНА ИНИЦИАЛИЗАЦИЯ)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-27
 
 НАЗНАЧЕНИЕ ФАЙЛА:
@@ -30,9 +30,9 @@ window.MishuraApp.app = (function() {
             return;
         }
 
-        console.log('🚀 Начало инициализации приложения МИШУРА (app.js v1.0.0)');
+        console.log('🚀 Начало инициализации приложения МИШУРА (app.js v1.1.0)');
         
-        // Инициализируем модули по порядку
+        // Инициализируем модули по порядку с проверками
         initializeLogger();
         initializeConfig();
         initializeUIHelpers();
@@ -49,107 +49,159 @@ window.MishuraApp.app = (function() {
         }, 100);
         
         isAppInitialized = true;
-        logger.info('Главный модуль приложения (app.js) успешно инициализирован');
+        if (logger) {
+            logger.info('Главный модуль приложения (app.js) успешно инициализирован');
+        } else {
+            console.info('App.js: Главный модуль приложения успешно инициализирован');
+        }
     }
     
     function initializeLogger() {
-        if (window.MishuraApp.utils && window.MishураApp.utils.logger) {
-            logger = window.MishuraApp.utils.logger;
-            if (typeof logger.init === 'function' && (!logger.isInitialized || !logger.isInitialized())) {
-                logger.init();
+        try {
+            // Безопасная проверка существования utils
+            if (window.MishuraApp && 
+                window.MishuraApp.utils && 
+                window.MishuraApp.utils.logger) {
+                logger = window.MishuraApp.utils.logger;
+                if (typeof logger.init === 'function') {
+                    logger.init();
+                }
+                console.log('App.js: Logger успешно инициализирован');
+            } else {
+                logger = console;
+                console.warn('App.js: Logger не найден, используется console fallback');
             }
-        } else {
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации logger:', error);
             logger = console;
-            logger.warn('App.js: Logger не найден, используется console.');
         }
     }
 
     function initializeConfig() {
-        if (window.MishuraApp.config) {
-            if (typeof window.MishuraApp.config.init === 'function' && 
-                (!window.MishuraApp.config.isInitialized || !window.MishuraApp.config.isInitialized())) {
-                window.MishuraApp.config.init();
-                if(logger) logger.debug('App.js: Config инициализирован.');
+        try {
+            if (window.MishuraApp && window.MishuraApp.config) {
+                if (typeof window.MishuraApp.config.init === 'function') {
+                    window.MishuraApp.config.init();
+                    console.log('App.js: Config инициализирован');
+                }
+            } else {
+                console.error('App.js: Config не найден');
             }
-        } else {
-            if(logger) logger.error('App.js: Config не найден.');
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации config:', error);
         }
     }
     
     function initializeUIHelpers() {
-        if (window.MishuraApp.utils && window.MishuraApp.utils.uiHelpers) {
-            uiHelpers = window.MishuraApp.utils.uiHelpers;
-            if (typeof uiHelpers.init === 'function' && (!uiHelpers.isInitialized || !uiHelpers.isInitialized())) {
-                uiHelpers.init();
+        try {
+            if (window.MishuraApp && 
+                window.MishuraApp.utils && 
+                window.MishuraApp.utils.uiHelpers) {
+                uiHelpers = window.MishuraApp.utils.uiHelpers;
+                if (typeof uiHelpers.init === 'function') {
+                    uiHelpers.init();
+                }
+                console.log('App.js: UI Helpers инициализированы');
+            } else {
+                console.error('App.js: UI Helpers не найдены');
             }
-            if(logger) logger.debug('App.js: UI Helpers инициализированы.');
-        } else {
-            if(logger) logger.error('App.js: UI Helpers не найдены.');
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации UI Helpers:', error);
         }
     }
     
     function initializeAPIService() {
-        if (window.MishuraApp.api && window.MishuraApp.api.service) {
-            apiService = window.MishuraApp.api.service;
-            if (typeof apiService.init === 'function' && (!apiService.isInitialized || !apiService.isInitialized())) {
-                 apiService.init(window.MishuraApp.config);
+        try {
+            if (window.MishuraApp && 
+                window.MishuraApp.api && 
+                window.MishuraApp.api.service) {
+                apiService = window.MishuraApp.api.service;
+                if (typeof apiService.init === 'function') {
+                    apiService.init(window.MishuraApp.config);
+                }
+                console.log('App.js: API Service инициализирован');
+            } else {
+                console.error('App.js: API Service не найден');
             }
-            if(logger) logger.debug('App.js: API Service инициализирован.');
-        } else {
-            if(logger) logger.error('App.js: API Service не найден.');
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации API Service:', error);
         }
     }
     
     function initializeModals() {
-        if (window.MishuraApp.components && window.MishuraApp.components.modals) {
-            modals = window.MishuraApp.components.modals;
-            if (typeof modals.init === 'function' && (!modals.isInitialized || !modals.isInitialized())) {
-                modals.init();
+        try {
+            if (window.MishuraApp && 
+                window.MishuraApp.components && 
+                window.MishuraApp.components.modals) {
+                modals = window.MishuraApp.components.modals;
+                if (typeof modals.init === 'function') {
+                    modals.init();
+                }
+                console.log('App.js: Modals инициализированы');
+            } else {
+                console.error('App.js: Modals не найдены');
             }
-            if(logger) logger.debug('App.js: Modals инициализированы.');
-        } else {
-            if(logger) logger.error('App.js: Modals не найдены.');
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации Modals:', error);
         }
     }
     
     function initializeImageUpload() {
-        if (window.MishuraApp.components && window.MishuraApp.components.imageUpload) {
-            imageUpload = window.MishuraApp.components.imageUpload;
-            if (typeof imageUpload.init === 'function' && (!imageUpload.isInitialized || !imageUpload.isInitialized())) {
-                imageUpload.init();
+        try {
+            if (window.MishuraApp && 
+                window.MishuraApp.components && 
+                window.MishuraApp.components.imageUpload) {
+                imageUpload = window.MishuraApp.components.imageUpload;
+                if (typeof imageUpload.init === 'function') {
+                    imageUpload.init();
+                }
+                console.log('App.js: Image Upload инициализирован');
+            } else {
+                console.error('App.js: Image Upload не найден');
             }
-            if(logger) logger.debug('App.js: Image Upload инициализирован.');
-        } else {
-            if(logger) logger.error('App.js: Image Upload не найден.');
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации Image Upload:', error);
         }
     }
     
     function initializeConsultation() {
-        if (window.MishuraApp.features && window.MishuraApp.features.consultation) {
-            consultation = window.MishuraApp.features.consultation;
-            if (typeof consultation.init === 'function' && (!consultation.isInitialized || !consultation.isInitialized())) {
-                consultation.init();
+        try {
+            if (window.MishuraApp && 
+                window.MishuraApp.features && 
+                window.MishuraApp.features.consultation) {
+                consultation = window.MishuraApp.features.consultation;
+                if (typeof consultation.init === 'function') {
+                    consultation.init();
+                }
+                console.log('App.js: Consultation инициализирован');
+            } else {
+                console.error('App.js: Consultation не найден');
             }
-            if(logger) logger.debug('App.js: Consultation инициализирован.');
-        } else {
-            if(logger) logger.error('App.js: Consultation не найден.');
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации Consultation:', error);
         }
     }
     
     function initializeComparison() {
-        if (window.MishuraApp.features && window.MishuraApp.features.comparison) {
-            comparison = window.MishuraApp.features.comparison;
-            if (typeof comparison.init === 'function' && (!comparison.isInitialized || !comparison.isInitialized())) {
-                comparison.init();
+        try {
+            if (window.MishuraApp && 
+                window.MishuraApp.features && 
+                window.MishuraApp.features.comparison) {
+                comparison = window.MishuraApp.features.comparison;
+                if (typeof comparison.init === 'function') {
+                    comparison.init();
+                }
+                console.log('App.js: Comparison инициализирован');
+            } else {
+                console.error('App.js: Comparison не найден');
             }
-            if(logger) logger.debug('App.js: Comparison инициализирован.');
-        } else {
-            if(logger) logger.error('App.js: Comparison не найден.');
+        } catch (error) {
+            console.error('App.js: Ошибка при инициализации Comparison:', error);
         }
     }
     
     function setModalMode(mode) {
-        if(logger) logger.debug(`App.js: Установка режима модального окна: ${mode}`);
+        console.log(`App.js: Установка режима модального окна: ${mode}`);
         
         const singleModeContainer = document.getElementById('single-analysis-mode');
         const compareModeContainer = document.getElementById('compare-analysis-mode');
@@ -169,44 +221,52 @@ window.MishuraApp.app = (function() {
         }
         
         document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
-        if(logger) logger.debug(`App.js: Режим ${mode} установлен и событие отправлено`);
+        console.log(`App.js: Режим ${mode} установлен и событие отправлено`);
     }
     
     // Обработчики событий для кнопок
     function consultationButtonClickHandler(e) {
         e.preventDefault();
-        logger.debug('App.js: Нажата кнопка консультации (single mode) - ID: consultation-button');
+        console.log('App.js: Нажата кнопка консультации (single mode)');
+        
         if (consultation && typeof consultation.openConsultationModal === 'function') {
             consultation.openConsultationModal();
             setTimeout(() => setModalMode('single'), 50);
         } else {
-            logger.error('App.js: Consultation module не найден для открытия модального окна');
+            console.error('App.js: Consultation module не найден или метод openConsultationModal недоступен');
+            if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+                uiHelpers.showToast('Ошибка: модуль консультации не загружен');
+            }
         }
     }
 
     function compareButtonClickHandler(e) {
         e.preventDefault();
-        logger.debug('App.js: Нажата кнопка сравнения образов (compare mode) - ID: compare-button');
+        console.log('App.js: Нажата кнопка сравнения образов (compare mode)');
+        
         if (consultation && typeof consultation.openConsultationModal === 'function') {
             consultation.openConsultationModal();
             setTimeout(() => setModalMode('compare'), 50);
         } else {
-            logger.error('App.js: Consultation module не найден для открытия модального окна (compare)');
+            console.error('App.js: Consultation module не найден или метод openConsultationModal недоступен');
+            if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+                uiHelpers.showToast('Ошибка: модуль консультации не загружен');
+            }
         }
     }
 
     function setupEventHandlers() {
-        if(logger) logger.debug('App.js: Настройка обработчиков событий');
+        console.log('App.js: Настройка обработчиков событий');
         
         const consultationButton = document.getElementById('consultation-button');
         if (consultationButton) {
             if (!consultationButton.dataset.mishuraHandlerAttached) {
                 consultationButton.addEventListener('click', consultationButtonClickHandler);
                 consultationButton.dataset.mishuraHandlerAttached = 'true';
-                logger.debug('App.js: Обработчик для кнопки консультации НАСТРОЕН');
+                console.log('App.js: Обработчик для кнопки консультации НАСТРОЕН');
             }
         } else {
-            logger.warn('App.js: Кнопка консультации (ID: consultation-button) не найдена');
+            console.warn('App.js: Кнопка консультации (ID: consultation-button) не найдена');
         }
         
         const compareButton = document.getElementById('compare-button');
@@ -214,17 +274,17 @@ window.MishuraApp.app = (function() {
              if (!compareButton.dataset.mishuraHandlerAttached) {
                 compareButton.addEventListener('click', compareButtonClickHandler);
                 compareButton.dataset.mishuraHandlerAttached = 'true';
-                logger.debug('App.js: Обработчик для кнопки сравнения НАСТРОЕН');
+                console.log('App.js: Обработчик для кнопки сравнения НАСТРОЕН');
             }
         } else {
-            logger.warn('App.js: Кнопка сравнения образов (ID: compare-button) не найдена');
+            console.warn('App.js: Кнопка сравнения образов (ID: compare-button) не найдена');
         }
     }
     
     function navItemClickHandler(e) {
         e.preventDefault();
         const page = this.dataset.page;
-        logger.debug(`App.js: Переход на страницу: ${page}`);
+        console.log(`App.js: Переход на страницу: ${page}`);
         
         document.querySelectorAll('.content-section').forEach(section => {
             section.classList.add('hidden');
@@ -236,27 +296,21 @@ window.MishuraApp.app = (function() {
         } else {
             const homeSection = document.getElementById('home-section');
             if (homeSection) {
-                homeSection.classList.remove('hidden');
+                homeSection.classList.remove('hidden');  
             }
-            logger.warn(`App.js: Секция ${page}-section не найдена, показана home-section`);
+            console.warn(`App.js: Секция ${page}-section не найдена, показана home-section`);
         }
         
         document.querySelectorAll('.nav-item').forEach(navItem => navItem.classList.remove('active'));
         this.classList.add('active');
         
-        const navBar = document.querySelector('.nav-bar');
-        if (navBar) {
-            navBar.style.display = 'flex';
-            navBar.style.visibility = 'visible';
-        }
-
         document.dispatchEvent(new CustomEvent('navigationChanged', { 
             detail: { page: page } 
         }));
     }
 
     function setupNavigation() {
-        if(logger) logger.debug('App.js: Настройка навигации');
+        console.log('App.js: Настройка навигации');
         
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(item => {
@@ -265,7 +319,7 @@ window.MishuraApp.app = (function() {
                 item.dataset.mishuraNavHandlerAttached = 'true';
             }
         });
-        if(logger) logger.debug('App.js: Навигация настроена');
+        console.log('App.js: Навигация настроена');
     }
     
     return {

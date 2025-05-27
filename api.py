@@ -97,14 +97,38 @@ app = FastAPI(
 )
 
 # Настройка CORS
+CORS_ORIGINS = [
+    "https://style-ai-bot.onrender.com",  # Основной домен на Render
+    "https://web.telegram.org",           # Telegram Web App
+    "https://t.me",                       # Telegram
+]
+
+# В development режиме добавляем localhost
+if os.getenv("ENVIRONMENT", "production") == "development":
+    CORS_ORIGINS.extend([
+        "http://localhost:8000",
+        "http://localhost:8001",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8001"
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # или укажите нужные адреса
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "X-Telegram-Init-Data"
+    ],
+    max_age=3600,  # Кэширование preflight запросов на 1 час
 )
-logger.info("CORS middleware настроен с allow_origins для портов 8000 и 8001.")
+
+logger.info(f"CORS middleware настроен. Разрешенные домены: {CORS_ORIGINS}")
 
 # Корневой маршрут для перенаправления на веб-приложение
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -232,6 +256,22 @@ async def compare_outfits_endpoint(
             status_code=500,
             content={"status": "error", "message": f"Внутренняя ошибка сервера при сравнении одежды: {str(e)}"}
         )
+
+@api_v1.get("/health", summary="Проверка состояния сервера (v1)", tags=["System"])
+@monitor_request()
+async def health_check_v1():
+    """Эндпоинт для проверки состояния сервера (версия 1)"""
+    return {
+        "status": "healthy",
+        "version": app.version,
+        "timestamp": datetime.now().isoformat(),
+        "system": {
+            "platform": platform.platform(),
+            "python_version": sys.version,
+            "memory_usage": "N/A"  # Можно добавить реальные метрики
+        },
+        "api_version": "v1"
+    }
 
 @app.get("/health", summary="Проверка состояния сервера", tags=["System"])
 @monitor_request()

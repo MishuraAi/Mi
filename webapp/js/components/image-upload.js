@@ -327,99 +327,30 @@ window.MishuraApp.components.imageUpload = (function() {
         }
     }
     
-    function handleCompareImageUpload(file, slotIndex) {
-        if (!isValidImageFile(file)) return;
+    function handleCompareImageUpload(file, slot) {
+        const previewContainer = document.querySelector(`.compare-upload-area[data-slot="${slot}"]`);
+        if (!previewContainer) return;
 
-        logger.debug(`Обработка compare изображения для слота ${slotIndex}: ${file.name}`);
-        isUploadingActive = true;
-        
         const reader = new FileReader();
         reader.onload = (e) => {
-            try {
-                const slot = document.querySelector(`#compare-analysis-mode .image-slot[data-slot="${slotIndex}"]`);
-                if (!slot) {
-                    logger.error(`Слот ${slotIndex} не найден`);
-                    return;
-                }
-
-                const previewImg = slot.querySelector('.preview-image');
-                const uploadIcon = slot.querySelector('.upload-icon');
-                
-                if (previewImg) {
-                    previewImg.src = e.target.result;
-                    previewImg.style.display = 'block';
-                }
-                
-                if (uploadIcon) {
-                    uploadIcon.style.display = 'none';
-                }
-
-                // Создаем кнопку удаления
-                let deleteBtn = slot.querySelector('.delete-image');
-                if (!deleteBtn) {
-                    deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'delete-image';
-                    deleteBtn.innerHTML = '×';
-                    deleteBtn.style.cssText = `
-                        position: absolute;
-                        top: 5px;
-                        right: 5px;
-                        z-index: 20;
-                        background: rgba(0, 0, 0, 0.7);
-                        color: white;
-                        border: none;
-                        border-radius: 50%;
-                        width: 20px;
-                        height: 20px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 12px;
-                    `;
-                    slot.appendChild(deleteBtn);
-                    
-                    deleteBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        logger.debug(`Удаление изображения из слота ${slotIndex}`);
-                        resetCompareSlot(slotIndex);
-                    });
-                }
-
-                slot.classList.add('filled');
-                uploadedImages.compare[slotIndex] = file;
-                
-                const filledCount = uploadedImages.compare.filter(img => img !== null).length;
-                logger.debug(`Compare: заполнено ${filledCount} слотов`);
-                
-                if (filledCount >= 2) {
-                    showFormElements();
-                }
-                
-                // Отправляем событие
-                document.dispatchEvent(new CustomEvent('compareImageUploaded', { 
-                    detail: { file: file, slot: slotIndex } 
-                }));
-                
-                logger.info(`Compare изображение загружено в слот ${slotIndex}: ${file.name}`);
-                showToast(`Изображение ${filledCount} загружено`);
-                
-            } catch (err) {
-                logger.error('Ошибка при обработке compare изображения:', err);
-                showToast('Ошибка при обработке изображения');
-            } finally {
-                isUploadingActive = false;
-            }
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.classList.add('preview-image');
+            previewContainer.innerHTML = '';
+            previewContainer.appendChild(img);
+            
+            // Активируем кнопку, если загружено достаточно фото
+            checkCompareButtonState();
         };
-        
-        reader.onerror = () => {
-            logger.error('Ошибка чтения compare файла');
-            showToast('Ошибка при чтении файла');
-            isUploadingActive = false;
-        };
-        
         reader.readAsDataURL(file);
+    }
+
+    function checkCompareButtonState() {
+        const uploadedImages = document.querySelectorAll('.compare-upload-area .preview-image');
+        const compareButton = document.querySelector('.compare-submit');
+        if (compareButton) {
+            compareButton.disabled = uploadedImages.length < 2;
+        }
     }
     
     function isValidImageFile(file) {
@@ -579,47 +510,40 @@ window.MishuraApp.components.imageUpload = (function() {
     };
 })();
 
-const singleUploadArea = document.getElementById('single-upload-area');
-const singleFileInput = document.getElementById('single-upload-input');
-
-if (singleUploadArea && singleFileInput) {
-    singleUploadArea.addEventListener('click', () => {
-        singleFileInput.click();
-    });
+export function initializeImageUpload() {
+    const singleUploadArea = document.getElementById('single-upload-area');
+    const singleFileInput = document.getElementById('single-upload-input');
+    
+    if (singleUploadArea && singleFileInput) {
+        singleUploadArea.addEventListener('click', () => {
+            singleFileInput.click();
+        });
+        
+        singleFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                displayPreview(file, singleUploadArea);
+                enableUploadButton();
+            }
+        });
+    }
 }
 
-const singleUploadArea = document.getElementById('single-upload-area');
-const singleFileInput = document.getElementById('single-upload-input');
-
-if (singleUploadArea && singleFileInput) {
-    singleUploadArea.addEventListener('click', () => {
-        singleFileInput.click();
-    });
+function displayPreview(file, container) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.classList.add('preview-image');
+        container.innerHTML = '';
+        container.appendChild(img);
+    };
+    reader.readAsDataURL(file);
 }
 
-const singleUploadArea = document.getElementById('single-upload-area');
-const singleFileInput = document.getElementById('single-upload-input');
-
-if (singleUploadArea && singleFileInput) {
-    singleUploadArea.addEventListener('click', () => {
-        singleFileInput.click();
-    });
-}
-
-const singleUploadArea = document.getElementById('single-upload-area');
-const singleFileInput = document.getElementById('single-upload-input');
-
-if (singleUploadArea && singleFileInput) {
-    singleUploadArea.addEventListener('click', () => {
-        singleFileInput.click();
-    });
-}
-
-const singleUploadArea = document.getElementById('single-upload-area');
-const singleFileInput = document.getElementById('single-upload-input');
-
-if (singleUploadArea && singleFileInput) {
-    singleUploadArea.addEventListener('click', () => {
-        singleFileInput.click();
-    });
+function enableUploadButton() {
+    const submitButton = document.querySelector('.consultation-submit');
+    if (submitButton) {
+        submitButton.disabled = false;
+    }
 }

@@ -2,12 +2,13 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Конфигурация (config.js)
-ВЕРСИЯ: 0.5.0 (Исправлены URL и настройки)
+ВЕРСИЯ: 1.0.0 (ИСПРАВЛЕН)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-27
 ==========================================================================================
 */
 
 window.MishuraApp = window.MishuraApp || {};
+
 window.MishuraApp.config = (function() {
     'use strict';
     
@@ -17,12 +18,12 @@ window.MishuraApp.config = (function() {
     
     const appSettings = {
         appName: 'МИШУРА',
-        appVersion: '0.5.0',
+        appVersion: '1.0.0',
         
-        // API URL в зависимости от окружения
+        // API URL в зависимости от окружения - ИСПРАВЛЕН ПОРТ
         apiUrl: isDevelopment 
-            ? 'http://localhost:8000/api/v1'  // Для локальной разработки
-            : 'https://style-ai-bot.onrender.com/api/v1',  // Для продакшена
+            ? 'http://localhost:8001/api/v1'  // Исправлен порт с 8000 на 8001
+            : 'https://style-ai-bot.onrender.com/api/v1',
             
         defaultLanguage: 'ru',
         debugMode: isDevelopment,
@@ -61,16 +62,13 @@ window.MishuraApp.config = (function() {
             // Основные эндпоинты
             consultation: '/analyze-outfit',
             compare: '/compare-outfits',
-            analyze: '/analyze',
+            analyze: '/analyze',  // Fallback эндпоинт
             
             // Дополнительные эндпоинты
             history: '/history',
             balance: '/balance',
             health: '/health',
-            wardrobe: '/wardrobe',
-            
-            // Виртуальная примерка
-            virtualFitting: '/virtual-fitting'
+            wardrobe: '/wardrobe'
         },
         headers: {
             'Accept': 'application/json',
@@ -108,7 +106,8 @@ window.MishuraApp.config = (function() {
             fileSize: `Файл слишком большой. Максимальный размер: ${(LIMITS.MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}МБ`,
             imageFormat: 'Неподдерживаемый формат изображения. Используйте JPG, PNG или WEBP.',
             imageSize: 'Изображение слишком маленькое или слишком большое.',
-            generic: 'Произошла ошибка. Попробуйте снова.'
+            generic: 'Произошла ошибка. Попробуйте снова.',
+            apiNotFound: 'API сервер недоступен. Убедитесь, что сервер запущен на порту 8001.'
         },
         success: {
             uploaded: 'Изображение успешно загружено',
@@ -136,7 +135,7 @@ window.MishuraApp.config = (function() {
                        ? window.MishuraApp.utils.logger 
                        : console;
 
-        tempLogger.info("Инициализация конфигурации (v0.5.0)...");
+        tempLogger.info("Инициализация конфигурации (v1.0.0)...");
         
         // Генерация или получение ID пользователя
         userId = localStorage.getItem('mishura_user_id') || generateUserId();
@@ -198,6 +197,33 @@ window.MishuraApp.config = (function() {
         return !isDevelopment;
     }
     
+    // Проверка доступности API
+    async function checkApiAvailability() {
+        try {
+            const response = await fetch(`${apiSettings.baseUrl}/health`, {
+                method: 'GET',
+                headers: apiSettings.headers,
+                timeout: 5000
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.info('Config: API сервер доступен', data);
+                return { available: true, data: data };
+            } else {
+                console.warn('Config: API сервер вернул ошибку', response.status);
+                return { available: false, error: `HTTP ${response.status}` };
+            }
+        } catch (error) {
+            console.error('Config: API сервер недоступен', error);
+            return { 
+                available: false, 
+                error: error.message,
+                suggestion: isDevelopment ? 'Запустите API сервер командой: python api.py' : 'Сервер временно недоступен'
+            };
+        }
+    }
+    
     return {
         init,
         appSettings,
@@ -209,6 +235,7 @@ window.MishuraApp.config = (function() {
         getTheme,
         getApiUrl,
         isProduction,
+        checkApiAvailability,
         get userId() { return userId; },
         get isDevelopment() { return isDevelopment; },
         isInitialized: () => isConfigInitialized

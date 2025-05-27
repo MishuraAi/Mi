@@ -1,282 +1,161 @@
 /*
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: API утилиты (utils/api.js)
-ВЕРСИЯ: 1.0.0
+КОМПОНЕНТ: Основной API сервис (api-service.js)
+ВЕРСИЯ: 1.1.0 (ИСПРАВЛЕН)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-27
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Связующее звено между компонентами приложения и API сервисом.
+Основной API сервис для взаимодействия с backend сервером.
 ==========================================================================================
 */
 
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.utils = window.MishuraApp.utils || {};
+window.MishuraApp.api = window.MishuraApp.api || {};
 
-window.MishuraApp.utils.api = (function() {
+window.MishuraApp.api.service = (function() {
     'use strict';
     
-    let logger;
-    let apiService;
-    let config;
-    let isInitialized = false;
+    let logger, config;
+    let baseUrl = '';
+    let isServiceInitialized = false;
     
-    function init() {
-        if (isInitialized) return;
+    function init(configModule) {
+        if (isServiceInitialized) return;
         
         logger = window.MishuraApp.utils.logger || console;
-        config = window.MishuraApp.config;
+        config = configModule || window.MishuraApp.config;
         
-        // Получаем ссылку на основной API сервис
-        if (window.MishuraApp.api && window.MishuraApp.api.service) {
-            apiService = window.MishuraApp.api.service;
-            logger.debug('Utils API: Связь с API сервисом установлена');
+        if (config && config.apiSettings) {
+            baseUrl = config.apiSettings.baseUrl;
         } else {
-            logger.error('Utils API: API сервис не найден!');
+            // Fallback URL
+            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            baseUrl = isDev ? 'http://localhost:8001/api/v1' : 'https://style-ai-bot.onrender.com/api/v1';
         }
         
-        isInitialized = true;
-        logger.info('Utils API инициализирован');
+        logger.info('API Service инициализирован с URL:', baseUrl);
+        isServiceInitialized = true;
     }
     
-    /**
-     * Анализ одиночного изображения
-     */
+    async function fetchWithTimeout(url, options = {}, timeout = 30000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('Превышено время ожидания ответа от сервера');
+            }
+            throw error;
+        }
+    }
+    
     async function analyzeImage(imageFile, mode = 'single', occasion = 'повседневный', preferences = '') {
-        if (!apiService) {
-            init();
+        if (!baseUrl) {
+            throw new Error('API сервис не инициализирован');
         }
         
+        logger.debug('API Service: Анализ изображения', {
+            fileName: imageFile.name,
+            mode: mode,
+            occasion: occasion
+        });
+        
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        formData.append('occasion', occasion);
+        formData.append('preferences', preferences);
+        
         try {
-            logger.debug('Utils API: Отправка изображения на анализ', {
-                fileName: imageFile.name,
-                fileSize: imageFile.size,
-                mode: mode,
-                occasion: occasion
+            const response = await fetchWithTimeout(`${baseUrl}/analyze-outfit`, {
+                method: 'POST',
+                body: formData
             });
             
-            const formData = new FormData();
-            formData.append('image', imageFile);
-            formData.append('mode', mode);
-            formData.append('occasion', occasion);
-            formData.append('preferences', preferences);
-            
-            const response = await apiService.processStylistConsultation(formData);
-            
-            logger.debug('Utils API: Ответ получен', response);
-            
-            // Преобразуем ответ в ожидаемый формат
-            if (response && response.analysis) {
-                return {
-                    status: 'success',
-                    advice: response.analysis
-                };
-            } else if (response && response.advice) {
-                return {
-                    status: 'success',
-                    advice: response.advice
-                };
-            } else {
-                throw new Error('Неверный формат ответа от сервера');
-            }
-            
+            return response;
         } catch (error) {
-            logger.error('Utils API: Ошибка при анализе изображения:', error);
-            
-            // Проверяем тип ошибки
-            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                return {
-                    status: 'error',
-                    message: 'Не удается подключиться к серверу. Проверьте соединение с интернетом.',
-                    error_type: 'connection_error'
-                };
-            }
-            
-            return {
-                status: 'error',
-                message: error.message || 'Произошла ошибка при анализе изображения',
-                error_type: 'general_error'
-            };
+            logger.error('API Service: Ошибка при анализе изображения:', error);
+            throw error;
         }
     }
     
-    /**
-     * Сравнение нескольких изображений
-     */
     async function compareImages(imageFiles, occasion = 'повседневный', preferences = '') {
-        if (!apiService) {
-            init();
+        if (!baseUrl) {
+            throw new Error('API сервис не инициализирован');
         }
         
+        logger.debug('API Service: Сравнение изображений', {
+            count: imageFiles.length,
+            occasion: occasion
+        });
+        
+        const formData = new FormData();
+        imageFiles.forEach((file, index) => {
+            if (file) {
+                formData.append('images', file);
+            }
+        });
+        formData.append('occasion', occasion);
+        formData.append('preferences', preferences);
+        
         try {
-            logger.debug('Utils API: Отправка изображений на сравнение', {
-                count: imageFiles.length,
-                occasion: occasion
+            const response = await fetchWithTimeout(`${baseUrl}/compare-outfits`, {
+                method: 'POST',
+                body: formData
             });
             
-            const formData = new FormData();
-            
-            // Добавляем все изображения
-            imageFiles.forEach((file, index) => {
-                if (file) {
-                    formData.append(`image${index + 1}`, file);
-                }
-            });
-            
-            formData.append('occasion', occasion);
-            formData.append('preferences', preferences);
-            formData.append('mode', 'compare');
-            
-            const response = await apiService.processCompareOutfits(formData);
-            
-            logger.debug('Utils API: Ответ сравнения получен', response);
-            
-            // Преобразуем ответ в ожидаемый формат
-            if (response && response.comparison) {
-                return {
-                    status: 'success',
-                    advice: response.comparison
-                };
-            } else if (response && response.advice) {
-                return {
-                    status: 'success',
-                    advice: response.advice
-                };
-            } else {
-                throw new Error('Неверный формат ответа от сервера');
-            }
-            
+            return response;
         } catch (error) {
-            logger.error('Utils API: Ошибка при сравнении изображений:', error);
-            
-            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                return {
-                    status: 'error',
-                    message: 'Не удается подключиться к серверу. Проверьте соединение с интернетом.',
-                    error_type: 'connection_error'
-                };
-            }
-            
-            return {
-                status: 'error',
-                message: error.message || 'Произошла ошибка при сравнении изображений',
-                error_type: 'general_error'
-            };
+            logger.error('API Service: Ошибка при сравнении изображений:', error);
+            throw error;
         }
     }
     
-    /**
-     * Получение истории консультаций
-     */
-    async function getConsultationHistory(userId) {
-        if (!apiService) {
-            init();
-        }
-        
+    async function checkHealth() {
         try {
-            const response = await apiService.fetchWithTimeout(
-                `${apiService.getBaseUrl()}/history/${userId}`,
-                {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                }
-            );
-            
-            return {
-                status: 'success',
-                data: response.history || []
-            };
-            
-        } catch (error) {
-            logger.error('Utils API: Ошибка при получении истории:', error);
-            return {
-                status: 'error',
-                message: 'Не удалось загрузить историю',
-                data: []
-            };
-        }
-    }
-    
-    /**
-     * Получение баланса пользователя
-     */
-    async function getUserBalance(userId) {
-        if (!apiService) {
-            init();
-        }
-        
-        try {
-            const response = await apiService.fetchWithTimeout(
-                `${apiService.getBaseUrl()}/balance/${userId}`,
-                {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                }
-            );
-            
-            return {
-                status: 'success',
-                balance: response.balance || 0
-            };
-            
-        } catch (error) {
-            logger.error('Utils API: Ошибка при получении баланса:', error);
-            return {
-                status: 'error',
-                message: 'Не удалось загрузить баланс',
-                balance: 0
-            };
-        }
-    }
-    
-    /**
-     * Проверка доступности API
-     */
-    async function checkApiHealth() {
-        if (!apiService) {
-            init();
-        }
-        
-        try {
-            const response = await apiService.fetchWithTimeout(
-                `${apiService.getBaseUrl()}/health`,
-                {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                },
-                5000 // 5 секунд таймаут для health check
-            );
+            const response = await fetchWithTimeout(`${baseUrl}/health`, {
+                method: 'GET'
+            }, 5000);
             
             return {
                 status: 'success',
                 available: true,
-                version: response.version || 'unknown'
+                data: response
             };
-            
         } catch (error) {
-            logger.error('Utils API: Сервер недоступен:', error);
+            logger.error('API Service: Сервер недоступен:', error);
             return {
                 status: 'error',
                 available: false,
-                message: 'API сервер недоступен'
+                message: error.message
             };
         }
     }
     
-    // Публичный API
+    function getBaseUrl() {
+        return baseUrl;
+    }
+    
     return {
         init,
         analyzeImage,
         compareImages,
-        getConsultationHistory,
-        getUserBalance,
-        checkApiHealth,
-        isInitialized: () => isInitialized
+        checkHealth,
+        getBaseUrl,
+        fetchWithTimeout,
+        isInitialized: () => isServiceInitialized
     };
 })();

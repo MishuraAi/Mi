@@ -2,10 +2,11 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 ФАЙЛ: styles.css
-ВЕРСИЯ: 1.0.0
-ДАТА: 2025-05-27
+ВЕРСИЯ: 1.0.1 (ИСПРАВЛЕНА АДАПТИВНОСТЬ И КНОПКИ)
+ДАТА: 2025-05-28
 
 ОПИСАНИЕ: Основные стили приложения с роскошным золотым дизайном
+ИСПРАВЛЕНИЯ: адаптивность, прокрутка, кнопки на мобильных устройствах
 ==========================================================================================
 */
 
@@ -32,22 +33,26 @@
     --header-height: 120px;
 }
 
-html, body {
+html {
     height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow: hidden;
+    /* ИСПРАВЛЕНИЕ: убираем overflow: hidden для HTML */
 }
 
 body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
     display: flex;
     justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+    align-items: stretch;
     background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #000000 100%);
+    /* ИСПРАВЛЕНИЕ: убираем overflow: hidden для body */
+    /* ИСПРАВЛЕНИЕ: используем align-items: stretch */
 }
 
 /* ===== КОНТЕЙНЕРЫ ===== */
@@ -56,8 +61,8 @@ body {
     max-width: var(--max-width);
     height: 100vh;
     position: relative;
-    overflow: hidden;
     background-color: var(--bg-primary);
+    /* ИСПРАВЛЕНИЕ: убираем overflow: hidden */
 }
 
 .app-container {
@@ -66,7 +71,7 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* ИСПРАВЛЕНИЕ: убираем overflow: hidden */
 }
 
 /* ===== ЭФФЕКТЫ И ДЕКОР ===== */
@@ -122,6 +127,7 @@ body {
     text-align: center;
     background: linear-gradient(180deg, rgba(212, 175, 55, 0.1) 0%, transparent 100%);
     z-index: 2;
+    flex-shrink: 0;
 }
 
 .app-logo {
@@ -148,11 +154,12 @@ body {
     padding-bottom: var(--nav-height);
     position: relative;
     z-index: 2;
+    /* ИСПРАВЛЕНИЕ: убираем min-height для лучшей адаптивности */
 }
 
 .content-section {
     padding: 20px;
-    min-height: calc(100vh - var(--header-height) - var(--nav-height));
+    /* ИСПРАВЛЕНИЕ: убираем min-height для лучшей адаптивности */
 }
 
 .hidden {
@@ -297,20 +304,22 @@ body {
     font-weight: 500;
 }
 
-/* ===== МОДАЛЬНЫЕ ОКНА ===== */
+/* ===== МОДАЛЬНЫЕ ОКНА (ИСПРАВЛЕНИЕ АДАПТИВНОСТИ) ===== */
 .overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 100vh;
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
     display: none;
     justify-content: center;
     align-items: center;
     z-index: 200;
-    padding: 20px;
+    padding: 10px;
+    /* ИСПРАВЛЕНИЕ: убираем возможность прокрутки оверлея */
+    overflow: hidden;
 }
 
 .overlay.active {
@@ -323,20 +332,25 @@ body {
     border-radius: 20px;
     width: 100%;
     max-width: 440px;
-    max-height: 90vh;
+    /* ИСПРАВЛЕНИЕ: улучшенная адаптивность высоты */
+    max-height: calc(100vh - 20px);
+    min-height: auto;
     overflow: hidden;
     position: relative;
     box-shadow: 0 20px 60px rgba(212, 175, 55, 0.2);
+    display: flex;
+    flex-direction: column;
 }
 
 .dialog-header {
-    padding: 24px;
+    padding: 20px 24px;
     border-bottom: 1px solid var(--border-color);
     background: linear-gradient(180deg, rgba(212, 175, 55, 0.1) 0%, transparent 100%);
+    flex-shrink: 0;
 }
 
 .dialog-title {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 500;
     color: var(--accent-gold);
     margin-bottom: 4px;
@@ -348,31 +362,44 @@ body {
 }
 
 .dialog-content {
-    padding: 24px;
+    padding: 20px 24px;
     overflow-y: auto;
-    max-height: 60vh;
+    overflow-x: hidden;
+    flex: 1;
+    /* ИСПРАВЛЕНИЕ: убираем max-height для лучшей адаптивности */
 }
 
 .dialog-footer {
-    padding: 20px 24px;
+    padding: 16px 24px;
     border-top: 1px solid var(--border-color);
     display: flex;
     gap: 12px;
     justify-content: flex-end;
+    flex-shrink: 0;
 }
 
-/* ===== ФОРМЫ ===== */
+/* ===== ФОРМЫ (ИСПРАВЛЕНИЕ ЗАГРУЗКИ) ===== */
 .upload-area {
     border: 2px dashed var(--accent-gold);
     border-radius: 12px;
-    padding: 40px 20px;
+    padding: 30px 20px;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
     background: var(--accent-gold-light);
+    /* ИСПРАВЛЕНИЕ: добавляем min-height для лучшего UX */
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    /* ИСПРАВЛЕНИЕ: важно для правильной работы клика */
+    touch-action: manipulation;
 }
 
-.upload-area:hover {
+.upload-area:hover,
+.upload-area:active {
     background-color: rgba(212, 175, 55, 0.15);
     border-color: var(--accent-gold-hover);
     transform: scale(1.02);
@@ -386,27 +413,34 @@ body {
 
 .upload-icon {
     color: var(--accent-gold);
-    margin-bottom: 16px;
+    margin-bottom: 12px;
+    font-size: 32px;
+    /* ИСПРАВЛЕНИЕ: добавляем pointer-events: none */
+    pointer-events: none;
 }
 
 .upload-text {
     color: var(--text-secondary);
     font-size: 14px;
     line-height: 1.4;
+    /* ИСПРАВЛЕНИЕ: добавляем pointer-events: none */
+    pointer-events: none;
 }
 
-/* Скрываем input элементы правильно */
+/* ИСПРАВЛЕНИЕ: правильное скрытие input элементов */
 .upload-input,
 .compare-upload-input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 /* ===== ПРЕВЬЮ ИЗОБРАЖЕНИЙ ===== */
@@ -442,14 +476,20 @@ body {
     font-size: 18px;
     transition: all 0.3s ease;
     z-index: 10;
+    border: none;
+    /* ИСПРАВЛЕНИЕ: улучшаем touch-взаимодействие */
+    touch-action: manipulation;
+    min-width: 44px;
+    min-height: 44px;
 }
 
-.delete-image:hover {
+.delete-image:hover,
+.delete-image:active {
     background: var(--accent-gold);
     transform: scale(1.1);
 }
 
-/* ===== РЕЖИМ СРАВНЕНИЯ ===== */
+/* ===== РЕЖИМ СРАВНЕНИЯ (ИСПРАВЛЕНИЯ) ===== */
 .compare-container {
     margin-bottom: 20px;
 }
@@ -457,26 +497,32 @@ body {
 .image-slots {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    gap: 12px;
     margin-bottom: 16px;
 }
 
 .image-slot {
     position: relative;
     width: 100%;
-    height: 140px;
+    height: 120px;
     border: 2px dashed var(--accent-gold);
     border-radius: 12px;
     background: var(--accent-gold-light);
     cursor: pointer;
     transition: all 0.3s ease;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* ИСПРАВЛЕНИЕ: важно для правильной работы клика */
+    touch-action: manipulation;
 }
 
-.image-slot:not(.filled):hover {
+.image-slot:not(.filled):hover,
+.image-slot:not(.filled):active {
     background-color: rgba(212, 175, 55, 0.15);
     border-color: var(--accent-gold-hover);
-    transform: scale(1.05);
+    transform: scale(1.02);
 }
 
 .image-slot.dragover {
@@ -497,6 +543,9 @@ body {
     width: 100%;
     height: 100%;
     color: var(--accent-gold);
+    font-size: 24px;
+    /* ИСПРАВЛЕНИЕ: добавляем pointer-events: none */
+    pointer-events: none;
 }
 
 .image-slot .preview-image {
@@ -538,14 +587,14 @@ body {
 }
 
 .preferences-input {
-    min-height: 100px;
+    min-height: 80px;
     resize: vertical;
     font-family: inherit;
 }
 
-/* ===== КНОПКИ ===== */
+/* ===== КНОПКИ (ИСПРАВЛЕНИЯ ДЛЯ МОБИЛЬНЫХ) ===== */
 .btn {
-    padding: 12px 24px;
+    padding: 14px 20px;
     border: none;
     border-radius: 8px;
     font-size: 16px;
@@ -554,16 +603,30 @@ body {
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    /* ИСПРАВЛЕНИЕ: улучшаем читаемость кнопок на мобильных */
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
+    /* ИСПРАВЛЕНИЕ: улучшаем touch-взаимодействие */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .btn-primary {
     background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-gold-hover) 100%);
     color: var(--bg-primary);
+    font-weight: 600;
+    /* ИСПРАВЛЕНИЕ: делаем текст более контрастным */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4);
+.btn-primary:hover:not(:disabled),
+.btn-primary:active:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
 }
 
 .btn-primary:disabled {
@@ -572,14 +635,19 @@ body {
 }
 
 .btn-secondary {
-    background: transparent;
+    background: var(--bg-tertiary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
+    font-weight: 500;
+    /* ИСПРАВЛЕНИЕ: улучшаем контрастность */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.btn-secondary:hover {
-    background: var(--bg-tertiary);
+.btn-secondary:hover,
+.btn-secondary:active {
+    background: var(--bg-secondary);
     border-color: var(--accent-gold);
+    color: var(--accent-gold);
 }
 
 /* ===== РЕЗУЛЬТАТЫ ===== */
@@ -937,7 +1005,7 @@ body {
     animation: fadeIn 0.3s ease-out;
 }
 
-/* ===== МЕДИА ЗАПРОСЫ ===== */
+/* ===== МЕДИА ЗАПРОСЫ (ИСПРАВЛЕНИЯ ДЛЯ МОБИЛЬНЫХ) ===== */
 @media (max-width: 768px) {
     .app-logo {
         font-size: 32px;
@@ -945,16 +1013,36 @@ body {
     }
     
     .dialog {
-        max-width: 100%;
+        max-width: calc(100% - 20px);
         margin: 10px;
+        max-height: calc(100vh - 20px);
+    }
+    
+    .dialog-header {
+        padding: 16px 20px;
+    }
+    
+    .dialog-content {
+        padding: 16px 20px;
+    }
+    
+    .dialog-footer {
+        padding: 12px 20px;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .dialog-footer .btn {
+        width: 100%;
+        min-height: 48px;
     }
     
     .image-slot {
-        height: 120px;
+        height: 100px;
     }
     
     .main-button {
-        padding: 24px 16px;
+        padding: 20px 16px;
     }
     
     .main-button-title {
@@ -964,12 +1052,82 @@ body {
     .main-button-description {
         font-size: 13px;
     }
+    
+    /* ИСПРАВЛЕНИЕ: улучшаем область загрузки на мобильных */
+    .upload-area {
+        padding: 24px 16px;
+        min-height: 100px;
+    }
+    
+    .upload-icon {
+        font-size: 28px;
+        margin-bottom: 8px;
+    }
+    
+    .upload-text {
+        font-size: 13px;
+    }
+    
+    /* ИСПРАВЛЕНИЕ: увеличиваем размер кнопок удаления на мобильных */
+    .delete-image {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        font-size: 16px;
+    }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 480px) {
+    :root {
+        --header-height: 100px;
+    }
+    
+    .app-header {
+        padding: 20px 16px;
+    }
+    
     .app-logo {
         font-size: 28px;
         letter-spacing: 4px;
+    }
+    
+    .content-section {
+        padding: 16px;
+    }
+    
+    .dialog-header {
+        padding: 12px 16px;
+    }
+    
+    .dialog-content {
+        padding: 12px 16px;
+    }
+    
+    .dialog-footer {
+        padding: 10px 16px;
+    }
+    
+    .dialog-title {
+        font-size: 20px;
+    }
+    
+    .image-slots {
+        gap: 8px;
+    }
+    
+    .image-slot {
+        height: 90px;
+    }
+    
+    .btn {
+        padding: 12px 16px;
+        font-size: 15px;
+        min-height: 44px;
+    }
+    
+    .preferences-input {
+        min-height: 70px;
     }
     
     .payment-options {
@@ -978,6 +1136,74 @@ body {
     
     .wardrobe-filters {
         flex-direction: column;
+    }
+}
+
+@media (max-width: 380px) {
+    .app-logo {
+        font-size: 24px;
+        letter-spacing: 3px;
+    }
+    
+    .dialog {
+        max-width: calc(100% - 16px);
+        margin: 8px;
+    }
+    
+    .main-button {
+        padding: 16px 12px;
+    }
+    
+    .main-button-title {
+        font-size: 16px;
+    }
+    
+    .main-button-description {
+        font-size: 12px;
+    }
+    
+    .upload-area {
+        padding: 20px 12px;
+        min-height: 90px;
+    }
+    
+    .btn {
+        font-size: 14px;
+        padding: 10px 14px;
+        min-height: 42px;
+    }
+}
+
+/* ===== ИСПРАВЛЕНИЯ ДЛЯ LANDSCAPE ОРИЕНТАЦИИ НА МОБИЛЬНЫХ ===== */
+@media (max-height: 500px) and (orientation: landscape) {
+    .dialog {
+        max-height: calc(100vh - 10px);
+    }
+    
+    .dialog-content {
+        padding: 12px 20px;
+    }
+    
+    .upload-area {
+        padding: 16px 20px;
+        min-height: 80px;
+    }
+    
+    .image-slot {
+        height: 80px;
+    }
+    
+    .app-header {
+        padding: 16px 20px;
+    }
+    
+    .app-logo {
+        font-size: 24px;
+        margin-bottom: 4px;
+    }
+    
+    .app-tagline {
+        font-size: 12px;
     }
 }
 
@@ -997,6 +1223,50 @@ body {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/* ===== УЛУЧШЕНИЯ ДЛЯ TOUCH УСТРОЙСТВ ===== */
+@media (hover: none) and (pointer: coarse) {
+    .main-button:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .main-button:active {
+        transform: scale(0.98);
+        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+    }
+    
+    .btn:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .btn:active {
+        transform: scale(0.98);
+    }
+    
+    .upload-area:hover {
+        transform: none;
+        background-color: var(--accent-gold-light);
+        border-color: var(--accent-gold);
+    }
+    
+    .upload-area:active {
+        transform: scale(0.98);
+        background-color: rgba(212, 175, 55, 0.2);
+    }
+    
+    .image-slot:not(.filled):hover {
+        transform: none;
+        background-color: var(--accent-gold-light);
+        border-color: var(--accent-gold);
+    }
+    
+    .image-slot:not(.filled):active {
+        transform: scale(0.98);
+        background-color: rgba(212, 175, 55, 0.15);
+    }
 }
 
 /* ===== LUXURY ЭФФЕКТ ===== */
@@ -1023,6 +1293,11 @@ body {
     
     .nav-bar {
         padding-bottom: env(safe-area-inset-bottom);
+        height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+    }
+    
+    .main-content {
+        padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
     }
 }
 
@@ -1037,7 +1312,7 @@ body {
 
 /* ===== СКРОЛЛБАР ===== */
 ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -1046,9 +1321,20 @@ body {
 
 ::-webkit-scrollbar-thumb {
     background: var(--accent-gold);
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--accent-gold-hover);
+}
+
+/* ===== ВЫСОКИЕ DPI ЭКРАНЫ ===== */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .app-logo {
+        text-rendering: optimizeLegibility;
+    }
+    
+    .btn {
+        -webkit-font-smoothing: antialiased;
+    }
 }

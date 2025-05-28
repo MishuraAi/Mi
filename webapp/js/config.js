@@ -2,8 +2,8 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Конфигурация (config.js)
-ВЕРСИЯ: 1.0.0 (ИСПРАВЛЕН)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-27
+ВЕРСИЯ: 1.0.1 (ИСПРАВЛЕН API ПОРТ И ОБРАБОТКА ОШИБОК)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-28
 ==========================================================================================
 */
 
@@ -18,12 +18,15 @@ window.MishuraApp.config = (function() {
     
     const appSettings = {
         appName: 'МИШУРА',
-        appVersion: '1.0.0',
+        appVersion: '1.0.1',
         
-        // API URL в зависимости от окружения - ИСПРАВЛЕН ПОРТ
+        // ИСПРАВЛЕНИЕ: API URL с правильным портом
         apiUrl: isDevelopment 
-            ? 'http://localhost:8001/api/v1'  // Исправлен порт с 8000 на 8001
+            ? 'http://localhost:5000/api/v1'  // Стандартный порт Flask
             : 'https://style-ai-bot.onrender.com/api/v1',
+            
+        // Альтернативные порты для проверки
+        fallbackPorts: [5000, 8000, 8001, 3000],
             
         defaultLanguage: 'ru',
         debugMode: isDevelopment,
@@ -57,7 +60,7 @@ window.MishuraApp.config = (function() {
     const apiSettings = {
         baseUrl: appSettings.apiUrl,
         timeout: 30000, // 30 секунд
-        retryAttempts: 2,
+        retryAttempts: 3, // Увеличено количество попыток
         endpoints: {
             // Основные эндпоинты
             consultation: '/analyze-outfit',
@@ -107,7 +110,8 @@ window.MishuraApp.config = (function() {
             imageFormat: 'Неподдерживаемый формат изображения. Используйте JPG, PNG или WEBP.',
             imageSize: 'Изображение слишком маленькое или слишком большое.',
             generic: 'Произошла ошибка. Попробуйте снова.',
-            apiNotFound: 'API сервер недоступен. Убедитесь, что сервер запущен на порту 8001.'
+            apiNotFound: 'API сервер недоступен (C00). Убедитесь, что сервер запущен.',
+            connectionFailed: 'Не удается подключиться к серверу (C01). Проверьте соединение.'
         },
         success: {
             uploaded: 'Изображение успешно загружено',
@@ -119,12 +123,14 @@ window.MishuraApp.config = (function() {
             loading: 'Загрузка...',
             analyzing: 'Анализируем ваш образ...',
             comparing: 'Сравниваем образы...',
-            saving: 'Сохранение...'
+            saving: 'Сохранение...',
+            checkingApi: 'Проверка соединения с сервером...'
         }
     };
     
     let userId = null;
     let isConfigInitialized = false;
+    let currentApiUrl = appSettings.apiUrl;
     
     function init() {
         if (isConfigInitialized) {
@@ -135,7 +141,7 @@ window.MishuraApp.config = (function() {
                        ? window.MishuraApp.utils.logger 
                        : console;
 
-        tempLogger.info("Инициализация конфигурации (v1.0.0)...");
+        tempLogger.info("Инициализация конфигурации (v1.0.1)...");
         
         // Генерация или получение ID пользователя
         userId = localStorage.getItem('mishura_user_id') || generateUserId();
@@ -144,9 +150,16 @@ window.MishuraApp.config = (function() {
         // Инициализация темы
         initTheme();
         
+        // Проверка API при инициализации
+        if (isDevelopment) {
+            setTimeout(() => {
+                autoDetectApiPort();
+            }, 1000);
+        }
+        
         // Логирование конфигурации
         tempLogger.info(`Config: ${appSettings.appName} v${appSettings.appVersion}`);
-        tempLogger.info(`Config: API URL: ${appSettings.apiUrl}`);
+        tempLogger.info(`Config: API URL: ${currentApiUrl}`);
         tempLogger.info(`Config: Режим: ${isDevelopment ? 'Разработка' : 'Продакшен'}`);
         
         isConfigInitialized = true;
@@ -182,7 +195,7 @@ window.MishuraApp.config = (function() {
     }
     
     function getApiUrl(endpoint) {
-        const baseUrl = apiSettings.baseUrl;
+        const baseUrl = currentApiUrl;
         const endpointPath = apiSettings.endpoints[endpoint];
         
         if (!endpointPath) {
@@ -197,31 +210,124 @@ window.MishuraApp.config = (function() {
         return !isDevelopment;
     }
     
+    // ИСПРАВЛЕНИЕ: автоопределение порта API в режиме разработки
+    async function autoDetectApiPort() {
+        console.info('Config: Автоопределение порта API...');
+        
+        for (const port of appSettings.fallbackPorts) {
+            const testUrl = `http://localhost:${port}/api/v1`;
+            
+            try {
+                const response = await fetch(`${testUrl}/health`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    timeout: 3000
+                });
+                
+                if (response.ok) {
+                    console.info(`Config: API найден на порту ${port}`);
+                    currentApiUrl = testUrl;
+                    apiSettings.baseUrl = testUrl;
+                    
+                    // Уведомляем об успешном подключении
+                    document.dispatchEvent(new CustomEvent('apiConnected', {
+                        detail: { url: testUrl, port: port }
+                    }));
+                    
+                    return true;
+                }
+            } catch (error) {
+                console.debug(`Config: Порт ${port} недоступен`);
+            }
+        }
+        
+        console.warn('Config: API сервер не найден ни на одном из портов');
+        
+        // Уведомляем о проблеме с подключением
+        document.dispatchEvent(new CustomEvent('apiConnectionFailed', {
+            detail: { 
+                message: 'API сервер недоступен (C00)',
+                suggestion: 'Запустите сервер командой: python api.py или python bot.py'
+            }
+        }));
+        
+        return false;
+    }
+    
     // Проверка доступности API
     async function checkApiAvailability() {
         try {
-            const response = await fetch(`${apiSettings.baseUrl}/health`, {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const response = await fetch(`${currentApiUrl}/health`, {
                 method: 'GET',
                 headers: apiSettings.headers,
-                timeout: 5000
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             if (response.ok) {
                 const data = await response.json();
                 console.info('Config: API сервер доступен', data);
+                
+                // Уведомляем о восстановлении соединения
+                document.dispatchEvent(new CustomEvent('apiConnected', {
+                    detail: { url: currentApiUrl, data: data }
+                }));
+                
                 return { available: true, data: data };
             } else {
                 console.warn('Config: API сервер вернул ошибку', response.status);
-                return { available: false, error: `HTTP ${response.status}` };
+                return { 
+                    available: false, 
+                    error: `HTTP ${response.status}`,
+                    code: 'C01'
+                };
             }
         } catch (error) {
             console.error('Config: API сервер недоступен', error);
+            
+            let errorMessage = 'API сервер недоступен';
+            let errorCode = 'C00';
+            
+            if (error.name === 'AbortError') {
+                errorMessage = 'Превышено время ожидания ответа';
+                errorCode = 'C02';
+            } else if (error.message.includes('Failed to fetch')) {
+                errorMessage = 'Не удается подключиться к серверу';
+                errorCode = 'C01';
+            }
+            
+            // Уведомляем о проблеме
+            document.dispatchEvent(new CustomEvent('apiConnectionFailed', {
+                detail: { 
+                    message: `${errorMessage} (${errorCode})`,
+                    error: error.message,
+                    suggestion: isDevelopment ? 'Запустите API сервер' : 'Сервер временно недоступен'
+                }
+            }));
+            
             return { 
                 available: false, 
                 error: error.message,
+                code: errorCode,
                 suggestion: isDevelopment ? 'Запустите API сервер командой: python api.py' : 'Сервер временно недоступен'
             };
         }
+    }
+    
+    // Установка нового URL API
+    function setApiUrl(newUrl) {
+        currentApiUrl = newUrl;
+        apiSettings.baseUrl = newUrl;
+        console.info(`Config: API URL изменен на ${newUrl}`);
+    }
+    
+    // Получение текущего URL API
+    function getCurrentApiUrl() {
+        return currentApiUrl;
     }
     
     return {
@@ -234,8 +340,11 @@ window.MishuraApp.config = (function() {
         setTheme,
         getTheme,
         getApiUrl,
+        getCurrentApiUrl,
+        setApiUrl,
         isProduction,
         checkApiAvailability,
+        autoDetectApiPort,
         get userId() { return userId; },
         get isDevelopment() { return isDevelopment; },
         isInitialized: () => isConfigInitialized

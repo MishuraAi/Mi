@@ -10,9 +10,9 @@
 */
 
 window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.components = window.MishuraApp.components || {};
+window.MishuraApp.features = window.MishuraApp.features || {};
 
-window.MishuraApp.components.consultation = (function() {
+window.MishuraApp.features.consultation = (function() {
     'use strict';
     
     let logger, uiHelpers, modalManager, imageUpload;
@@ -450,40 +450,39 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
             showErrorMessage("Ошибка: API не инициализирован. Попробуйте обновить страницу.");
             return;
         }
-        
+
+        // Получаем изображения из comparison
+        const comparison = window.MishuraApp.features.comparison;
+        if (!comparison || typeof comparison.getUploadedImages !== 'function') {
+            logger.error("Модуль сравнения не найден или не реализует getUploadedImages");
+            showErrorMessage("Ошибка: Модуль сравнения не найден.");
+            return;
+        }
+        const images = comparison.getUploadedImages ? comparison.getUploadedImages() : [];
+        if (!images || images.length < 2) {
+            if (uiHelpers) uiHelpers.showToast('Загрузите минимум 2 изображения для сравнения');
+            return;
+        }
+
+        const occasion = document.getElementById('occasion-selector')?.value || 'повседневный';
+        const preferences = document.getElementById('preferences-input')?.value || '';
+
+        if (uiHelpers) uiHelpers.showLoading('Сравниваем образы...');
+
         try {
-            isSubmitting = true;
-            updateSubmitButtonState();
-            
-            showLoadingIndicator("Сравниваем ваши образы...");
-            
-            const uploadedImages = imageUpload?.getUploadedImages();
-            const compareImages = uploadedImages?.compare || [];
-            const validImages = compareImages.filter(img => img !== null);
-            
-            if (validImages.length < 2) {
-                throw new Error("Необходимо минимум 2 изображения для сравнения");
+            const result = await apiService.compareImages(images, { occasion, preferences });
+            if (uiHelpers) {
+                uiHelpers.hideLoading();
+                if (uiHelpers.closeModal) uiHelpers.closeModal('consultation-overlay');
+                if (uiHelpers.showResults) uiHelpers.showResults(result);
             }
-            
-            const occasion = getSelectedOccasion();
-            const preferences = getPreferences();
-            
-            logger.debug("Отправка на сравнение:", { 
-                imageCount: validImages.length,
-                occasion,
-                preferences 
-            });
-            
-            const result = await apiService.compareImages(validImages, { occasion, preferences });
-            displayComparisonResult(result);
-            
+            logger.info("Сравнение образов завершено успешно");
         } catch (error) {
-            logger.error("Ошибка при отправке:", error);
-            showErrorMessage(`Ошибка сравнения: ${error.message}`);
-        } finally {
-            isSubmitting = false;
-            hideLoadingIndicator();
-            updateSubmitButtonState();
+            logger.error("Ошибка при сравнении образов:", error);
+            if (uiHelpers) {
+                uiHelpers.hideLoading();
+                uiHelpers.showToast('Ошибка при сравнении образов. Попробуйте снова.');
+            }
         }
     }
     
@@ -680,6 +679,19 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
             updateSubmitButtonState();
             setupButtonHandlers();
         }, 200);
+    }
+    
+    function getCurrentMode() {
+        return currentMode;
+    }
+
+    function handleConsultationSubmit() {
+        const mode = getCurrentMode();
+        if (mode === 'compare') {
+            handleCompareConsultationSubmit();
+        } else {
+            handleSingleConsultationSubmit();
+        }
     }
     
     return {

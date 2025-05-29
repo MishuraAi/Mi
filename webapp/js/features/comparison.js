@@ -2,11 +2,11 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Сравнение образов (comparison.js)
-ВЕРСИЯ: 1.1.0 (ИСПРАВЛЕН - добавлена функция reset)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-27
+ВЕРСИЯ: 1.3.0 (ИСПРАВЛЕН - работает с модальным окном)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-29
 
 НАЗНАЧЕНИЕ ФАЙЛА:
-Обеспечивает функциональность сравнения образов на отдельной странице.
+Обеспечивает функциональность сравнения образов в модальном окне и на отдельной странице.
 ==========================================================================================
 */
 
@@ -19,9 +19,11 @@ window.MishuraApp.features.comparison = (function() {
     console.log('DEBUG: Модуль comparison.js загружается...');
     
     let logger, uiHelpers, apiService;
-    let compareContainer, compareSlots, compareForm, compareSubmitBtn;
+    let compareContainer, compareSlots, compareForm, compareSubmitBtn, compareCancelBtn;
+    let modalCompareSlots; // Слоты в модальном окне
     let uploadedImages = [null, null, null, null];
     let isComparisonInitialized = false;
+    let currentMode = 'page'; // 'page' или 'modal'
     
     function init() {
         console.log('DEBUG: comparison.init() вызвана, isComparisonInitialized =', isComparisonInitialized);
@@ -31,12 +33,9 @@ window.MishuraApp.features.comparison = (function() {
         uiHelpers = window.MishuraApp.utils.uiHelpers;
         
         // Инициализация API сервиса
-        if (window.MishuraApp.api && window.MishuraApp.api.service) {
-            apiService = window.MishuraApp.api.service;
-            if (typeof apiService.init === 'function' && (!apiService.isInitialized || !apiService.isInitialized())) {
-                apiService.init(window.MishuraApp.config);
-            }
-            logger.info("Comparison: API сервис успешно инициализирован");
+        if (window.MishuraApp.api) {
+            apiService = window.MishuraApp.api;
+            logger.info("Comparison: API сервис найден");
         } else {
             logger.error("Comparison: API сервис НЕ НАЙДЕН! Запросы не будут работать.");
             if (uiHelpers) uiHelpers.showToast("Ошибка: Сервис API не загружен (C00).", 5000);
@@ -49,7 +48,25 @@ window.MishuraApp.features.comparison = (function() {
             logger.debug(`navigationChanged: получено событие для страницы ${e.detail.page}`);
             if (e.detail.page === 'compare') {
                 logger.debug('navigationChanged: активация страницы сравнения');
+                currentMode = 'page';
                 onComparePageActivated();
+            }
+        });
+        
+        // Слушаем события модального окна
+        document.addEventListener('modalOpened', (e) => {
+            if (e.detail.modalId === 'consultation-overlay') {
+                logger.debug('modalOpened: модальное окно консультации открыто');
+                initModalCompare();
+            }
+        });
+        
+        // Слушаем события смены режима в модальном окне
+        document.addEventListener('modeChanged', (e) => {
+            if (e.detail.mode === 'compare') {
+                logger.debug('modeChanged: режим сравнения в модальном окне');
+                currentMode = 'modal';
+                initModalCompareSlots();
             }
         });
         
@@ -67,36 +84,60 @@ window.MishuraApp.features.comparison = (function() {
     }
     
     function initDOMElements() {
+        // Ищем элементы на странице сравнения
         compareContainer = document.getElementById('compare-section');
-        compareSlots = document.querySelectorAll('#compare-section .image-slot');
-        compareForm = document.querySelector('#compare-section .compare-form');
-        compareSubmitBtn = document.getElementById('compare-submit');
-        
-        logger.debug(`initDOMElements: compareContainer = ${compareContainer ? 'найден' : 'НЕ НАЙДЕН'}`);
-        logger.debug(`initDOMElements: найдено ${compareSlots.length} слотов для сравнения`);
-        logger.debug(`initDOMElements: compareForm = ${compareForm ? 'найдена' : 'НЕ НАЙДЕНА'}`);
-        logger.debug(`initDOMElements: compareSubmitBtn = ${compareSubmitBtn ? 'найдена' : 'НЕ НАЙДЕНА'}`);
-        
         if (!compareContainer) {
             logger.warn("Секция сравнения не найдена");
             return false;
         }
         
-        if (compareSlots.length === 0) {
-            logger.warn("Слоты для сравнения не найдены");
-            return false;
+        compareSlots = compareContainer.querySelectorAll('.image-slot');
+        compareForm = compareContainer.querySelector('.compare-form');
+        compareSubmitBtn = document.getElementById('compare-submit');
+        compareCancelBtn = document.getElementById('compare-cancel');
+        
+        logger.debug(`initDOMElements: найдено ${compareSlots.length} слотов для сравнения на странице`);
+        
+        return compareSlots.length > 0;
+    }
+    
+    function initModalCompare() {
+        // Ищем слоты в модальном окне
+        const modal = document.getElementById('consultation-overlay');
+        if (!modal) {
+            logger.warn("Модальное окно консультации не найдено");
+            return;
         }
         
-        // Проверяем каждый слот
-        compareSlots.forEach((slot, index) => {
-            const input = slot.querySelector('.compare-upload-input, input[type="file"]');
-            const uploadIcon = slot.querySelector('.upload-icon');
-            const previewImg = slot.querySelector('.preview-image');
-            
-            logger.debug(`Слот ${index}: input=${input ? 'есть' : 'НЕТ'}, uploadIcon=${uploadIcon ? 'есть' : 'НЕТ'}, previewImg=${previewImg ? 'есть' : 'НЕТ'}`);
+        modalCompareSlots = modal.querySelectorAll('#compare-analysis-mode .image-slot');
+        logger.debug(`initModalCompare: найдено ${modalCompareSlots.length} слотов в модальном окне`);
+        
+        if (modalCompareSlots.length > 0) {
+            currentMode = 'modal';
+            initModalCompareSlots();
+        }
+    }
+    
+    function initModalCompareSlots() {
+        if (!modalCompareSlots || modalCompareSlots.length === 0) {
+            const modal = document.getElementById('consultation-overlay');
+            if (modal) {
+                modalCompareSlots = modal.querySelectorAll('#compare-analysis-mode .image-slot');
+                logger.debug(`initModalCompareSlots: повторный поиск, найдено ${modalCompareSlots.length} слотов`);
+            }
+        }
+        
+        if (!modalCompareSlots || modalCompareSlots.length === 0) {
+            logger.warn("Слоты для сравнения в модальном окне не найдены");
+            return;
+        }
+        
+        // Инициализация каждого слота в модальном окне
+        modalCompareSlots.forEach((slot, index) => {
+            initSlot(slot, index, 'modal');
         });
         
-        return true;
+        logger.debug(`initModalCompareSlots: инициализировано ${modalCompareSlots.length} слотов в модальном окне`);
     }
     
     function initEventHandlers() {
@@ -105,34 +146,44 @@ window.MishuraApp.features.comparison = (function() {
             return;
         }
         
-        // Инициализация каждого слота
+        // Инициализация каждого слота на странице
         compareSlots.forEach((slot, index) => {
-            initSlot(slot, index);
+            initSlot(slot, index, 'page');
         });
         
         // Обработчик кнопки сравнения
         if (compareSubmitBtn) {
-            // Убираем старый обработчик
             compareSubmitBtn.removeEventListener('click', handleCompareSubmit);
             compareSubmitBtn.addEventListener('click', handleCompareSubmit);
             logger.debug("Обработчик кнопки сравнения установлен");
         }
+        
+        // Обработчик кнопки отмены
+        if (compareCancelBtn) {
+            compareCancelBtn.removeEventListener('click', handleCompareCancel);
+            compareCancelBtn.addEventListener('click', handleCompareCancel);
+            logger.debug("Обработчик кнопки отмены установлен");
+        }
     }
     
-    function initSlot(slot, index) {
+    function initSlot(slot, index, mode = 'page') {
         const input = slot.querySelector('.compare-upload-input, input[type="file"]');
         
         if (!input) {
-            logger.warn(`Слот ${index}: input не найден`);
+            logger.warn(`Слот ${index} (${mode}): input не найден`);
             return;
         }
         
+        // Удаляем старые обработчики
+        slot.removeEventListener('click', slot._clickHandler);
+        input.removeEventListener('change', input._changeHandler);
+        
         // Клик по слоту
-        slot.addEventListener('click', (e) => {
+        const clickHandler = (e) => {
             if (e.target.classList.contains('delete-image') || e.target.closest('.delete-image')) {
                 e.preventDefault();
                 e.stopPropagation();
-                resetSlot(index);
+                resetSlot(index, mode);
                 return;
             }
             
@@ -141,15 +192,22 @@ window.MishuraApp.features.comparison = (function() {
                 e.stopPropagation();
                 input.click();
             }
-        });
+        };
         
         // Изменение файла
-        input.addEventListener('change', (e) => {
+        const changeHandler = (e) => {
             const file = e.target.files[0];
             if (file && isValidImageFile(file)) {
-                handleImageUpload(file, index);
+                handleImageUpload(file, index, mode);
             }
-        });
+        };
+        
+        slot.addEventListener('click', clickHandler);
+        input.addEventListener('change', changeHandler);
+        
+        // Сохраняем ссылки на обработчики для удаления
+        slot._clickHandler = clickHandler;
+        input._changeHandler = changeHandler;
         
         // Drag & Drop
         slot.addEventListener('dragover', (e) => {
@@ -170,21 +228,32 @@ window.MishuraApp.features.comparison = (function() {
             if (!slot.classList.contains('filled') && e.dataTransfer.files.length > 0) {
                 const file = e.dataTransfer.files[0];
                 if (isValidImageFile(file)) {
-                    handleImageUpload(file, index);
+                    handleImageUpload(file, index, mode);
                 }
             }
         });
+        
+        logger.debug(`Слот ${index} (${mode}): обработчики установлены`);
     }
     
-    function handleImageUpload(file, slotIndex) {
-        logger.debug(`Загрузка файла в слот ${slotIndex}: ${file.name}`);
+    function handleImageUpload(file, slotIndex, mode = 'page') {
+        logger.debug(`Загрузка файла в слот ${slotIndex} (${mode}): ${file.name}`);
         
         uploadedImages[slotIndex] = file;
         
         const reader = new FileReader();
         reader.onload = (e) => {
-            const slot = compareSlots[slotIndex];
-            if (!slot) return;
+            let slot;
+            if (mode === 'modal') {
+                slot = modalCompareSlots ? modalCompareSlots[slotIndex] : null;
+            } else {
+                slot = compareSlots ? compareSlots[slotIndex] : null;
+            }
+            
+            if (!slot) {
+                logger.warn(`Слот ${slotIndex} не найден для режима ${mode}`);
+                return;
+            }
             
             const previewImg = slot.querySelector('.preview-image');
             const uploadIcon = slot.querySelector('.upload-icon');
@@ -192,6 +261,9 @@ window.MishuraApp.features.comparison = (function() {
             if (previewImg) {
                 previewImg.src = e.target.result;
                 previewImg.style.display = 'block';
+                logger.debug(`Превью установлено для слота ${slotIndex} (${mode})`);
+            } else {
+                logger.warn(`Превью элемент не найден для слота ${slotIndex} (${mode})`);
             }
             
             if (uploadIcon) {
@@ -211,16 +283,32 @@ window.MishuraApp.features.comparison = (function() {
                 slot.appendChild(deleteBtn);
             }
             
-            updateFormVisibility();
+            updateFormVisibility(mode);
+            
+            // Отправляем событие для consultation.js
+            document.dispatchEvent(new CustomEvent('compareImageUploaded', {
+                detail: { slotIndex, fileName: file.name, mode }
+            }));
+        };
+        
+        reader.onerror = () => {
+            logger.error(`Ошибка чтения файла ${file.name}`);
+            if (uiHelpers) uiHelpers.showToast('Ошибка чтения файла');
         };
         
         reader.readAsDataURL(file);
     }
     
-    function resetSlot(slotIndex) {
-        logger.debug(`Сброс слота ${slotIndex}`);
+    function resetSlot(slotIndex, mode = 'page') {
+        logger.debug(`Сброс слота ${slotIndex} (${mode})`);
         
-        const slot = compareSlots[slotIndex];
+        let slot;
+        if (mode === 'modal') {
+            slot = modalCompareSlots ? modalCompareSlots[slotIndex] : null;
+        } else {
+            slot = compareSlots ? compareSlots[slotIndex] : null;
+        }
+        
         if (!slot) return;
         
         const img = slot.querySelector('.preview-image');
@@ -239,13 +327,18 @@ window.MishuraApp.features.comparison = (function() {
         slot.classList.remove('filled');
         uploadedImages[slotIndex] = null;
         
-        updateFormVisibility();
+        updateFormVisibility(mode);
+        
+        // Отправляем событие для consultation.js
+        document.dispatchEvent(new CustomEvent('compareImageRemoved', {
+            detail: { slotIndex, mode }
+        }));
     }
     
-    function updateFormVisibility() {
+    function updateFormVisibility(mode = 'page') {
         const filledCount = uploadedImages.filter(img => img !== null).length;
         
-        if (compareForm) {
+        if (mode === 'page' && compareForm) {
             if (filledCount >= 2) {
                 compareForm.style.display = 'block';
                 if (compareSubmitBtn) compareSubmitBtn.disabled = false;
@@ -255,7 +348,14 @@ window.MishuraApp.features.comparison = (function() {
             }
         }
         
-        logger.debug(`Форма сравнения: ${filledCount >= 2 ? 'показана' : 'скрыта'} (изображений: ${filledCount})`);
+        // Для модального окна обновляем состояние через consultation.js
+        if (mode === 'modal') {
+            document.dispatchEvent(new CustomEvent('compareImagesChanged', {
+                detail: { count: filledCount, images: uploadedImages.filter(img => img !== null) }
+            }));
+        }
+        
+        logger.debug(`Форма сравнения (${mode}): ${filledCount >= 2 ? 'показана' : 'скрыта'} (изображений: ${filledCount})`);
     }
     
     async function handleCompareSubmit() {
@@ -277,7 +377,7 @@ window.MishuraApp.features.comparison = (function() {
                 throw new Error('API сервис не доступен');
             }
             
-            const result = await apiService.compareImages(filledImages, occasion, preferences);
+            const result = await apiService.compareImages(filledImages, { occasion, preferences });
             
             if (uiHelpers) {
                 uiHelpers.hideLoading();
@@ -291,6 +391,17 @@ window.MishuraApp.features.comparison = (function() {
                 uiHelpers.hideLoading();
                 uiHelpers.showToast('Ошибка при сравнении образов. Попробуйте снова.');
             }
+        }
+    }
+    
+    function handleCompareCancel() {
+        logger.debug("Отмена сравнения");
+        reset();
+        
+        // Переход на главную страницу
+        const homeNavItem = document.querySelector('.nav-item[data-page="home"]');
+        if (homeNavItem) {
+            homeNavItem.click();
         }
     }
     
@@ -329,36 +440,48 @@ window.MishuraApp.features.comparison = (function() {
         reset();
     }
     
-    // ИСПРАВЛЕНИЕ: Добавляем функцию reset
     function reset() {
         logger.debug("Сброс модуля сравнения");
         
         // Сбрасываем загруженные изображения
         uploadedImages = [null, null, null, null];
         
-        // Сбрасываем все слоты
+        // Сбрасываем все слоты (и на странице, и в модальном окне)
         for (let i = 0; i < 4; i++) {
-            resetSlot(i);
+            resetSlot(i, 'page');
+            resetSlot(i, 'modal');
         }
         
         // Скрываем форму
-        updateFormVisibility();
+        updateFormVisibility('page');
+        updateFormVisibility('modal');
+        
+        // Сбрасываем форму
+        if (compareForm) {
+            const occasionSelect = document.getElementById('compare-occasion-selector');
+            const preferencesInput = document.getElementById('compare-preferences-input');
+            
+            if (occasionSelect) occasionSelect.value = 'повседневный';
+            if (preferencesInput) preferencesInput.value = '';
+        }
         
         logger.debug("Модуль сравнения сброшен");
     }
     
-    function renderComparisonResults(resultText) {
-        const resultsContainer = document.getElementById('results-container');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = resultText;
-            resultsContainer.classList.add('active');
-        }
+    // Публичные методы для использования из consultation.js
+    function getUploadedImages() {
+        return uploadedImages.filter(img => img !== null);
+    }
+    
+    function getImageCount() {
+        return uploadedImages.filter(img => img !== null).length;
     }
     
     return {
         init,
-        reset, // ИСПРАВЛЕНИЕ: Экспортируем функцию reset
-        isInitialized: () => isComparisonInitialized,
-        isInitializedInternal: () => isComparisonInitialized // Альтернативное название
+        reset,
+        getUploadedImages,
+        getImageCount,
+        initModalCompareSlots,
+        isInitialized: () => isComparisonInitialized
     };
-})();

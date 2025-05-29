@@ -114,7 +114,43 @@
                         
                         <div class="compare-slots-wrapper">
                             <div class="image-slots">
-                                <!-- Слоты для загрузки изображений будут добавлены динамически -->
+                                <!-- Слоты для загрузки изображений -->
+                                <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 1">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="0" style="display: none;">
+                                </div>
+                                <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 2">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="1" style="display: none;">
+                                </div>
+                                <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 3">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="2" style="display: none;">
+                                </div>
+                                <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
+                                    <div class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="24" height="24">
+                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                                        </svg>
+                                    </div>
+                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 4">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="3" style="display: none;">
+                                </div>
                             </div>
                         </div>
 
@@ -132,7 +168,10 @@
                             <label for="compare-preferences-input" class="input-label">Ваши предпочтения:</label>
                             <textarea class="preferences-input" id="compare-preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
                             
-                            <button class="btn btn-primary" id="compare-submit" type="button">Сравнить образы</button>
+                            <div class="dialog-footer">
+                                <button class="btn btn-primary" id="compare-submit" type="button">Сравнить образы</button>
+                                <button class="btn btn-secondary" id="compare-cancel" type="button">Отмена</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -318,7 +357,7 @@
                                         </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 1">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="0">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="0" style="display: none;">
                                 </div>
                                 <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
                                     <div class="upload-icon" aria-hidden="true">
@@ -327,7 +366,7 @@
                                         </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 2">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="1">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="1" style="display: none;">
                                 </div>
                                 <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
                                     <div class="upload-icon" aria-hidden="true">
@@ -336,7 +375,7 @@
                                         </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 3">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="2">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="2" style="display: none;">
                                 </div>
                                 <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
                                     <div class="upload-icon" aria-hidden="true">
@@ -345,7 +384,7 @@
                                         </svg>
                                     </div>
                                     <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 4">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="3">
+                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="3" style="display: none;">
                                 </div>
                             </div>
                             <div class="upload-text">Загрузите от 2 до 4 фотографий для сравнения</div>
@@ -409,7 +448,6 @@
     <!-- API Service -->
     <script src="js/services/api.js"></script>
     <!-- Компоненты -->
-    <script src="js/components/consultation.js"></script>
     <script src="js/features/consultation.js"></script>
     <script src="js/features/comparison.js"></script>
     <script src="js/app-init.js"></script>

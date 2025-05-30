@@ -31,6 +31,12 @@
     --max-width: 480px;
     --nav-height: 60px;
     --header-height: 120px;
+    
+    /* Базовые переменные для мобильных */
+    --mobile-padding: 16px;
+    --mobile-button-height: 48px;
+    --mobile-touch-target: 44px;
+    --mobile-font-size: 16px; /* Предотвращает zoom на iOS */
 }
 
 html {
@@ -62,7 +68,8 @@ body {
     height: 100vh;
     position: relative;
     background-color: var(--bg-primary);
-    /* ИСПРАВЛЕНИЕ: убираем overflow: hidden */
+    /* ИСПРАВЛЕНО: убираем overflow: hidden */
+    overflow: visible;
 }
 
 .app-container {
@@ -71,7 +78,8 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
-    /* ИСПРАВЛЕНИЕ: убираем overflow: hidden */
+    /* ИСПРАВЛЕНО: добавляем стабильность layout */
+    min-height: 100vh;
 }
 
 /* ===== ЭФФЕКТЫ И ДЕКОР ===== */
@@ -154,7 +162,8 @@ body {
     padding-bottom: var(--nav-height);
     position: relative;
     z-index: 2;
-    /* ИСПРАВЛЕНИЕ: убираем min-height для лучшей адаптивности */
+    /* ИСПРАВЛЕНО: предотвращаем layout shifts */
+    contain: layout style;
 }
 
 .content-section {
@@ -255,6 +264,8 @@ body {
     justify-content: space-around;
     align-items: center;
     z-index: 100;
+    contain: layout style;
+    will-change: auto;
 }
 
 .nav-item {
@@ -321,12 +332,26 @@ body {
     align-items: center;
     z-index: 200;
     padding: 10px;
-    /* ИСПРАВЛЕНИЕ: убираем возможность прокрутки оверлея */
+    /* ИСПРАВЛЕНО: предотвращаем сдвиги */
     overflow: hidden;
+    will-change: opacity;
 }
 
 .overlay.active {
     display: flex;
+}
+
+/* ИСПРАВЛЕНИЕ: предотвращение сдвигов при модальных окнах */
+body.modal-open {
+    overflow: hidden;
+    /* ДОБАВЛЕНО: компенсация скроллбара */
+    padding-right: 15px;
+}
+
+body.modal-open .phone-container {
+    /* ДОБАВЛЕНО: стабилизация при открытии модалок */
+    transform: translateX(0);
+    transition: none;
 }
 
 .dialog {
@@ -507,11 +532,10 @@ body {
 .image-slot {
     position: relative !important;
     overflow: hidden !important;
+    min-height: 150px !important;
     border: 2px dashed #d4af37 !important;
     border-radius: 10px !important;
     background: rgba(212, 175, 55, 0.05) !important;
-    min-height: 150px !important;
-    width: 100% !important;
 }
 
 .image-slot .preview-image {
@@ -525,6 +549,11 @@ body {
     display: block !important;
     opacity: 1 !important;
     z-index: 15 !important;
+    visibility: visible !important;
+}
+
+.image-slot.filled .preview-image {
+    display: block !important;
     visibility: visible !important;
 }
 
@@ -1029,86 +1058,51 @@ body {
     animation: fadeIn 0.3s ease-out;
 }
 
-/* ===== МЕДИА ЗАПРОСЫ (ИСПРАВЛЕНИЯ ДЛЯ МОБИЛЬНЫХ) ===== */
-@media (max-width: 768px) {
-    .app-logo {
-        font-size: 32px;
-        letter-spacing: 6px;
-    }
-    
-    .dialog {
-        max-width: calc(100% - 20px);
-        margin: 10px;
-        max-height: calc(100vh - 20px);
-    }
-    
-    .dialog-header {
-        padding: 16px 20px;
-    }
-    
-    .dialog-content {
-        padding: 16px 20px;
-    }
-    
-    .dialog-footer {
-        padding: 12px 20px;
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .dialog-footer .btn {
-        width: 100%;
-        min-height: 48px;
-    }
-    
-    .image-slot {
-        height: 100px;
-    }
-    
+/* ИСПРАВЛЕННЫЕ мобильные стили */
+
+/* Улучшенная поддержка touch устройств */
+@media (hover: none) and (pointer: coarse) {
     .main-button {
-        padding: 20px 16px;
+        min-height: var(--mobile-touch-target);
+        padding: 16px 20px;
+        /* Убираем hover эффекты */
     }
     
-    .main-button-title {
-        font-size: 18px;
+    .main-button:hover {
+        transform: none;
+        box-shadow: none;
     }
     
-    .main-button-description {
-        font-size: 13px;
+    .main-button:active {
+        transform: scale(0.98);
+        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
     }
     
-    /* ИСПРАВЛЕНИЕ: улучшаем область загрузки на мобильных */
-    .upload-area {
-        padding: 24px 16px;
-        min-height: 100px;
+    .btn {
+        min-height: var(--mobile-button-height);
+        font-size: var(--mobile-font-size);
+        padding: 12px 20px;
+        /* Улучшенная область нажатия */
+        position: relative;
     }
     
-    .upload-icon {
-        font-size: 28px;
-        margin-bottom: 8px;
-    }
-    
-    .upload-text {
-        font-size: 13px;
-    }
-    
-    /* ИСПРАВЛЕНИЕ: увеличиваем размер кнопок удаления на мобильных */
-    .delete-image {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-        min-height: 36px;
-        font-size: 16px;
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: -8px;
+        left: -8px;
+        right: -8px;
+        bottom: -8px;
+        /* Расширяем область нажатия */
     }
 }
 
-@media (max-width: 480px) {
-    :root {
-        --header-height: 100px;
-    }
-    
-    .app-header {
-        padding: 20px 16px;
+/* Исправленные медиа-запросы */
+@media screen and (max-width: 768px) {
+    .phone-container {
+        width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh; /* Для новых браузеров */
     }
     
     .app-logo {
@@ -1116,118 +1110,113 @@ body {
         letter-spacing: 4px;
     }
     
-    .content-section {
-        padding: 16px;
+    .main-content {
+        padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
     }
     
-    .dialog-header {
-        padding: 12px 16px;
-    }
-    
-    .dialog-content {
-        padding: 12px 16px;
-    }
-    
-    .dialog-footer {
-        padding: 10px 16px;
-    }
-    
-    .dialog-title {
-        font-size: 20px;
+    .dialog {
+        width: calc(100% - 20px);
+        max-width: none;
+        margin: 10px;
+        max-height: calc(100vh - 20px);
+        max-height: calc(100dvh - 20px);
     }
     
     .image-slots {
-        gap: 8px;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
     }
     
     .image-slot {
-        height: 90px;
+        min-height: 120px;
+        height: 120px;
     }
     
-    .btn {
-        padding: 12px 16px;
-        font-size: 15px;
-        min-height: 44px;
+    /* Улучшенная загрузка на мобильных */
+    .upload-area {
+        min-height: 120px;
+        padding: 20px 16px;
+        border-width: 2px;
     }
     
-    .preferences-input {
-        min-height: 70px;
+    .upload-text {
+        font-size: 14px;
+        line-height: 1.4;
     }
     
-    .payment-options {
-        flex-direction: column;
-    }
-    
-    .wardrobe-filters {
-        flex-direction: column;
+    /* Увеличенные кнопки удаления */
+    .delete-image {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        font-size: 18px;
+        /* Улучшенная область нажатия */
+        margin: 8px;
     }
 }
 
-@media (max-width: 380px) {
-    .app-logo {
-        font-size: 24px;
-        letter-spacing: 3px;
+@media screen and (max-width: 480px) {
+    .image-slots {
+        grid-template-columns: 1fr; /* Один столбец на узких экранах */
+        gap: 16px;
     }
     
-    .dialog {
-        max-width: calc(100% - 16px);
-        margin: 8px;
+    .image-slot {
+        height: 150px; /* Больше высота для удобства */
+    }
+    
+    .content-section {
+        padding: var(--mobile-padding);
     }
     
     .main-button {
-        padding: 16px 12px;
-    }
-    
-    .main-button-title {
-        font-size: 16px;
-    }
-    
-    .main-button-description {
-        font-size: 12px;
-    }
-    
-    .upload-area {
-        padding: 20px 12px;
-        min-height: 90px;
-    }
-    
-    .btn {
-        font-size: 14px;
-        padding: 10px 14px;
-        min-height: 42px;
-    }
-}
-
-/* ===== ИСПРАВЛЕНИЯ ДЛЯ LANDSCAPE ОРИЕНТАЦИИ НА МОБИЛЬНЫХ ===== */
-@media (max-height: 500px) and (orientation: landscape) {
-    .dialog {
-        max-height: calc(100vh - 10px);
+        padding: 20px 16px;
+        margin-bottom: 16px;
     }
     
     .dialog-content {
-        padding: 12px 20px;
+        padding: 16px;
+        max-height: calc(70vh);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
+    }
+}
+
+/* Поддержка safe areas (iPhone X+) */
+@supports (padding-top: env(safe-area-inset-top)) {
+    .app-header {
+        padding-top: calc(30px + env(safe-area-inset-top));
     }
     
-    .upload-area {
-        padding: 16px 20px;
-        min-height: 80px;
+    .nav-bar {
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(var(--nav-height) + env(safe-area-inset-bottom));
     }
     
-    .image-slot {
-        height: 80px;
+    .main-content {
+        padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
+    }
+}
+
+/* Оптимизация для landscape на мобильных */
+@media screen and (max-height: 500px) and (orientation: landscape) {
+    .dialog {
+        max-height: calc(100vh - 10px);
+        width: calc(100% - 40px);
     }
     
     .app-header {
-        padding: 16px 20px;
+        padding: 12px 20px;
     }
     
     .app-logo {
-        font-size: 24px;
+        font-size: 20px;
         margin-bottom: 4px;
     }
     
-    .app-tagline {
-        font-size: 12px;
+    .image-slot {
+        height: 100px;
     }
 }
 
@@ -1307,22 +1296,6 @@ body {
     );
     pointer-events: none;
     z-index: 0;
-}
-
-/* ===== БЕЗОПАСНАЯ ЗОНА ДЛЯ iOS ===== */
-@supports (padding-top: env(safe-area-inset-top)) {
-    .app-header {
-        padding-top: calc(30px + env(safe-area-inset-top));
-    }
-    
-    .nav-bar {
-        padding-bottom: env(safe-area-inset-bottom);
-        height: calc(var(--nav-height) + env(safe-area-inset-bottom));
-    }
-    
-    .main-content {
-        padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
-    }
 }
 
 /* ===== ТЕМНАЯ ТЕМА ДЛЯ СИСТЕМНЫХ ЭЛЕМЕНТОВ ===== */
@@ -1507,9 +1480,6 @@ body {
     border: 2px dashed #d4af37 !important;
     border-radius: 10px !important;
     background: rgba(212, 175, 55, 0.05) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
 }
 
 /* Input файлы - невидимые но кликабельные */
@@ -1617,4 +1587,46 @@ body {
 
 .visible-compare-button:hover {
     background: rgba(212, 175, 55, 0.1) !important;
+}
+
+/* ===== СТАБИЛИЗАЦИЯ LAYOUT ===== */
+.layout-stable {
+    contain: layout style;
+    will-change: auto;
+}
+
+.prevent-shift {
+    transform: translateZ(0); /* Форсируем GPU layer */
+    backface-visibility: hidden;
+}
+
+/* Улучшенные переходы без сдвигов */
+.content-section {
+    transition: opacity 0.3s ease;
+    transform: translateZ(0);
+}
+
+.content-section.hidden {
+    opacity: 0;
+    pointer-events: none;
+    /* НЕ используем display: none для предотвращения layout shifts */
+}
+
+.content-section:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Стабильная навигация */
+.nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: var(--max-width);
+    height: var(--nav-height);
+    /* ДОБАВЛЕНО: стабилизация */
+    contain: layout style;
+    will-change: auto;
 }

@@ -184,59 +184,145 @@ async def api_root():
 
 @api_v1.post("/analyze-outfit", summary="Анализ одного предмета одежды", tags=["AI Analysis"])
 async def analyze_outfit_endpoint(
-    image: UploadFile = File(..., description="Фотография предмета одежды для анализа."),
-    occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
-    preferences: str = Form("", description="Дополнительные предпочтения пользователя (опционально).")
+    image: UploadFile = File(...),
+    occasion: str = Form(...),
+    preferences: str = Form(""),
 ):
-    logger.info(f"Получен запрос на анализ outfit. Повод: '{occasion}', Предпочтения: '{preferences}', Файл: '{image.filename}'")
+    logger.info(f"Получен запрос на анализ. Повод: '{occasion}'")
     
     try:
+        # Проверка доступности Gemini перед обработкой
+        if not GEMINI_AVAILABLE:
+            logger.error("Gemini AI недоступен при запросе анализа")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error", 
+                    "message": "ИИ-сервис временно недоступен. Проверьте GEMINI_API_KEY в настройках.",
+                    "code": "GEMINI_UNAVAILABLE",
+                    "details": {
+                        "service": "Gemini AI",
+                        "reason": "API ключ не настроен или недействителен"
+                    }
+                }
+            )
+
+        # Тест соединения перед анализом
+        connection_ok, connection_msg = await test_gemini_connection()
+        if not connection_ok:
+            logger.error(f"Gemini недоступен: {connection_msg}")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": f"ИИ-сервис недоступен: {connection_msg}",
+                    "code": "GEMINI_CONNECTION_FAILED",
+                    "details": {
+                        "service": "Gemini AI",
+                        "error": connection_msg,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }
+            )
+
         # Валидация файла
         if not validate_image_file(image):
             logger.error("Ошибка валидации файла изображения")
             return JSONResponse(
                 status_code=400,
-                content={"status": "error", "message": "Некорректный файл изображения. Поддерживаются только JPG, PNG, WEBP до 10MB."}
+                content={
+                    "status": "error", 
+                    "message": "Некорректный файл изображения",
+                    "code": "INVALID_IMAGE",
+                    "details": {
+                        "allowed_types": ["image/jpeg", "image/png", "image/webp"],
+                        "max_size": "10MB",
+                        "received_type": image.content_type,
+                        "received_size": f"{image.size} bytes" if hasattr(image, 'size') else "unknown"
+                    }
+                }
             )
 
-        # Проверяем доступность Gemini
-        if not GEMINI_AVAILABLE:
-            logger.error("Gemini AI недоступен")
-            return JSONResponse(
-                status_code=503,
-                content={"status": "error", "message": "ИИ-модуль временно недоступен. Проверьте настройки Gemini API."}
-            )
-
-        # Читаем данные изображения
-        image_data = await image.read()
-        if not image_data:
-            logger.error("Получены пустые данные изображения")
+        # Читаем и анализируем
+        try:
+            image_data = await image.read()
+            logger.info(f"Изображение прочитано, размер: {len(image_data)} байт")
+        except Exception as e:
+            logger.error(f"Ошибка чтения файла: {e}")
             return JSONResponse(
                 status_code=400,
-                content={"status": "error", "message": "Файл изображения не может быть пустым."}
+                content={
+                    "status": "error",
+                    "message": "Не удалось прочитать файл изображения",
+                    "code": "FILE_READ_ERROR",
+                    "details": {
+                        "error": str(e),
+                        "file_name": image.filename
+                    }
+                }
             )
-
-        logger.info(f"Изображение прочитано, размер: {len(image_data)} байт. Вызов Gemini AI...")
         
-        # Вызываем анализ
-        advice = await analyze_clothing_image(image_data, occasion, preferences)
+        try:
+            advice = await analyze_clothing_image(image_data, occasion, preferences)
+        except Exception as e:
+            logger.error(f"Ошибка при анализе изображения: {e}")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": "Ошибка при обработке изображения ИИ-моделью",
+                    "code": "AI_PROCESSING_ERROR",
+                    "details": {
+                        "error": str(e),
+                        "occasion": occasion,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }
+            )
         
-        # Проверяем на ошибки в ответе
+        # Проверка на ошибки в ответе ИИ
         if is_error_message(advice):
             logger.error(f"Ошибка от ИИ-модуля: {advice}")
             return JSONResponse(
                 status_code=503, 
-                content={"status": "error", "message": advice}
+                content={
+                    "status": "error", 
+                    "message": advice,
+                    "code": "AI_RESPONSE_ERROR",
+                    "details": {
+                        "raw_response": advice,
+                        "occasion": occasion,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }
             )
         
         logger.info("Анализ от Gemini AI успешно получен")
-        return {"status": "success", "advice": advice}
+        return {
+            "status": "success", 
+            "advice": advice,
+            "metadata": {
+                "occasion": occasion,
+                "preferences": preferences,
+                "timestamp": datetime.now().isoformat(),
+                "processing_time": "~2-3 секунды"
+            }
+        }
         
     except Exception as e:
-        logger.error(f"Критическая ошибка при обработке анализа: {e}", exc_info=True)
+        logger.error(f"Критическая ошибка при анализе: {e}", exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": f"Внутренняя ошибка сервера: {str(e)}"}
+            content={
+                "status": "error", 
+                "message": "Внутренняя ошибка сервера при обработке изображения",
+                "code": "INTERNAL_ERROR",
+                "details": {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
         )
 
 @api_v1.post("/compare-outfits", summary="Сравнение нескольких предметов одежды", tags=["AI Analysis"])

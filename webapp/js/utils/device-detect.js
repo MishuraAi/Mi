@@ -74,15 +74,61 @@ window.MishuraApp.utils.deviceDetector = (function() {
         // Определяем ориентацию
         deviceInfo.orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
         
-        // Определяем тип устройства по ширине экрана
-        deviceInfo.isMobile = deviceInfo.screenWidth < 768;
-        deviceInfo.isTablet = deviceInfo.screenWidth >= 768 && deviceInfo.screenWidth < 1024;
-        deviceInfo.isDesktop = deviceInfo.screenWidth >= 1024;
+        // Улучшенное определение типа устройства
+        const userAgent = navigator.userAgent.toLowerCase();
+        deviceInfo.isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent) || 
+                             deviceInfo.screenWidth < 768;
+        deviceInfo.isTablet = /ipad|android(?!.*mobile)/i.test(userAgent) || 
+                             (deviceInfo.screenWidth >= 768 && deviceInfo.screenWidth < 1024);
+        deviceInfo.isDesktop = !deviceInfo.isMobile && !deviceInfo.isTablet;
         
-        // Проверяем наличие сенсорного экрана
+        // Расширенная проверка сенсорного экрана
         deviceInfo.isTouchDevice = 'ontouchstart' in window || 
-                                   navigator.maxTouchPoints > 0 || 
-                                   navigator.msMaxTouchPoints > 0;
+                                  navigator.maxTouchPoints > 0 || 
+                                  navigator.msMaxTouchPoints > 0 ||
+                                  (window.DocumentTouch && document instanceof DocumentTouch);
+        
+        // Дополнительная информация о мобильном устройстве
+        deviceInfo.isIOS = /iphone|ipad|ipod/i.test(userAgent);
+        deviceInfo.isAndroid = /android/i.test(userAgent);
+        deviceInfo.hasNotch = deviceInfo.isIOS && 
+                             (window.screen.height === 812 || 
+                              window.screen.height === 844 || 
+                              window.screen.height === 896 || 
+                              window.screen.height === 926);
+        
+        // ДОБАВЛЕНО: Дополнительная мобильная диагностика
+        deviceInfo.userAgent = navigator.userAgent;
+        deviceInfo.isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+        deviceInfo.isWebView = /wv|WebView/.test(navigator.userAgent);
+        
+        // Проверка поддержки современных CSS features
+        deviceInfo.supportsCSSContain = CSS.supports('contain: layout');
+        deviceInfo.supportsWebP = checkWebPSupport();
+        
+        // Определение DPI для оптимизации изображений
+        deviceInfo.dpi = window.devicePixelRatio * 96;
+        deviceInfo.isHighDPI = window.devicePixelRatio > 1.5;
+        
+        logger.debug('Mobile diagnostics:', {
+            isIOS: deviceInfo.isIOS,
+            isAndroid: deviceInfo.isAndroid,
+            isSafari: deviceInfo.isSafari,
+            dpi: deviceInfo.dpi,
+            supportsCSSContain: deviceInfo.supportsCSSContain
+        });
+    }
+    
+    /**
+     * Проверка поддержки WebP
+     * @private
+     * @returns {boolean} - результат проверки
+     */
+    function checkWebPSupport() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        return canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
     }
     
     /**
@@ -130,6 +176,7 @@ window.MishuraApp.utils.deviceDetector = (function() {
         bodyClasses.remove('device-mobile', 'device-tablet', 'device-desktop');
         bodyClasses.remove('touch-device', 'no-touch-device');
         bodyClasses.remove('orientation-portrait', 'orientation-landscape');
+        bodyClasses.remove('ios-device', 'android-device', 'has-notch');
         
         // Добавляем новые классы
         if (deviceInfo.isMobile) bodyClasses.add('device-mobile');
@@ -141,6 +188,10 @@ window.MishuraApp.utils.deviceDetector = (function() {
         } else {
             bodyClasses.add('no-touch-device');
         }
+        
+        if (deviceInfo.isIOS) bodyClasses.add('ios-device');
+        if (deviceInfo.isAndroid) bodyClasses.add('android-device');
+        if (deviceInfo.hasNotch) bodyClasses.add('has-notch');
         
         bodyClasses.add('orientation-' + deviceInfo.orientation);
     }

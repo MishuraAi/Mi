@@ -18,14 +18,14 @@ window.MishuraApp.services.api = (function() {
     let logger;
     let isInitialized = false;
     
-    // Конфигурация API с автоопределением
+    // Конфигурация с правильными портами
     const CONFIG = {
         possibleUrls: [
-            'http://localhost:8001/api/v1',  // Основной адрес
-            'http://localhost:8000/api/v1',  // Резервный
+            'http://localhost:8001/api/v1',  // Основной порт для api.py
+            'http://localhost:8000/api/v1',  // Резервный порт
             'https://style-ai-bot.onrender.com/api/v1'  // Продакшн
         ],
-        baseUrl: null, // Будет определен автоматически
+        baseUrl: null,
         timeout: 30000,
         retries: 3
     };
@@ -38,7 +38,7 @@ window.MishuraApp.services.api = (function() {
         geminiDirect: '/gemini/analyze'
     };
     
-    // Функция автоопределения рабочего API URL
+    // ИСПРАВЛЕННАЯ функция проверки здоровья API
     async function detectWorkingApiUrl() {
         logger.debug('🔍 Автоопределение рабочего API адреса...');
         
@@ -47,7 +47,7 @@ window.MishuraApp.services.api = (function() {
                 logger.debug(`⏳ Проверка ${url}...`);
                 
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const timeoutId = setTimeout(() => controller.abort(), 3000); // Уменьшили таймаут
                 
                 const response = await fetch(`${url}/health`, {
                     method: 'GET',
@@ -59,13 +59,28 @@ window.MishuraApp.services.api = (function() {
                 
                 if (response.ok) {
                     const data = await response.json();
-                    CONFIG.baseUrl = url;
-                    logger.info(`✅ Найден рабочий API: ${url}`);
-                    return { url, data };
+                    
+                    // ДОБАВИТЬ: Проверка доступности Gemini через health endpoint
+                    if (data.gemini_ai && data.gemini_ai.status === 'active') {
+                        CONFIG.baseUrl = url;
+                        logger.info(`✅ Найден рабочий API с активным Gemini: ${url}`);
+                        return { url, data };
+                    } else {
+                        logger.warn(`⚠️ API ${url} работает, но Gemini недоступен:`, data);
+                        // Продолжаем поиск, но сохраняем как fallback
+                        if (!CONFIG.baseUrl) {
+                            CONFIG.baseUrl = url;
+                        }
+                    }
                 }
             } catch (error) {
                 logger.debug(`❌ ${url} недоступен: ${error.message}`);
             }
+        }
+        
+        if (CONFIG.baseUrl) {
+            logger.warn(`🔄 Используем API без Gemini: ${CONFIG.baseUrl}`);
+            return { url: CONFIG.baseUrl, data: { status: 'partial' } };
         }
         
         throw new Error('Все API адреса недоступны');

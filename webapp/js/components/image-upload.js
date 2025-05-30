@@ -162,6 +162,10 @@ window.MishuraApp.components.imageUpload = (function() {
             cursor: pointer;
             transition: all 0.3s ease;
             min-height: 200px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
         `;
         
         // Добавляем hover эффект
@@ -197,6 +201,28 @@ window.MishuraApp.components.imageUpload = (function() {
             
             handleSingleImageUpload(file);
         });
+        
+        // Добавляем touch-оптимизации
+        uploadButton.style.cssText += `
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        `;
+        
+        // Улучшенные touch-события
+        uploadButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            uploadButton.style.transform = 'scale(0.98)';
+            uploadButton.style.background = 'rgba(212, 175, 55, 0.15)';
+        }, { passive: false });
+        
+        uploadButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            uploadButton.style.transform = 'scale(1)';
+            uploadButton.style.background = 'rgba(212, 175, 55, 0.05)';
+            hiddenInput.click();
+        }, { passive: false });
         
         // Добавляем в DOM
         uploadArea.appendChild(hiddenInput);
@@ -292,6 +318,10 @@ window.MishuraApp.components.imageUpload = (function() {
             transition: all 0.3s ease;
             padding: 16px 8px;
             box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
         `;
         
         // Добавляем hover эффект
@@ -335,6 +365,28 @@ window.MishuraApp.components.imageUpload = (function() {
             }
         });
         
+        // Добавляем touch-оптимизации
+        uploadButton.style.cssText += `
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        `;
+        
+        // Улучшенные touch-события
+        uploadButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            uploadButton.style.transform = 'scale(0.98)';
+            uploadButton.style.background = 'rgba(212, 175, 55, 0.15)';
+        }, { passive: false });
+        
+        uploadButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            uploadButton.style.transform = 'scale(1)';
+            uploadButton.style.background = 'rgba(212, 175, 55, 0.05)';
+            hiddenInput.click();
+        }, { passive: false });
+        
         // Добавляем в DOM
         slot.appendChild(hiddenInput);
         slot.appendChild(uploadButton);
@@ -350,6 +402,10 @@ window.MishuraApp.components.imageUpload = (function() {
     }
     
     function setupDragAndDrop(element, onFileDrop) {
+        // Улучшенная поддержка touch устройств
+        let touchStarted = false;
+        
+        // Desktop drag & drop
         element.addEventListener('dragover', function(e) {
             e.preventDefault();
             element.classList.add('dragover');
@@ -371,7 +427,57 @@ window.MishuraApp.components.imageUpload = (function() {
                 onFileDrop(files[0]);
             }
         });
+        
+        // ДОБАВЛЕНО: Улучшенная поддержка touch
+        element.addEventListener('touchstart', function(e) {
+            touchStarted = true;
+            element.classList.add('touch-active');
+            
+            // Предотвращаем нежелательный скролл
+            if (e.target === element) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        element.addEventListener('touchend', function(e) {
+            if (touchStarted) {
+                touchStarted = false;
+                element.classList.remove('touch-active');
+                
+                // Эмулируем клик для touch устройств
+                if (e.target === element || element.contains(e.target)) {
+                    const input = element.querySelector('input[type="file"]');
+                    if (input) {
+                        setTimeout(() => input.click(), 100);
+                    }
+                }
+            }
+        });
+        
+        element.addEventListener('touchcancel', function() {
+            touchStarted = false;
+            element.classList.remove('touch-active');
+        });
     }
+    
+    // ДОБАВИТЬ: Стили для touch активности
+    const touchStyles = document.createElement('style');
+    touchStyles.textContent = `
+        .touch-active {
+            background: rgba(212, 175, 55, 0.15) !important;
+            transform: scale(0.98) !important;
+            transition: all 0.1s ease !important;
+        }
+        
+        /* Улучшенные touch targets */
+        @media (hover: none) {
+            .upload-area, .image-slot, .btn {
+                -webkit-tap-highlight-color: rgba(212, 175, 55, 0.2);
+                touch-action: manipulation;
+            }
+        }
+    `;
+    document.head.appendChild(touchStyles);
     
     function setupSingleDeleteButton() {
         const deleteButton = document.querySelector('#single-preview-container .delete-image');
@@ -447,67 +553,55 @@ window.MishuraApp.components.imageUpload = (function() {
                 return;
             }
             
-            // Очищаем слот
+            // ИСПРАВЛЕНИЕ: Правильная очистка и создание превью
             slot.innerHTML = '';
+            slot.classList.add('filled');
             
             // Создаем preview изображение
             const previewImg = document.createElement('img');
             previewImg.className = 'preview-image';
             previewImg.src = e.target.result;
+            previewImg.alt = `Превью изображения ${slotIndex + 1}`;
+            
+            // ИСПРАВЛЕНИЕ: Правильные стили без конфликтов
             previewImg.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
-                border-radius: 10px;
+                border-radius: 8px;
+                display: block;
+                opacity: 1;
+                z-index: 15;
+                visibility: visible;
             `;
             
             // Создаем кнопку удаления
-            const deleteBtn = document.createElement('div');
+            const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-image';
             deleteBtn.innerHTML = '✕';
-            deleteBtn.style.cssText = `
-                position: absolute;
-                top: 5px;
-                right: 5px;
-                width: 28px;
-                height: 28px;
-                background: rgba(0,0,0,0.8);
-                color: white;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: bold;
-                z-index: 30;
-                transition: all 0.3s ease;
-            `;
+            deleteBtn.setAttribute('aria-label', `Удалить изображение ${slotIndex + 1}`);
             
-            // Hover эффект для кнопки удаления
-            deleteBtn.addEventListener('mouseenter', () => {
-                deleteBtn.style.background = 'rgba(255,0,0,0.8)';
-                deleteBtn.style.transform = 'scale(1.1)';
+            // ИСПРАВЛЕНИЕ: Обработчик удаления с правильным scope
+            deleteBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetCompareSlot(slotIndex);
             });
             
-            deleteBtn.addEventListener('mouseleave', () => {
-                deleteBtn.style.background = 'rgba(0,0,0,0.8)';
-                deleteBtn.style.transform = 'scale(1)';
-            });
-            
-            // Добавляем элементы в слот
+            // Добавляем элементы в DOM
             slot.appendChild(previewImg);
             slot.appendChild(deleteBtn);
             
-            slot.classList.add('filled');
-            
-            // Проверяем, достаточно ли изображений для показа формы
+            // Показываем форму, если достаточно изображений
             const filledCount = uploadedImages.compare.filter(img => img !== null).length;
             if (filledCount >= 2) {
                 showFormElements();
             }
             
-            // Отправляем событие
+            // ИСПРАВЛЕНИЕ: Корректное событие
             document.dispatchEvent(new CustomEvent('compareImageUploaded', { 
                 detail: { 
                     file: file, 
@@ -516,11 +610,6 @@ window.MishuraApp.components.imageUpload = (function() {
                     fileName: file.name
                 } 
             }));
-        };
-        
-        reader.onerror = function() {
-            logger.error(`Ошибка чтения файла для слота ${slotIndex}:`, file.name);
-            showToast('Ошибка при загрузке изображения');
         };
         
         reader.readAsDataURL(file);

@@ -208,20 +208,41 @@ window.MishuraApp.app = (function() {
         const dialogTitle = document.getElementById('consultation-dialog-title');
         const dialogSubtitle = document.querySelector('#consultation-overlay .dialog-subtitle');
         
-        if (mode === 'single') {
-            if (singleModeContainer) singleModeContainer.classList.remove('hidden');
-            if (compareModeContainer) compareModeContainer.classList.add('hidden');
-            if (dialogTitle) dialogTitle.textContent = 'Получить консультацию';
-            if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите фото одежды для анализа';
-        } else if (mode === 'compare') {
-            if (singleModeContainer) singleModeContainer.classList.add('hidden');
-            if (compareModeContainer) compareModeContainer.classList.remove('hidden');
-            if (dialogTitle) dialogTitle.textContent = 'Сравнить образы';
-            if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите от 2 до 4 фотографий для сравнения';
-        }
+        // ИСПРАВЛЕНИЕ: Batch DOM updates для предотвращения layout thrashing
+        requestAnimationFrame(() => {
+            if (mode === 'single') {
+                if (singleModeContainer) {
+                    singleModeContainer.classList.remove('hidden');
+                    singleModeContainer.style.display = 'block';
+                }
+                if (compareModeContainer) {
+                    compareModeContainer.classList.add('hidden');
+                    compareModeContainer.style.display = 'none';
+                }
+                if (dialogTitle) dialogTitle.textContent = 'Получить консультацию';
+                if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите фото одежды для анализа';
+            } else if (mode === 'compare') {
+                if (singleModeContainer) {
+                    singleModeContainer.classList.add('hidden');
+                    singleModeContainer.style.display = 'none';
+                }
+                if (compareModeContainer) {
+                    compareModeContainer.classList.remove('hidden');
+                    compareModeContainer.style.display = 'block';
+                }
+                if (dialogTitle) dialogTitle.textContent = 'Сравнить образы';
+                if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите от 2 до 4 фотографий для сравнения';
+            }
+            
+            // ИСПРАВЛЕНИЕ: Stabilize layout после изменений
+            const overlay = document.getElementById('consultation-overlay');
+            if (overlay) {
+                overlay.style.contain = 'layout style';
+            }
+        });
         
         document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
-        console.log(`App.js: Режим ${mode} установлен и событие отправлено`);
+        console.log(`App.js: Режим ${mode} установлен без layout shifts`);
     }
     
     // Обработчики событий для кнопок

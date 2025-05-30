@@ -509,7 +509,12 @@ window.MishuraApp.components.imageUpload = (function() {
             
             // Отправляем событие
             document.dispatchEvent(new CustomEvent('compareImageUploaded', { 
-                detail: { file: file, slot: slotIndex } 
+                detail: { 
+                    file: file, 
+                    slot: slotIndex,
+                    slotIndex: slotIndex,
+                    fileName: file.name
+                } 
             }));
         };
         
@@ -654,7 +659,10 @@ window.MishuraApp.components.imageUpload = (function() {
         }
         
         document.dispatchEvent(new CustomEvent('compareImageRemoved', { 
-            detail: { slot: slotIndex } 
+            detail: { 
+                slot: slotIndex,
+                slotIndex: slotIndex
+            } 
         }));
     }
     

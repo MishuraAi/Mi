@@ -22,7 +22,7 @@ window.MishuraApp.config = (function() {
         
         // ИСПРАВЛЕНИЕ: API URL с правильным портом
         apiUrl: isDevelopment 
-            ? 'http://localhost:5000/api/v1'  // Стандартный порт Flask
+            ? 'http://localhost:8000/api/v1'  // ИСПРАВЛЕНО: Изменен порт с 5000 на 8000
             : 'https://style-ai-bot.onrender.com/api/v1',
             
         // Альтернативные порты для проверки

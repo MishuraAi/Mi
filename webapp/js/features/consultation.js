@@ -1,702 +1,613 @@
-/*
-==========================================================================================
-ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Консультации со встроенным API (consultation.js)
-ВЕРСИЯ: 1.2.0 (ПОЛНАЯ ПОДДЕРЖКА СРАВНЕНИЯ)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-29
+/**
+ * Модуль консультаций - обработка запросов к API
+ */
 
-ИСПРАВЛЕНИЯ: Добавлена полная поддержка режима сравнения образов
-==========================================================================================
-*/
+import { Logger } from './logger.js';
+import { ApiService } from './api.js';
 
-window.MishuraApp = window.MishuraApp || {};
-window.MishuraApp.features = window.MishuraApp.features || {};
+const logger = new Logger('Consultation');
 
-window.MishuraApp.features.consultation = (function() {
-    'use strict';
-    
-    let logger, uiHelpers, modalManager, imageUpload;
-    let isConsultationInitialized = false;
-    let currentMode = 'single';
-    let currentAnalysisMode = 'single'; // 'single' или 'compare'
-    let isSubmitting = false;
-    
-    // ==== ВСТРОЕННЫЙ API ====
-    const API_SERVICE = {
-        baseUrl: null,
-        isReady: false,
-        
-        async init() {
-            logger.info("🚀 Инициализация встроенного API Service");
-            
-            // Пробуем найти рабочий API
-            const urls = [
-                'http://localhost:8001/api/v1',
-                'http://localhost:8000/api/v1',
-                'https://style-ai-bot.onrender.com/api/v1'
-            ];
-            
-            for (const url of urls) {
-                try {
-                    logger.debug(`⏳ Проверка ${url}...`);
-                    
-                    const response = await fetch(`${url}/health`, {
-                        method: 'GET',
-                        headers: { 'Content-Type': 'application/json' },
-                        signal: AbortSignal.timeout(5000)
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        this.baseUrl = url;
-                        this.isReady = true;
-                        logger.info(`✅ API найден: ${url}`, data);
-                        
-                        // Регистрируем глобально
-                        window.MishuraApp.api = {
-                            analyzeImage: this.analyzeImage.bind(this),
-                            compareImages: this.compareImages.bind(this),
-                            isInitialized: () => this.isReady
-                        };
-                        
-                        return true;
-                    }
-                } catch (error) {
-                    logger.debug(`❌ ${url} недоступен: ${error.message}`);
-                }
-            }
-            
-            // Если API недоступен, используем mock
-            logger.warn("🎭 API недоступен, активирован режим демонстрации");
-            this.setupMockApi();
-            return false;
-        },
-        
-        setupMockApi() {
-            this.isReady = true;
-            window.MishuraApp.api = {
-                analyzeImage: this.mockAnalyzeImage.bind(this),
-                compareImages: this.mockCompareImages.bind(this),
-                isInitialized: () => true
-            };
-            logger.info("✅ Mock API активирован");
-        },
-        
-        async analyzeImage(imageFile, options = {}) {
-            if (!this.baseUrl) {
-                return this.mockAnalyzeImage(imageFile, options);
-            }
-            
-            logger.info("📸 Анализ изображения через API");
-            
-            try {
-                const formData = new FormData();
-                formData.append('image', imageFile);
-                formData.append('metadata', JSON.stringify({
-                    occasion: options.occasion || '',
-                    preferences: options.preferences || '',
-                    analysis_type: 'single',
-                    timestamp: new Date().toISOString()
-                }));
-                
-                const response = await fetch(`${this.baseUrl}/analyze/single`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: AbortSignal.timeout(30000)
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const result = await response.json();
-                logger.info("✅ Анализ завершен");
-                return result;
-                
-            } catch (error) {
-                logger.error("❌ Ошибка API анализа:", error);
-                logger.warn("🔄 Переключение на mock данные");
-                return this.mockAnalyzeImage(imageFile, options);
-            }
-        },
-        
-        async compareImages(imageFiles, options = {}) {
-            if (!this.baseUrl) {
-                return this.mockCompareImages(imageFiles, options);
-            }
-            
-            logger.info("🔍 Сравнение изображений через API");
-            
-            try {
-                const formData = new FormData();
-                
-                imageFiles.forEach((file, index) => {
-                    formData.append(`image_${index}`, file);
-                });
-                
-                formData.append('metadata', JSON.stringify({
-                    occasion: options.occasion || '',
-                    preferences: options.preferences || '',
-                    analysis_type: 'compare',
-                    image_count: imageFiles.length,
-                    timestamp: new Date().toISOString()
-                }));
-                
-                const response = await fetch(`${this.baseUrl}/analyze/compare`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: AbortSignal.timeout(45000)
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const result = await response.json();
-                logger.info("✅ Сравнение завершено");
-                return result;
-                
-            } catch (error) {
-                logger.error("❌ Ошибка API сравнения:", error);
-                logger.warn("🔄 Переключение на mock данные");
-                return this.mockCompareImages(imageFiles, options);
-            }
-        },
-        
-        async mockAnalyzeImage(imageFile, options) {
-            logger.info("🎭 Mock анализ изображения");
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            const occasionText = options.occasion ? ` для случая "${options.occasion}"` : '';
-            
-            return {
-                success: true,
-                analysis_type: 'single',
-                image_name: imageFile.name,
-                style_analysis: `Анализ образа${occasionText}: Вы выбрали стильное сочетание, которое отлично подходит для вашего типа фигуры. Цветовая гамма гармонична и создает приятное визуальное впечатление.`,
-                recommendations: `Рекомендации по улучшению: Попробуйте добавить яркий аксессуар для создания акцента. Возможно, стоит рассмотреть обувь на небольшом каблуке для более элегантного силуэта.`,
-                rating: `Общая оценка: 8.5/10. Отличный базовый образ с потенциалом для небольших улучшений. Вы выглядите стильно и уверенно!`,
-                color_analysis: "Цветовая палитра подходит к вашему цветотипу и создает гармоничный образ.",
-                style_tips: [
-                    "Добавьте контрастный аксессуар",
-                    "Рассмотрите другую обувь", 
-                    "Попробуйте слегка другой силуэт"
-                ],
-                timestamp: new Date().toISOString(),
-                mode: 'mock'
-            };
-        },
-        
-        async mockCompareImages(imageFiles, options) {
-            logger.info("🎭 Mock сравнение изображений");
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            
-            const occasionText = options.occasion ? ` для случая "${options.occasion}"` : '';
-            
-            return {
-                success: true,
-                analysis_type: 'compare',
-                image_count: imageFiles.length,
-                best_outfit: `Лучший образ${occasionText}: Образ №2 (${imageFiles[1]?.name || 'второе изображение'}) выигрывает благодаря более гармоничному сочетанию цветов и лучшей посадке по фигуре.`,
-                comparison: `Детальное сравнение:
-                
-🥇 Образ №1: Хорошие пропорции, но цветовая гамма могла бы быть более яркой. Оценка: 7.5/10
-
-🏆 Образ №2: Отличное сочетание цветов, идеальная посадка, стильные аксессуары. Оценка: 9/10
-
-${imageFiles[2] ? '🥉 Образ №3: Интересный выбор, но стиль немного не соответствует случаю. Оценка: 7/10' : ''}`,
-                improvement_tips: `Советы по улучшению:
-• Для образа №1: добавьте яркий аксессуар или шарф
-• Для образа №2: уже отлично, возможно другая обувь
-${imageFiles[2] ? '• Для образа №3: смените верх на более подходящий к случаю' : ''}`,
-                winner_index: 1,
-                scores: imageFiles.map((_, i) => ({ 
-                    image_index: i, 
-                    score: i === 1 ? 9.0 : (7.5 - Math.random() * 0.5)
-                })),
-                timestamp: new Date().toISOString(),
-                mode: 'mock'
-            };
-        }
-    };
-    
-    function init() {
-        if (isConsultationInitialized) {
-            logger?.debug("Модуль консультаций уже инициализирован");
-            return;
-        }
-
-        logger = window.MishuraApp.utils.logger || createFallbackLogger();
-        uiHelpers = window.MishuraApp.utils.uiHelpers;
-        modalManager = window.MishuraApp.components.modalManager;
-        imageUpload = window.MishuraApp.components.imageUpload;
-
-        logger.info("🚀 Инициализация модуля консультаций v1.2.0 (Full Compare Support)");
-        
-        // Инициализируем встроенный API
-        API_SERVICE.init().then((hasRealApi) => {
-            logger.info(hasRealApi ? "✅ Реальный API подключен" : "🎭 Работаем в режиме демонстрации");
-            setupEventListeners();
-            setupButtonHandlers();
-            isConsultationInitialized = true;
-            logger.info("✅ Модуль консультаций готов к работе");
-        });
+export class ConsultationModule {
+    constructor() {
+        this.apiService = null;
+        this.currentMode = 'single';
+        this.uploadedImages = new Map();
+        this.compareImages = new Map();
+        this.singleImage = null;
+        this.submitHandler = null;
+        this.cancelHandlers = [];
+        this.isInitialized = false;
     }
-    
-    function createFallbackLogger() {
+
+    async init() {
+        try {
+            logger.debug('⏳ Проверка http://localhost:8001/api/v1...');
+            const response = await fetch('http://localhost:8001/api/v1/health');
+            if (response.ok) {
+                logger.info('✅ Локальный API найден на порту 8001');
+                this.apiService = new ApiService('http://localhost:8001/api/v1');
+                await this.apiService.init();
+                logger.info('✅ Реальный API подключен');
+                this.setupEventHandlers();
+                this.isInitialized = true;
+                logger.info('✅ Модуль консультаций готов к работе');
+                return;
+            }
+        } catch (error) {
+            logger.debug('❌ http://localhost:8001/api/v1 недоступен:', error.message);
+        }
+
+        try {
+            logger.debug('⏳ Проверка http://localhost:8000/api/v1...');
+            const response = await fetch('http://localhost:8000/api/v1/health');
+            if (response.ok) {
+                logger.info('✅ Локальный API найден на порту 8000');
+                this.apiService = new ApiService('http://localhost:8000/api/v1');
+                await this.apiService.init();
+                logger.info('✅ Реальный API подключен');
+                this.setupEventHandlers();
+                this.isInitialized = true;
+                logger.info('✅ Модуль консультаций готов к работе');
+                return;
+            }
+        } catch (error) {
+            logger.debug('❌ http://localhost:8000/api/v1 недоступен:', error.message);
+        }
+
+        try {
+            logger.debug('⏳ Проверка https://style-ai-bot.onrender.com/api/v1...');
+            const response = await fetch('https://style-ai-bot.onrender.com/api/v1/health');
+            if (response.ok) {
+                const data = await response.json();
+                logger.info('✅ API найден: https://style-ai-bot.onrender.com/api/v1', data);
+                this.apiService = new ApiService('https://style-ai-bot.onrender.com/api/v1');
+                await this.apiService.init();
+                logger.info('✅ Реальный API подключен');
+                this.setupEventHandlers();
+                this.isInitialized = true;
+                logger.info('✅ Модуль консультаций готов к работе');
+                return;
+            }
+        } catch (error) {
+            logger.debug('❌ https://style-ai-bot.onrender.com/api/v1 недоступен:', error.message);
+        }
+
+        logger.warn('⚠️ API сервер недоступен, используются mock данные');
+        this.setupEventHandlers();
+        this.isInitialized = true;
+        logger.info('✅ Модуль консультаций готов к работе (mock режим)');
+    }
+
+    async analyzeImage(imageData, imageName, occasion, preferences) {
+        const apiBaseUrl = this.apiService ? this.apiService.baseUrl : null;
+        
+        if (!apiBaseUrl) {
+            logger.warn('🔄 Переключение на mock данные');
+            return this.getMockAnalysisResult();
+        }
+
+        try {
+            logger.info('📸 Анализ изображения через API');
+            
+            const formData = new FormData();
+            
+            const blob = this.dataURLtoBlob(imageData);
+            formData.append('image', blob, imageName);
+            formData.append('occasion', occasion || '');
+            formData.append('preferences', preferences || '');
+            formData.append('analysis_type', 'single');
+
+            const response = await fetch(`${apiBaseUrl}/analyze`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+
+            const result = await response.json();
+            logger.info('✅ Анализ получен от API');
+            return result;
+
+        } catch (error) {
+            logger.error('❌ Ошибка API анализа:', error);
+            logger.warn('🔄 Переключение на mock данные');
+            logger.info('🎭 Mock анализ изображения');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return this.getMockAnalysisResult();
+        }
+    }
+
+    async compareImages(images, occasion, preferences) {
+        const apiBaseUrl = this.apiService ? this.apiService.baseUrl : null;
+        
+        if (!apiBaseUrl) {
+            logger.warn('🔄 Переключение на mock данные');
+            return this.getMockComparisonResult();
+        }
+
+        try {
+            logger.info('🔍 Сравнение изображений через API');
+            
+            const formData = new FormData();
+            
+            images.forEach((imageData, index) => {
+                const blob = this.dataURLtoBlob(imageData.data);
+                formData.append('images', blob, imageData.name);
+            });
+            
+            formData.append('occasion', occasion || '');
+            formData.append('preferences', preferences || '');
+            formData.append('analysis_type', 'compare');
+
+            const response = await fetch(`${apiBaseUrl}/analyze`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+
+            const result = await response.json();
+            logger.info('✅ Сравнение получено от API');
+            return result;
+
+        } catch (error) {
+            logger.error('❌ Ошибка API сравнения:', error);
+            logger.warn('🔄 Переключение на mock данные');
+            logger.info('🎭 Mock сравнение изображений');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return this.getMockComparisonResult();
+        }
+    }
+
+    dataURLtoBlob(dataURL) {
+        const arr = dataURL.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+    }
+
+    getMockAnalysisResult() {
         return {
-            debug: (...args) => console.debug("Consultation:", ...args),
-            info: (...args) => console.info("Consultation:", ...args),
-            warn: (...args) => console.warn("Consultation:", ...args),
-            error: (...args) => console.error("Consultation:", ...args)
+            analysis: {
+                style: "Элегантный вечерний стиль",
+                colors: ["Черный", "Золотой", "Серебряный"],
+                occasion_fit: 95,
+                recommendations: [
+                    "Отличный выбор для вечернего мероприятия",
+                    "Рекомендуем добавить аксессуары золотого цвета",
+                    "Подходящая обувь: классические туфли на каблуке"
+                ],
+                overall_score: 92
+            },
+            status: "success"
         };
     }
-    
-    function setupEventListeners() {
-        // Слушаем смену режима
-        document.addEventListener('modeChanged', (e) => {
-            currentMode = e.detail.mode;
-            currentAnalysisMode = e.detail.mode;
-            logger.debug(`Consultation (event modeChanged): режим ${currentMode}. Обновление кнопки.`);
-            updateSubmitButtonState();
-            // Восстанавливаем обработчики после смены режима
-            setTimeout(setupButtonHandlers, 100);
-        });
 
-        // Слушаем загрузку изображений
-        document.addEventListener('singleImageUploaded', (e) => {
-            logger.debug(`Consultation (event singleImageUploaded): Изображение загружено - ${e.detail.file.name}`);
-            updateSubmitButtonState();
-        });
+    getMockComparisonResult() {
+        return {
+            comparison: {
+                best_choice: {
+                    index: 0,
+                    reason: "Лучше всего подходит для данного случая"
+                },
+                analysis: [
+                    {
+                        style: "Классический деловой",
+                        score: 95,
+                        pros: ["Элегантность", "Универсальность"],
+                        cons: ["Может быть слишком формальным"]
+                    },
+                    {
+                        style: "Повседневный шик",
+                        score: 78,
+                        pros: ["Комфорт", "Стильность"],
+                        cons: ["Менее подходит для официальных мероприятий"]
+                    }
+                ],
+                recommendations: [
+                    "Первый образ лучше подходит для вечеринки",
+                    "Добавьте яркие аксессуары к первому образу",
+                    "Второй образ больше подходит для дневных мероприятий"
+                ]
+            },
+            status: "success"
+        };
+    }
 
-        document.addEventListener('singleImageRemoved', () => {
-            logger.debug("Consultation (event singleImageRemoved): Изображение для одиночного анализа удалено.");
-            updateSubmitButtonState();
-        });
+    setupEventHandlers() {
+        document.addEventListener('consultationSubmit', this.handleConsultationSubmit.bind(this));
+        document.addEventListener('consultationCancel', this.handleConsultationCancel.bind(this));
+        document.addEventListener('modeChanged', this.handleModeChange.bind(this));
+        document.addEventListener('singleImageUploaded', this.handleSingleImageUploaded.bind(this));
+        document.addEventListener('singleImageRemoved', this.handleSingleImageRemoved.bind(this));
+        document.addEventListener('compareImageUploaded', this.handleCompareImageUploaded.bind(this));
+        document.addEventListener('compareImageRemoved', this.handleCompareImageRemoved.bind(this));
+        
+        this.setupSubmitHandler();
+        this.setupCancelHandlers();
+        logger.debug('🔧 Настройка обработчиков кнопок консультации');
+        logger.debug('✅ Обработчик consultation submit установлен');
+        logger.debug(`✅ ${this.cancelHandlers.length} обработчиков отмены установлено`);
+    }
 
-        // Слушаем события загрузки изображений для сравнения
-        document.addEventListener('compareImageUploaded', (e) => {
-            logger.debug(`Consultation (event compareImageUploaded): Изображение загружено в слот ${e.detail.slotIndex}, файл ${e.detail.fileName}`);
-            updateSubmitButtonState();
-        });
-
-        document.addEventListener('compareImageRemoved', (e) => {
-            logger.debug(`Consultation (event compareImageRemoved): Изображение удалено из слота ${e.detail.slotIndex}`);
-            updateSubmitButtonState();
-        });
-
-        // Слушаем открытие модальных окон
-        document.addEventListener('modalOpened', (e) => {
-            if (e.detail.modalId === 'consultation-overlay') {
-                logger.debug(`Consultation (event modalOpened '${e.detail.modalId}'): Обновление состояния кнопки.`);
-                updateSubmitButtonState();
-                setTimeout(setupButtonHandlers, 100);
+    setupSubmitHandler() {
+        const form = document.getElementById('consultation-form');
+        if (form) {
+            if (this.submitHandler) {
+                form.removeEventListener('submit', this.submitHandler);
             }
+            
+            this.submitHandler = (e) => {
+                e.preventDefault();
+                
+                const mode = form.dataset.mode || this.currentMode;
+                logger.info(`🚀 Обработчик submit формы, режим '${mode}'`);
+                
+                document.dispatchEvent(new CustomEvent('consultationSubmit', {
+                    detail: { mode }
+                }));
+            };
+            
+            form.addEventListener('submit', this.submitHandler);
+        }
+    }
+
+    setupCancelHandlers() {
+        this.cancelHandlers.forEach(({ element, handler }) => {
+            element.removeEventListener('click', handler);
+        });
+        this.cancelHandlers = [];
+
+        const cancelButtons = document.querySelectorAll('.modal-close, .cancel-consultation');
+        cancelButtons.forEach(button => {
+            const handler = () => {
+                document.dispatchEvent(new CustomEvent('consultationCancel'));
+            };
+            
+            button.addEventListener('click', handler);
+            this.cancelHandlers.push({ element: button, handler });
         });
     }
-    
-    function setupButtonHandlers() {
-        logger.debug("🔧 Настройка обработчиков кнопок консультации");
+
+    async handleConsultationSubmit(event) {
+        const { mode } = event.detail;
         
-        // Кнопка отправки консультации (единая для обоих режимов)
-        const submitBtn = document.querySelector('#submit-consultation');
-        if (submitBtn) {
-            // Удаляем старые обработчики
-            const newBtn = submitBtn.cloneNode(true);
-            submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-            
-            newBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!isSubmitting) {
-                    handleConsultationSubmit();
-                }
-            });
-            logger.debug("✅ Обработчик consultation submit установлен");
+        if (mode === 'single') {
+            await this.handleSingleConsultationSubmit();
+        } else if (mode === 'compare') {
+            await this.handleCompareConsultationSubmit();
+        }
+    }
+
+    async handleSingleConsultationSubmit() {
+        if (!this.singleImage) {
+            logger.warn('❌ Нет изображения для анализа');
+            return;
         }
 
-        // Кнопки отмены
-        const cancelBtns = document.querySelectorAll('#consultation-cancel, #compare-cancel');
-        cancelBtns.forEach(btn => {
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
-            
-            newBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleCancelConsultation();
-            });
-        });
+        const submitButton = document.querySelector('#consultation-submit');
+        const loadingIndicator = document.querySelector('.loading-indicator');
         
-        if (cancelBtns.length > 0) {
-            logger.debug(`✅ ${cancelBtns.length} обработчиков отмены установлено`);
+        if (submitButton) {
+            submitButton.disabled = true;
+            logger.debug('Consultation: Кнопка submit (single mode) деактивирована');
+        }
+        
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'block';
+            logger.debug('Показан индикатор загрузки');
+        }
+
+        try {
+            const occasionSelect = document.getElementById('occasion');
+            const preferencesInput = document.getElementById('preferences');
+            
+            const occasion = occasionSelect ? occasionSelect.value : '';
+            const preferences = preferencesInput ? preferencesInput.value : '';
+            
+            logger.debug('Отправка на анализ:', {
+                imageSize: this.singleImage.data.length,
+                imageName: this.singleImage.name,
+                occasion,
+                preferences
+            });
+
+            const result = await this.analyzeImage(
+                this.singleImage.data,
+                this.singleImage.name,
+                occasion,
+                preferences
+            );
+
+            this.displayAnalysisResult(result);
+
+        } catch (error) {
+            logger.error('❌ Ошибка при отправке на анализ:', error);
+            this.displayError('Произошла ошибка при анализе изображения');
+        } finally {
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+                logger.debug('Скрыт индикатор загрузки');
+            }
+            
+            if (submitButton) {
+                submitButton.disabled = false;
+                logger.debug('Consultation: Кнопка submit (single mode) активирована');
+            }
         }
     }
-    
-    function updateSubmitButtonState() {
-        const submitBtn = document.querySelector('#submit-consultation');
-        if (!submitBtn) return;
+
+    async handleCompareConsultationSubmit() {
+        if (this.compareImages.size < 2) {
+            logger.warn('❌ Недостаточно изображений для сравнения');
+            return;
+        }
+
+        const submitButton = document.querySelector('#consultation-submit');
+        const loadingIndicator = document.querySelector('.loading-indicator');
         
-        if (currentAnalysisMode === 'single') {
-            const hasImage = imageUpload?.getUploadedImages()?.single !== null;
+        if (submitButton) {
+            submitButton.disabled = true;
+            logger.debug(`Consultation: Кнопка submit (compare mode) деактивирована (изображений: ${this.compareImages.size})`);
+        }
+        
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'block';
+            logger.debug('Показан индикатор загрузки');
+        }
+
+        try {
+            const occasionSelect = document.getElementById('occasion');
+            const preferencesInput = document.getElementById('preferences');
             
-            if (hasImage && !isSubmitting) {
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('disabled');
-                submitBtn.textContent = 'Проанализировать';
-                logger.debug("Consultation: Кнопка submit (single mode) активирована");
+            const occasion = occasionSelect ? occasionSelect.value : '';
+            const preferences = preferencesInput ? preferencesInput.value : '';
+            
+            logger.debug('Отправка на сравнение:', {
+                imageCount: this.compareImages.size,
+                occasion,
+                preferences
+            });
+
+            const images = Array.from(this.compareImages.values());
+            const result = await this.compareImages(images, occasion, preferences);
+
+            this.displayComparisonResult(result);
+
+        } catch (error) {
+            logger.error('❌ Ошибка при отправке на сравнение:', error);
+            this.displayError('Произошла ошибка при сравнении изображений');
+        } finally {
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+                logger.debug('Скрыт индикатор загрузки');
+            }
+            
+            if (submitButton) {
+                submitButton.disabled = false;
+                logger.debug(`Consultation: Кнопка submit (compare mode) активирована (изображений: ${this.compareImages.size})`);
+            }
+        }
+    }
+
+    handleConsultationCancel() {
+        logger.debug('Отмена консультации');
+        this.closeModal();
+    }
+
+    handleModeChange(event) {
+        const { mode } = event.detail;
+        this.currentMode = mode;
+        
+        logger.debug(`Consultation (event modeChanged): режим ${mode}. Обновление кнопки.`);
+        this.updateSubmitButton();
+    }
+
+    handleSingleImageUploaded(event) {
+        const { imageData, imageName } = event.detail;
+        this.singleImage = { data: imageData, name: imageName };
+        
+        logger.debug(`Consultation (event singleImageUploaded): Изображение загружено, файл ${imageName}`);
+        this.updateSubmitButton();
+    }
+
+    handleSingleImageRemoved(event) {
+        this.singleImage = null;
+        
+        logger.debug('Consultation (event singleImageRemoved): Изображение для одиночного анализа удалено.');
+        this.updateSubmitButton();
+    }
+
+    handleCompareImageUploaded(event) {
+        const { slot, imageData, imageName } = event.detail;
+        this.compareImages.set(slot, { data: imageData, name: imageName });
+        
+        logger.debug(`Consultation (event compareImageUploaded): Изображение загружено в слот ${slot}, файл ${imageName}`);
+        this.updateSubmitButton();
+    }
+
+    handleCompareImageRemoved(event) {
+        const { slot } = event.detail;
+        this.compareImages.delete(slot);
+        
+        logger.debug(`Consultation (event compareImageRemoved): Изображение удалено из слота ${slot}`);
+        this.updateSubmitButton();
+    }
+
+    updateSubmitButton() {
+        const submitButton = document.querySelector('#consultation-submit');
+        if (!submitButton) return;
+
+        if (this.currentMode === 'single') {
+            const hasImage = this.singleImage !== null;
+            submitButton.disabled = !hasImage;
+            
+            if (hasImage) {
+                logger.debug('Consultation: Кнопка submit (single mode) активирована');
             } else {
-                submitBtn.disabled = true;
-                submitBtn.classList.add('disabled');
-                submitBtn.textContent = 'Загрузите изображение';
-                logger.debug("Consultation: Кнопка submit (single mode) деактивирована");
+                logger.debug('Consultation: Кнопка submit (single mode) деактивирована');
             }
-        } else if (currentAnalysisMode === 'compare') {
-            updateCompareSubmitButton();
-        }
-    }
-    
-    function updateCompareSubmitButton() {
-        const comparison = window.MishuraApp.features.comparison;
-        const submitBtn = document.querySelector('#submit-consultation');
-        
-        if (!comparison || !submitBtn) return;
-        
-        const imageCount = comparison.getImageCount();
-        
-        if (imageCount >= 2 && !isSubmitting) {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('disabled');
-            submitBtn.textContent = `Сравнить образы (${imageCount})`;
-            logger.debug(`Consultation: Кнопка submit (compare mode) активирована (изображений: ${imageCount})`);
-        } else {
-            submitBtn.disabled = true;
-            submitBtn.classList.add('disabled');
-            submitBtn.textContent = imageCount === 0 ? 'Загрузите минимум 2 образа' : `Загружено: ${imageCount}/2`;
-            logger.debug(`Consultation: Кнопка submit (compare mode) деактивирована (изображений: ${imageCount})`);
-        }
-    }
-    
-    async function handleConsultationSubmit() {
-        logger.info(`🚀 Обработчик submit формы, режим '${currentAnalysisMode}'`);
-        
-        if (currentAnalysisMode === 'compare') {
-            await handleCompareConsultationSubmit();
-        } else {
-            await handleSingleConsultationSubmit();
-        }
-    }
-    
-    async function handleSingleConsultationSubmit() {
-        logger.info("🚀 Обработчик submit формы, режим 'single'");
-        
-        if (isSubmitting) {
-            logger.warn("Уже идет процесс отправки");
-            return;
-        }
-        
-        // Проверяем доступность API
-        const apiService = window.MishuraApp.api;
-        if (!apiService) {
-            logger.error("API Service недоступен!");
-            showErrorMessage("Ошибка: API не инициализирован. Попробуйте обновить страницу.");
-            return;
-        }
-        
-        try {
-            isSubmitting = true;
-            updateSubmitButtonState();
+        } else if (this.currentMode === 'compare') {
+            const imageCount = this.compareImages.size;
+            const hasEnoughImages = imageCount >= 2;
+            submitButton.disabled = !hasEnoughImages;
             
-            showLoadingIndicator("Анализируем ваш образ...");
-            
-            const uploadedImages = imageUpload?.getUploadedImages();
-            const singleImage = uploadedImages?.single;
-            
-            if (!singleImage) {
-                throw new Error("Изображение не найдено");
-            }
-            
-            const occasion = getSelectedOccasion();
-            const preferences = getPreferences();
-            
-            logger.debug("Отправка на анализ:", { 
-                imageSize: singleImage.size,
-                imageName: singleImage.name,
-                occasion,
-                preferences 
-            });
-            
-            const result = await apiService.analyzeImage(singleImage, { occasion, preferences });
-            displayAnalysisResult(result);
-            
-        } catch (error) {
-            logger.error("Ошибка при отправке:", error);
-            showErrorMessage(`Ошибка анализа: ${error.message}`);
-        } finally {
-            isSubmitting = false;
-            hideLoadingIndicator();
-            updateSubmitButtonState();
-        }
-    }
-    
-    async function handleCompareConsultationSubmit() {
-        logger.info("🚀 Обработчик submit формы, режим 'compare'");
-        
-        if (isSubmitting) {
-            logger.warn("Уже идет процесс отправки");
-            return;
-        }
-        
-        const comparison = window.MishuraApp.features.comparison;
-        if (!comparison) {
-            logger.error("Модуль сравнения не найден");
-            showErrorMessage("Ошибка: модуль сравнения не загружен");
-            return;
-        }
-        
-        const images = comparison.getUploadedImages();
-        if (images.length < 2) {
-            showErrorMessage('Загрузите минимум 2 изображения для сравнения');
-            return;
-        }
-        
-        // Проверяем доступность API
-        const apiService = window.MishuraApp.api;
-        if (!apiService) {
-            logger.error("API Service недоступен!");
-            showErrorMessage("Ошибка: API не инициализирован. Попробуйте обновить страницу.");
-            return;
-        }
-        
-        try {
-            isSubmitting = true;
-            updateSubmitButtonState();
-            
-            showLoadingIndicator("Сравниваем ваши образы...");
-            
-            const occasion = getSelectedOccasion();
-            const preferences = getPreferences();
-            
-            logger.debug("Отправка на сравнение:", { 
-                imageCount: images.length,
-                occasion,
-                preferences 
-            });
-            
-            const result = await apiService.compareImages(images, { occasion, preferences });
-            displayComparisonResult(result);
-            
-        } catch (error) {
-            logger.error("Ошибка при сравнении:", error);
-            showErrorMessage(`Ошибка сравнения: ${error.message}`);
-        } finally {
-            isSubmitting = false;
-            hideLoadingIndicator();
-            updateSubmitButtonState();
-        }
-    }
-    
-    function handleCancelConsultation() {
-        logger.debug("Отмена консультации");
-        
-        if (modalManager) {
-            modalManager.closeModal('consultation-overlay');
-        } else {
-            const modal = document.querySelector('#consultation-overlay');
-            if (modal) {
-                modal.classList.remove('active');
-                modal.style.display = 'none';
+            if (hasEnoughImages) {
+                logger.debug(`Consultation: Кнопка submit (compare mode) активирована (изображений: ${imageCount})`);
+            } else {
+                logger.debug(`Consultation: Кнопка submit (compare mode) деактивирована (изображений: ${imageCount})`);
             }
         }
     }
-    
-    // Утилиты для работы с формой
-    function getSelectedOccasion() {
-        const select = document.querySelector('#occasion-selector');
-        return select?.value || 'повседневный';
-    }
-    
-    function getPreferences() {
-        const textarea = document.querySelector('#preferences-input');
-        return textarea?.value || '';
-    }
-    
-    // UI функции
-    function showLoadingIndicator(message = "Обработка...") {
-        if (uiHelpers?.showLoadingIndicator) {
-            uiHelpers.showLoadingIndicator(message);
-        } else {
-            let loader = document.getElementById('loading-indicator');
-            if (!loader) {
-                loader = document.createElement('div');
-                loader.id = 'loading-indicator';
-                loader.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0,0,0,0.8);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 9999;
-                    color: white;
-                    font-size: 18px;
-                `;
-                document.body.appendChild(loader);
-            }
-            loader.innerHTML = `
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 16px;">⏳</div>
-                    <div>${message}</div>
+
+    displayAnalysisResult(result) {
+        logger.info('Отображение результата анализа');
+        
+        const resultContainer = document.querySelector('.consultation-result');
+        if (!resultContainer) {
+            logger.error('❌ Контейнер результатов не найден');
+            return;
+        }
+
+        const analysis = result.analysis || {};
+        
+        const html = `
+            <div class="analysis-result">
+                <h3>📊 Анализ образа</h3>
+                <div class="result-section">
+                    <h4>🎨 Стиль</h4>
+                    <p>${analysis.style || 'Не определен'}</p>
                 </div>
-            `;
-            loader.style.display = 'flex';
-        }
-        logger.debug("Показан индикатор загрузки");
-    }
-    
-    function hideLoadingIndicator() {
-        if (uiHelpers?.hideLoadingIndicator) {
-            uiHelpers.hideLoadingIndicator();
-        } else {
-            const loader = document.getElementById('loading-indicator');
-            if (loader) {
-                loader.style.display = 'none';
-            }
-        }
-        logger.debug("Скрыт индикатор загрузки");
-    }
-    
-    function showErrorMessage(message) {
-        if (uiHelpers?.showToast) {
-            uiHelpers.showToast(message, 'error');
-        } else {
-            alert(message);
-        }
-    }
-    
-    function displayAnalysisResult(result) {
-        logger.info("Отображение результата анализа");
-        
-        if (modalManager) {
-            modalManager.closeModal('consultation-overlay');
-        }
-        
-        const resultHtml = formatAnalysisResult(result);
-        showResultModal('Анализ вашего образа', resultHtml);
-    }
-    
-    function displayComparisonResult(result) {
-        logger.info("Отображение результата сравнения");
-        
-        if (modalManager) {
-            modalManager.closeModal('consultation-overlay');
-        }
-        
-        const resultHtml = formatComparisonResult(result);
-        showResultModal('Сравнение ваших образов', resultHtml);
-    }
-    
-    function formatAnalysisResult(result) {
-        const modeLabel = result.mode === 'mock' ? '<p style="color: #7f8c8d; font-size: 0.9em;">📝 Демонстрационный режим</p>' : '';
-        
-        return `
-            <div class="analysis-result" style="padding: 20px; line-height: 1.6;">
-                <div class="result-section" style="margin-bottom: 20px;">
-                    <h3 style="color: #2c3e50; margin-bottom: 10px;">🎯 Стиль и образ</h3>
-                    <p>${result.style_analysis || 'Анализ стиля...'}</p>
+                <div class="result-section">
+                    <h4>🌈 Цвета</h4>
+                    <p>${(analysis.colors || []).join(', ') || 'Не определены'}</p>
                 </div>
-                <div class="result-section" style="margin-bottom: 20px;">
-                    <h3 style="color: #2c3e50; margin-bottom: 10px;">💡 Рекомендации</h3>
-                    <p>${result.recommendations || 'Персональные рекомендации...'}</p>
+                <div class="result-section">
+                    <h4>🎯 Соответствие случаю</h4>
+                    <p>${analysis.occasion_fit || 0}%</p>
                 </div>
-                <div class="result-section" style="margin-bottom: 20px;">
-                    <h3 style="color: #2c3e50; margin-bottom: 10px;">🌟 Оценка</h3>
-                    <p>${result.rating || 'Общая оценка образа...'}</p>
+                <div class="result-section">
+                    <h4>💡 Рекомендации</h4>
+                    <ul>
+                        ${(analysis.recommendations || []).map(rec => `<li>${rec}</li>`).join('')}
+                    </ul>
                 </div>
-                ${modeLabel}
+                <div class="result-section">
+                    <h4>⭐ Общая оценка</h4>
+                    <p>${analysis.overall_score || 0}/100</p>
+                </div>
             </div>
         `;
-    }
-    
-    function formatComparisonResult(result) {
-        const modeLabel = result.mode === 'mock' ? '<p style="color: #7f8c8d; font-size: 0.9em; margin-top: 20px;">📝 Демонстрационный режим</p>' : '';
         
-        return `
-            <div class="comparison-result" style="padding: 20px; line-height: 1.6;">
-                <div class="result-section" style="margin-bottom: 20px;">
-                    <h3 style="color: #2c3e50; margin-bottom: 10px;">🏆 Лучший образ</h3>
-                    <p>${result.best_outfit || 'Определение лучшего образа...'}</p>
+        resultContainer.innerHTML = html;
+        resultContainer.style.display = 'block';
+    }
+
+    displayComparisonResult(result) {
+        logger.info('Отображение результата сравнения');
+        
+        const resultContainer = document.querySelector('.consultation-result');
+        if (!resultContainer) {
+            logger.error('❌ Контейнер результатов не найден');
+            return;
+        }
+
+        const comparison = result.comparison || {};
+        const bestChoice = comparison.best_choice || {};
+        const analysis = comparison.analysis || [];
+        
+        const html = `
+            <div class="comparison-result">
+                <h3>🔍 Сравнение образов</h3>
+                <div class="result-section">
+                    <h4>🏆 Лучший выбор</h4>
+                    <p>Образ ${(bestChoice.index || 0) + 1}: ${bestChoice.reason || 'Не указано'}</p>
                 </div>
-                <div class="result-section" style="margin-bottom: 20px;">
-                    <h3 style="color: #2c3e50; margin-bottom: 10px;">📊 Сравнительный анализ</h3>
-                    <p style="white-space: pre-line;">${result.comparison || 'Детальное сравнение образов...'}</p>
+                <div class="result-section">
+                    <h4>📊 Анализ образов</h4>
+                    ${analysis.map((item, index) => `
+                        <div class="outfit-analysis">
+                            <h5>Образ ${index + 1} - ${item.style || 'Не определен'}</h5>
+                            <p><strong>Оценка:</strong> ${item.score || 0}/100</p>
+                            <p><strong>Плюсы:</strong> ${(item.pros || []).join(', ')}</p>
+                            <p><strong>Минусы:</strong> ${(item.cons || []).join(', ')}</p>
+                        </div>
+                    `).join('')}
                 </div>
-                <div class="result-section" style="margin-bottom: 20px;">
-                    <h3 style="color: #2c3e50; margin-bottom: 10px;">💡 Рекомендации по улучшению</h3>
-                    <p style="white-space: pre-line;">${result.improvement_tips || 'Советы по улучшению образов...'}</p>
+                <div class="result-section">
+                    <h4>💡 Рекомендации</h4>
+                    <ul>
+                        ${(comparison.recommendations || []).map(rec => `<li>${rec}</li>`).join('')}
+                    </ul>
                 </div>
-                ${modeLabel}
             </div>
         `;
+        
+        resultContainer.innerHTML = html;
+        resultContainer.style.display = 'block';
     }
-    
-    function showResultModal(title, content) {
-        let resultModal = document.getElementById('result-modal');
-        if (!resultModal) {
-            resultModal = document.createElement('div');
-            resultModal.id = 'result-modal';
-            resultModal.innerHTML = `
-                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;">
-                    <div style="background: white; border-radius: 12px; max-width: 700px; max-height: 80vh; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-                        <div style="padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 12px 12px 0 0;">
-                            <h2 id="result-title" style="margin: 0; color: #2c3e50;"></h2>
-                            <button onclick="document.getElementById('result-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #7f8c8d; padding: 0;">✕</button>
-                        </div>
-                        <div id="result-content"></div>
-                        <div style="padding: 20px; border-top: 1px solid #eee; text-align: right; background: #f8f9fa; border-radius: 0 0 12px 12px;">
-                            <button onclick="document.getElementById('result-modal').remove()" style="background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px;">Закрыть</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(resultModal);
+
+    displayError(message) {
+        const resultContainer = document.querySelector('.consultation-result');
+        if (!resultContainer) return;
+
+        resultContainer.innerHTML = `
+            <div class="error-result">
+                <h3>❌ Ошибка</h3>
+                <p>${message}</p>
+            </div>
+        `;
+        resultContainer.style.display = 'block';
+    }
+
+    closeModal() {
+        const modal = document.getElementById('consultation-modal');
+        if (modal) {
+            modal.style.display = 'none';
         }
         
-        document.getElementById('result-title').textContent = title;
-        document.getElementById('result-content').innerHTML = content;
-    }
-    
-    // Публичный API
-    function openConsultationModal(mode = 'single') {
-        logger.info("Consultation: вызов openConsultationModal()");
-        currentMode = mode;
-        currentAnalysisMode = mode;
+        this.singleImage = null;
+        this.compareImages.clear();
         
-        if (modalManager) {
-            modalManager.openModal('consultation-overlay');
-        } else {
-            const modal = document.querySelector('#consultation-overlay');
-            if (modal) {
-                modal.classList.add('active');
-                modal.style.display = 'block';
-            }
+        const resultContainer = document.querySelector('.consultation-result');
+        if (resultContainer) {
+            resultContainer.style.display = 'none';
+            resultContainer.innerHTML = '';
+        }
+    }
+
+    openConsultationModal(mode = 'single') {
+        logger.info('Consultation: вызов openConsultationModal()');
+        
+        const modal = document.getElementById('consultation-modal');
+        if (!modal) {
+            logger.error('❌ Модальное окно консультации не найдено');
+            return;
+        }
+
+        this.currentMode = mode;
+        modal.style.display = 'flex';
+        
+        const form = document.getElementById('consultation-form');
+        if (form) {
+            form.dataset.mode = mode;
         }
         
-        // Обновляем состояние кнопок и восстанавливаем обработчики
-        setTimeout(() => {
-            updateSubmitButtonState();
-            setupButtonHandlers();
-        }, 200);
+        document.dispatchEvent(new CustomEvent('modeChanged', {
+            detail: { mode }
+        }));
+        
+        this.setupSubmitHandler();
+        this.setupCancelHandlers();
+        this.updateSubmitButton();
     }
-    
-    return {
-        init,
-        openConsultationModal,
-        updateSubmitButtonState,
-        setupButtonHandlers,
-        isInitialized: () => isConsultationInitialized
-    };
-})();
+}

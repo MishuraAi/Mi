@@ -2,10 +2,10 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Консультации со встроенным API (consultation.js)
-ВЕРСИЯ: 1.1.0 (ВСТРОЕННЫЙ API)
+ВЕРСИЯ: 1.2.0 (ПОЛНАЯ ПОДДЕРЖКА СРАВНЕНИЯ)
 ДАТА ОБНОВЛЕНИЯ: 2025-05-29
 
-ИСПРАВЛЕНИЯ: API интегрирован напрямую в модуль консультаций
+ИСПРАВЛЕНИЯ: Добавлена полная поддержка режима сравнения образов
 ==========================================================================================
 */
 
@@ -18,6 +18,7 @@ window.MishuraApp.features.consultation = (function() {
     let logger, uiHelpers, modalManager, imageUpload;
     let isConsultationInitialized = false;
     let currentMode = 'single';
+    let currentAnalysisMode = 'single'; // 'single' или 'compare'
     let isSubmitting = false;
     
     // ==== ВСТРОЕННЫЙ API ====
@@ -230,7 +231,7 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
         modalManager = window.MishuraApp.components.modalManager;
         imageUpload = window.MishuraApp.components.imageUpload;
 
-        logger.info("🚀 Инициализация модуля консультаций v1.1.0 (Embedded API)");
+        logger.info("🚀 Инициализация модуля консультаций v1.2.0 (Full Compare Support)");
         
         // Инициализируем встроенный API
         API_SERVICE.init().then((hasRealApi) => {
@@ -255,6 +256,7 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
         // Слушаем смену режима
         document.addEventListener('modeChanged', (e) => {
             currentMode = e.detail.mode;
+            currentAnalysisMode = e.detail.mode;
             logger.debug(`Consultation (event modeChanged): режим ${currentMode}. Обновление кнопки.`);
             updateSubmitButtonState();
             // Восстанавливаем обработчики после смены режима
@@ -272,13 +274,14 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
             updateSubmitButtonState();
         });
 
+        // Слушаем события загрузки изображений для сравнения
         document.addEventListener('compareImageUploaded', (e) => {
-            logger.debug(`Consultation (event compareImageUploaded): Изображение загружено в слот ${e.detail.slot} - ${e.detail.file.name}`);
+            logger.debug(`Consultation (event compareImageUploaded): Изображение загружено в слот ${e.detail.slotIndex}, файл ${e.detail.fileName}`);
             updateSubmitButtonState();
         });
 
         document.addEventListener('compareImageRemoved', (e) => {
-            logger.debug(`Consultation (event compareImageRemoved): Изображение удалено из слота ${e.detail.slot}`);
+            logger.debug(`Consultation (event compareImageRemoved): Изображение удалено из слота ${e.detail.slotIndex}`);
             updateSubmitButtonState();
         });
 
@@ -295,38 +298,21 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
     function setupButtonHandlers() {
         logger.debug("🔧 Настройка обработчиков кнопок консультации");
         
-        // Кнопка отправки single консультации
-        const submitSingleBtn = document.querySelector('#submit-consultation');
-        if (submitSingleBtn) {
+        // Кнопка отправки консультации (единая для обоих режимов)
+        const submitBtn = document.querySelector('#submit-consultation');
+        if (submitBtn) {
             // Удаляем старые обработчики
-            const newBtn = submitSingleBtn.cloneNode(true);
-            submitSingleBtn.parentNode.replaceChild(newBtn, submitSingleBtn);
+            const newBtn = submitBtn.cloneNode(true);
+            submitBtn.parentNode.replaceChild(newBtn, submitBtn);
             
             newBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 if (!isSubmitting) {
-                    handleSingleConsultationSubmit();
+                    handleConsultationSubmit();
                 }
             });
-            logger.debug("✅ Обработчик single consultation установлен");
-        }
-
-        // Кнопка отправки compare консультации  
-        const submitCompareBtn = document.querySelector('#submit-comparison');
-        if (submitCompareBtn) {
-            // Удаляем старые обработчики
-            const newBtn = submitCompareBtn.cloneNode(true);
-            submitCompareBtn.parentNode.replaceChild(newBtn, submitCompareBtn);
-            
-            newBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!isSubmitting) {
-                    handleCompareConsultationSubmit();
-                }
-            });
-            logger.debug("✅ Обработчик compare consultation установлен");
+            logger.debug("✅ Обработчик consultation submit установлен");
         }
 
         // Кнопки отмены
@@ -348,38 +334,56 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
     }
     
     function updateSubmitButtonState() {
-        const submitSingleBtn = document.querySelector('#submit-consultation');
-        const submitCompareBtn = document.querySelector('#submit-comparison');
+        const submitBtn = document.querySelector('#submit-consultation');
+        if (!submitBtn) return;
         
-        if (currentMode === 'single') {
+        if (currentAnalysisMode === 'single') {
             const hasImage = imageUpload?.getUploadedImages()?.single !== null;
             
-            if (submitSingleBtn) {
-                if (hasImage && !isSubmitting) {
-                    submitSingleBtn.disabled = false;
-                    submitSingleBtn.classList.remove('disabled');
-                    logger.debug("Consultation: Кнопка submit (single mode) активирована");
-                } else {
-                    submitSingleBtn.disabled = true;
-                    submitSingleBtn.classList.add('disabled');
-                    logger.debug("Consultation: Кнопка submit (single mode) деактивирована");
-                }
+            if (hasImage && !isSubmitting) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('disabled');
+                submitBtn.textContent = 'Проанализировать';
+                logger.debug("Consultation: Кнопка submit (single mode) активирована");
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('disabled');
+                submitBtn.textContent = 'Загрузите изображение';
+                logger.debug("Consultation: Кнопка submit (single mode) деактивирована");
             }
-        } else if (currentMode === 'compare') {
-            const images = imageUpload?.getUploadedImages()?.compare || [];
-            const imageCount = images.filter(img => img !== null).length;
-            
-            if (submitCompareBtn) {
-                if (imageCount >= 2 && !isSubmitting) {
-                    submitCompareBtn.disabled = false;
-                    submitCompareBtn.classList.remove('disabled');
-                    logger.debug(`Consultation: Кнопка submit (compare mode) активирована (изображений: ${imageCount})`);
-                } else {
-                    submitCompareBtn.disabled = true;
-                    submitCompareBtn.classList.add('disabled');
-                    logger.debug(`Consultation: Кнопка submit (compare mode) деактивирована (изображений: ${imageCount})`);
-                }
-            }
+        } else if (currentAnalysisMode === 'compare') {
+            updateCompareSubmitButton();
+        }
+    }
+    
+    function updateCompareSubmitButton() {
+        const comparison = window.MishuraApp.features.comparison;
+        const submitBtn = document.querySelector('#submit-consultation');
+        
+        if (!comparison || !submitBtn) return;
+        
+        const imageCount = comparison.getImageCount();
+        
+        if (imageCount >= 2 && !isSubmitting) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('disabled');
+            submitBtn.textContent = `Сравнить образы (${imageCount})`;
+            logger.debug(`Consultation: Кнопка submit (compare mode) активирована (изображений: ${imageCount})`);
+        } else {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('disabled');
+            submitBtn.textContent = imageCount === 0 ? 'Загрузите минимум 2 образа' : `Загружено: ${imageCount}/2`;
+            logger.debug(`Consultation: Кнопка submit (compare mode) деактивирована (изображений: ${imageCount})`);
+        }
+    }
+    
+    async function handleConsultationSubmit() {
+        logger.info(`🚀 Обработчик submit формы, режим '${currentAnalysisMode}'`);
+        
+        if (currentAnalysisMode === 'compare') {
+            await handleCompareConsultationSubmit();
+        } else {
+            await handleSingleConsultationSubmit();
         }
     }
     
@@ -443,6 +447,19 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
             return;
         }
         
+        const comparison = window.MishuraApp.features.comparison;
+        if (!comparison) {
+            logger.error("Модуль сравнения не найден");
+            showErrorMessage("Ошибка: модуль сравнения не загружен");
+            return;
+        }
+        
+        const images = comparison.getUploadedImages();
+        if (images.length < 2) {
+            showErrorMessage('Загрузите минимум 2 изображения для сравнения');
+            return;
+        }
+        
         // Проверяем доступность API
         const apiService = window.MishuraApp.api;
         if (!apiService) {
@@ -450,39 +467,32 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
             showErrorMessage("Ошибка: API не инициализирован. Попробуйте обновить страницу.");
             return;
         }
-
-        // Получаем изображения из comparison
-        const comparison = window.MishuraApp.features.comparison;
-        if (!comparison || typeof comparison.getUploadedImages !== 'function') {
-            logger.error("Модуль сравнения не найден или не реализует getUploadedImages");
-            showErrorMessage("Ошибка: Модуль сравнения не найден.");
-            return;
-        }
-        const images = comparison.getUploadedImages ? comparison.getUploadedImages() : [];
-        if (!images || images.length < 2) {
-            if (uiHelpers) uiHelpers.showToast('Загрузите минимум 2 изображения для сравнения');
-            return;
-        }
-
-        const occasion = document.getElementById('occasion-selector')?.value || 'повседневный';
-        const preferences = document.getElementById('preferences-input')?.value || '';
-
-        if (uiHelpers) uiHelpers.showLoading('Сравниваем образы...');
-
+        
         try {
+            isSubmitting = true;
+            updateSubmitButtonState();
+            
+            showLoadingIndicator("Сравниваем ваши образы...");
+            
+            const occasion = getSelectedOccasion();
+            const preferences = getPreferences();
+            
+            logger.debug("Отправка на сравнение:", { 
+                imageCount: images.length,
+                occasion,
+                preferences 
+            });
+            
             const result = await apiService.compareImages(images, { occasion, preferences });
-            if (uiHelpers) {
-                uiHelpers.hideLoading();
-                if (uiHelpers.closeModal) uiHelpers.closeModal('consultation-overlay');
-                if (uiHelpers.showResults) uiHelpers.showResults(result);
-            }
-            logger.info("Сравнение образов завершено успешно");
+            displayComparisonResult(result);
+            
         } catch (error) {
-            logger.error("Ошибка при сравнении образов:", error);
-            if (uiHelpers) {
-                uiHelpers.hideLoading();
-                uiHelpers.showToast('Ошибка при сравнении образов. Попробуйте снова.');
-            }
+            logger.error("Ошибка при сравнении:", error);
+            showErrorMessage(`Ошибка сравнения: ${error.message}`);
+        } finally {
+            isSubmitting = false;
+            hideLoadingIndicator();
+            updateSubmitButtonState();
         }
     }
     
@@ -502,12 +512,12 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
     
     // Утилиты для работы с формой
     function getSelectedOccasion() {
-        const select = document.querySelector('.occasion-selector select');
-        return select?.value || '';
+        const select = document.querySelector('#occasion-selector');
+        return select?.value || 'повседневный';
     }
     
     function getPreferences() {
-        const textarea = document.querySelector('.preferences-input textarea');
+        const textarea = document.querySelector('#preferences-input');
         return textarea?.value || '';
     }
     
@@ -663,6 +673,7 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
     function openConsultationModal(mode = 'single') {
         logger.info("Consultation: вызов openConsultationModal()");
         currentMode = mode;
+        currentAnalysisMode = mode;
         
         if (modalManager) {
             modalManager.openModal('consultation-overlay');
@@ -679,19 +690,6 @@ ${imageFiles[2] ? '• Для образа №3: смените верх на б
             updateSubmitButtonState();
             setupButtonHandlers();
         }, 200);
-    }
-    
-    function getCurrentMode() {
-        return currentMode;
-    }
-
-    function handleConsultationSubmit() {
-        const mode = getCurrentMode();
-        if (mode === 'compare') {
-            handleCompareConsultationSubmit();
-        } else {
-            handleSingleConsultationSubmit();
-        }
     }
     
     return {

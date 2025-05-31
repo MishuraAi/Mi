@@ -1,16 +1,37 @@
-// 🎯 УЛЬТИМАТИВНОЕ ПРИЛОЖЕНИЕ - webapp/app.js
-// Версия: 3.0.0 - Лучший TMA в мире с премиум функциями
-console.log('🚀 Ультимативное приложение загружается...');
+// 🎭 МИШУРА - Luxury ИИ Стилист
+// Главный файл приложения - app.js (исправленная версия)
+
+console.log('🎭 МИШУРА App загружается...');
 
 class MishuraApp {
     constructor() {
-        console.log('🔧 Инициализация премиум MishuraApp');
+        console.log('🚀 Инициализация MishuraApp...');
         
-        // Основные компоненты
-        this.api = new window.MishuraAPIService();
+        // Состояние приложения
         this.currentMode = null; // 'single' или 'compare'
+        this.currentSection = 'home'; // 'home', 'history', 'balance'
         this.compareImages = [null, null, null, null];
         this.singleImage = null;
+        this.isLoading = false;
+        this.lastAnalysisResult = null;
+        
+        // Пользовательские данные
+        this.userBalance = 100;
+        this.consultationsHistory = [];
+        this.consultationsUsed = 0;
+        
+        // API клиент - создаем экземпляр!
+        if (window.MishuraAPIService) {
+            this.api = new window.MishuraAPIService();
+            console.log('✅ API экземпляр создан:', this.api);
+        } else if (window.mishuraAPI) {
+            this.api = window.mishuraAPI;
+            console.log('✅ API клиент подключен:', this.api);
+        } else {
+            this.api = null;
+            console.error('❌ API клиент не найден!');
+            this.showNotification('Ошибка подключения к API', 'error');
+        }
         
         // Варианты поводов
         this.occasionOptions = [
@@ -32,441 +53,423 @@ class MishuraApp {
             '🎪 Мероприятие на свежем воздухе'
         ];
         
-        // Состояние приложения
-        this.isLoading = false;
-        this.lastAnalysisResult = null;
+        // Аналитика
         this.analytics = {
-            sessionsStarted: 0,
-            imagesUploaded: 0,
+            appStartTime: Date.now(),
             analysisRequested: 0,
             successfulAnalysis: 0,
             errors: 0
         };
         
-        // Настройки
-        this.settings = {
-            autoOptimizeImages: true,
-            hapticFeedback: true,
-            animationsEnabled: true,
-            debugMode: false
-        };
-        
         this.init();
     }
 
-    async init() {
-        console.log('🔗 Установка обработчиков событий и инициализация');
-        
-        // Telegram WebApp интеграция
-        this.initTelegramWebApp();
-        
-        // Основные обработчики
-        this.setupModeButtons();
-        this.setupCloseButtons();
-        this.setupSubmitButton();
-        this.initUploaders();
-        
-        // Дополнительные функции
-        this.setupKeyboardShortcuts();
-        this.setupDragAndDrop();
-        this.setupContextMenu();
-        this.setupOccasionDropdown();
-        
-        // Системные проверки
-        await this.performSystemChecks();
-        
-        // Аналитика
-        this.trackSession();
-        
-        console.log('✅ Премиум MishuraApp готово к работе');
-        this.showWelcomeAnimation();
-    }
-
-    // 📱 Интеграция с Telegram WebApp
-    initTelegramWebApp() {
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
+    // 🎯 Инициализация
+    init() {
+        try {
+            // Основные обработчики
+            this.setupModeButtons();
+            this.setupCloseButtons();
+            this.setupSubmitButton();
+            this.initUploaders();
+            this.setupNavigation();
             
-            // Настройка внешнего вида
-            tg.ready();
-            tg.expand();
+            // Дополнительные функции
+            this.setupKeyboardShortcuts();
+            this.setupDragAndDrop();
+            this.setupContextMenu();
+            this.setupOccasionDropdown();
             
-            // Настройка темы
-            if (tg.colorScheme === 'dark') {
-                document.body.classList.add('dark-theme');
-            }
+            // Загружаем данные пользователя
+            this.loadUserData();
             
-            // Обработчики Telegram событий
-            tg.onEvent('themeChanged', () => {
-                document.body.classList.toggle('dark-theme', tg.colorScheme === 'dark');
-            });
+            // Telegram интеграция
+            this.setupTelegramIntegration();
             
-            tg.onEvent('viewportChanged', (data) => {
-                console.log('📱 Viewport изменен:', data);
-                this.handleViewportChange(data);
-            });
-            
-            // Настройка главной кнопки
-            tg.MainButton.setText('Получить совет стилиста');
-            tg.MainButton.onClick(() => {
-                if (this.currentMode) {
-                    this.submit();
-                }
-            });
-            
-            console.log('📱 Telegram WebApp интеграция активирована');
+            console.log('✅ MishuraApp инициализирован');
+        } catch (error) {
+            console.error('❌ Ошибка инициализации:', error);
         }
     }
 
-    handleViewportChange(data) {
-        // Адаптируем интерфейс под изменения viewport
-        if (data.isStateStable) {
-            this.optimizeLayoutForViewport();
-        }
-    }
-
-    optimizeLayoutForViewport() {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-    }
-
-    // 🎭 Анимации и эффекты
-    showWelcomeAnimation() {
-        if (!this.settings.animationsEnabled) return;
+    // 🧭 Настройка навигации
+    setupNavigation() {
+        const navButtons = document.querySelectorAll('.nav-btn');
         
-        const header = document.querySelector('.header');
-        const buttons = document.querySelectorAll('.action-btn');
-        
-        // Анимация заголовка
-        header.style.transform = 'translateY(-50px)';
-        header.style.opacity = '0';
-        
-        setTimeout(() => {
-            header.style.transition = 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
-            header.style.transform = 'translateY(0)';
-            header.style.opacity = '1';
-        }, 100);
-        
-        // Последовательная анимация кнопок
-        buttons.forEach((btn, index) => {
-            btn.style.transform = 'translateY(30px)';
-            btn.style.opacity = '0';
-            
-            setTimeout(() => {
-                btn.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
-                btn.style.transform = 'translateY(0)';
-                btn.style.opacity = '1';
-            }, 300 + index * 200);
-        });
-    }
-
-    triggerHapticFeedback(type = 'light') {
-        if (!this.settings.hapticFeedback) return;
-        
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-            switch (type) {
-                case 'light':
-                    window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-                    break;
-                case 'medium':
-                    window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-                    break;
-                case 'heavy':
-                    window.Telegram.WebApp.HapticFeedback.impactOccurred('heavy');
-                    break;
-                case 'success':
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    break;
-                case 'error':
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
-                    break;
-                case 'warning':
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
-                    break;
-            }
-        } else if (navigator.vibrate) {
-            // Fallback для устройств без Telegram
-            const patterns = {
-                light: [10],
-                medium: [20],
-                heavy: [30],
-                success: [10, 50, 10],
-                error: [100, 50, 100],
-                warning: [50, 30, 50]
-            };
-            navigator.vibrate(patterns[type] || [10]);
-        }
-    }
-
-    // 🚀 Системные проверки
-    async performSystemChecks() {
-        console.log('🔍 Выполнение системных проверок...');
-        
-        // Проверка API
-        const apiHealth = await this.api.healthCheck();
-        if (!apiHealth.isHealthy) {
-            this.showNotification('⚠️ Сервер временно недоступен', 'warning', 5000);
-        }
-        
-        // Проверка браузера
-        this.checkBrowserCompatibility();
-        
-        // Проверка подключения
-        this.setupConnectionMonitoring();
-        
-        console.log('✅ Системные проверки завершены');
-    }
-
-    checkBrowserCompatibility() {
-        const requiredFeatures = {
-            'File API': window.File,
-            'FormData': window.FormData,
-            'Fetch API': window.fetch,
-            'Promises': window.Promise,
-            'ES6 Classes': class {},
-            'Canvas': document.createElement('canvas').getContext,
-            'Local Storage': window.localStorage
-        };
-        
-        const unsupported = Object.entries(requiredFeatures)
-            .filter(([name, feature]) => !feature)
-            .map(([name]) => name);
-        
-        if (unsupported.length > 0) {
-            console.warn('⚠️ Неподдерживаемые функции:', unsupported);
-            this.showNotification(`Ваш браузер не поддерживает: ${unsupported.join(', ')}`, 'warning', 8000);
-        }
-    }
-
-    setupConnectionMonitoring() {
-        window.addEventListener('online', () => {
-            this.showNotification('✅ Подключение восстановлено', 'success');
-        });
-        
-        window.addEventListener('offline', () => {
-            this.showNotification('❌ Нет подключения к интернету', 'error');
-        });
-    }
-
-    // ⌨️ Клавиатурные сокращения
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Проверяем, что фокус не на input элементе
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            
-            switch (e.key) {
-                case '1':
-                    e.preventDefault();
-                    this.openSingleModal();
-                    break;
-                case '2':
-                    e.preventDefault();
-                    this.openCompareModal();
-                    break;
-                case 'Escape':
-                    e.preventDefault();
-                    this.closeModal();
-                    break;
-                case 'Enter':
-                    if (e.ctrlKey || e.metaKey) {
-                        e.preventDefault();
-                        if (this.currentMode && !this.isLoading) {
-                            this.submit();
-                        }
-                    }
-                    break;
-            }
-        });
-    }
-
-    // 📋 Настройка выпадающего списка поводов
-    setupOccasionDropdown() {
-        const occasionInput = document.getElementById('occasion');
-        const optionsContainer = document.getElementById('occasion-options');
-        
-        if (!occasionInput || !optionsContainer) return;
-        
-        // Создаем опции
-        this.occasionOptions.forEach(option => {
-            const optionElement = document.createElement('div');
-            optionElement.className = 'occasion-option';
-            optionElement.textContent = option;
-            optionElement.addEventListener('click', () => {
-                occasionInput.value = option;
-                optionsContainer.classList.remove('active');
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetSection = btn.id.replace('nav-', '');
+                this.navigateToSection(targetSection);
                 this.triggerHapticFeedback('light');
             });
-            optionsContainer.appendChild(optionElement);
         });
         
-        // Показываем/скрываем опции
-        occasionInput.addEventListener('click', () => {
-            optionsContainer.classList.toggle('active');
-            this.triggerHapticFeedback('light');
-        });
-        
-        // Скрываем при клике вне
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.occasion-dropdown')) {
-                optionsContainer.classList.remove('active');
-            }
-        });
-        
-        // Позволяем ввод custom значения
-        occasionInput.addEventListener('input', () => {
-            if (occasionInput.value.length > 0) {
-                occasionInput.removeAttribute('readonly');
-            }
-        });
-        
-        occasionInput.addEventListener('focus', () => {
-            if (occasionInput.hasAttribute('readonly')) {
-                optionsContainer.classList.add('active');
-            }
-        });
-    }
-    // 🖱️ Drag & Drop функциональность
-    setupDragAndDrop() {
-        const dropZones = [
-            document.getElementById('single-preview'),
-            ...document.querySelectorAll('.compare-slot')
-        ].filter(Boolean);
-        
-        dropZones.forEach(zone => {
-            zone.addEventListener('dragover', this.handleDragOver.bind(this));
-            zone.addEventListener('dragleave', this.handleDragLeave.bind(this));
-            zone.addEventListener('drop', this.handleDrop.bind(this));
-        });
-        
-        // Предотвращаем дефолтное поведение на всем документе
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            document.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            });
-        });
+        console.log('✅ Навигация настроена');
     }
 
-    handleDragOver(e) {
-        e.preventDefault();
-        e.currentTarget.classList.add('drag-over');
+    navigateToSection(section) {
+        console.log(`🧭 Переход в раздел: ${section}`);
+        
+        // Обновляем активную кнопку
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.getElementById(`nav-${section}`).classList.add('active');
+        
+        // Показываем нужный контент
+        this.currentSection = section;
+        this.showSection(section);
+        
+        // Закрываем модальное окно если открыто
+        this.closeModal();
     }
 
-    handleDragLeave(e) {
-        e.preventDefault();
-        e.currentTarget.classList.remove('drag-over');
-    }
-
-    handleDrop(e) {
-        e.preventDefault();
-        e.currentTarget.classList.remove('drag-over');
-        
-        const files = Array.from(e.dataTransfer.files);
-        const imageFiles = files.filter(file => file.type.startsWith('image/'));
-        
-        if (imageFiles.length === 0) {
-            this.showNotification('Пожалуйста, перетащите изображения', 'warning');
-            return;
+    showSection(section) {
+        switch (section) {
+            case 'home':
+                this.showHomeSection();
+                break;
+            case 'history':
+                this.showHistorySection();
+                break;
+            case 'balance':
+                this.showBalanceSection();
+                break;
         }
-        
-        // Определяем куда загружать
-        if (e.currentTarget.id === 'single-preview') {
-            this.handleSingleUpload(imageFiles[0]);
-        } else if (e.currentTarget.classList.contains('compare-slot')) {
-            const slotIndex = parseInt(e.currentTarget.dataset.slot);
-            this.handleCompareUpload(imageFiles[0], slotIndex);
-        }
-        
-        this.triggerHapticFeedback('light');
     }
 
-    // 🎯 Контекстное меню
-    setupContextMenu() {
-        document.addEventListener('contextmenu', (e) => {
-            // Для изображений показываем кастомное меню
-            if (e.target.tagName === 'IMG' && e.target.closest('.upload-area, .compare-slot')) {
-                e.preventDefault();
-                this.showImageContextMenu(e);
-            }
-        });
-    }
+    showHomeSection() {
+        const container = document.querySelector('.container');
+        container.innerHTML = `
+            <header class="header">
+                <h1>✨ МИШУРА</h1>
+                <p>Luxury ИИ-стилист премиум класса</p>
+            </header>
 
-    showImageContextMenu(e) {
-        // Простое контекстное меню для изображений
-        const menu = document.createElement('div');
-        menu.className = 'context-menu';
-        menu.innerHTML = `
-            <div class="context-item" data-action="remove">Удалить</div>
-            <div class="context-item" data-action="replace">Заменить</div>
+            <div class="action-buttons">
+                <button id="single-mode-btn" class="action-btn">
+                    <span class="icon">📷</span>
+                    Анализ образа
+                </button>
+                <button id="compare-mode-btn" class="action-btn">
+                    <span class="icon">🔄</span>
+                    Сравнение образов
+                </button>
+            </div>
         `;
         
-        menu.style.cssText = `
-            position: fixed;
-            top: ${e.clientY}px;
-            left: ${e.clientX}px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 10000;
-            overflow: hidden;
-        `;
-        
-        document.body.appendChild(menu);
-        
-        // Закрытие меню
-        const closeMenu = () => {
-            menu.remove();
-            document.removeEventListener('click', closeMenu);
-        };
-        
-        setTimeout(() => document.addEventListener('click', closeMenu), 100);
-        
-        // Обработка действий
-        menu.addEventListener('click', (event) => {
-            const action = event.target.dataset.action;
-            if (action === 'remove') {
-                this.removeImage(e.target);
-            } else if (action === 'replace') {
-                this.replaceImage(e.target);
-            }
-            closeMenu();
-        });
+        // Переинициализируем обработчики с небольшой задержкой
+        setTimeout(() => {
+            this.setupModeButtons();
+        }, 100);
     }
 
-    // 🖼️ Управление изображениями
-    removeImage(imgElement) {
-        const container = imgElement.closest('.upload-area, .compare-slot');
+    showHistorySection() {
+        const container = document.querySelector('.container');
+        const history = this.consultationsHistory.slice(-10).reverse();
         
-        if (container.classList.contains('compare-slot')) {
-            const slotIndex = parseInt(container.dataset.slot);
-            this.compareImages[slotIndex] = null;
-            container.innerHTML = `
-                <span class="slot-number">${slotIndex + 1}</span>
-                <span class="add-icon">+</span>
+        let historyHTML = `
+            <header class="header">
+                <h1>📚 История</h1>
+                <p>Ваши консультации стилиста</p>
+            </header>
+            
+            <div class="stats-card" style="
+                background: rgba(212, 175, 55, 0.1);
+                border: 1px solid var(--border-gold);
+                border-radius: 16px;
+                padding: 20px;
+                margin-bottom: 20px;
+                text-align: center;
+            ">
+                <div style="color: var(--text-gold); font-size: 1.2rem; font-weight: 600;">
+                    Всего консультаций: ${this.consultationsHistory.length}
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">
+                    Осталось: ${this.userBalance} бесплатных
+                </div>
+            </div>
+        `;
+
+        if (history.length === 0) {
+            historyHTML += `
+                <div style="
+                    text-align: center;
+                    padding: 40px 20px;
+                    color: var(--text-muted);
+                ">
+                    <div style="font-size: 3rem; margin-bottom: 16px;">📝</div>
+                    <div style="font-size: 1.1rem;">История пуста</div>
+                    <div style="font-size: 0.9rem; margin-top: 8px;">
+                        Получите первую консультацию!
+                    </div>
+                </div>
             `;
-            container.classList.remove('has-image');
-            this.updateCompareSubmitButton();
-        } else if (container.id === 'single-preview') {
-            this.singleImage = null;
-            container.innerHTML = '<div class="upload-text">Нажмите для выбора фото</div>';
-            container.classList.remove('has-image');
-            this.updateSingleSubmitButton();
+        } else {
+            historyHTML += '<div class="history-list">';
+            
+            history.forEach((consultation, index) => {
+                const date = new Date(consultation.timestamp).toLocaleDateString('ru-RU');
+                const time = new Date(consultation.timestamp).toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                historyHTML += `
+                    <div class="history-item" style="
+                        background: rgba(26, 26, 26, 0.8);
+                        border: 1px solid var(--border-light);
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                        cursor: pointer;
+                        transition: var(--transition);
+                    " onclick="window.mishuraApp.viewConsultation(${this.consultationsHistory.length - 1 - index})">
+                        <div style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 8px;
+                        ">
+                            <span style="
+                                color: var(--text-gold);
+                                font-weight: 600;
+                                text-transform: uppercase;
+                                font-size: 0.9rem;
+                            ">${consultation.occasion}</span>
+                            <span style="
+                                color: var(--text-muted);
+                                font-size: 0.8rem;
+                            ">${date} ${time}</span>
+                        </div>
+                        <div style="
+                            color: var(--text-light);
+                            font-size: 0.9rem;
+                            line-height: 1.4;
+                            display: -webkit-box;
+                            -webkit-line-clamp: 2;
+                            -webkit-box-orient: vertical;
+                            overflow: hidden;
+                        ">
+                            ${consultation.advice.replace(/<[^>]*>/g, '').substring(0, 100)}...
+                        </div>
+                    </div>
+                `;
+            });
+            
+            historyHTML += '</div>';
         }
+
+        container.innerHTML = historyHTML;
+    }
+
+    showBalanceSection() {
+        const container = document.querySelector('.container');
         
+        container.innerHTML = `
+            <header class="header">
+                <h1>💰 Баланс</h1>
+                <p>Управление консультациями</p>
+            </header>
+            
+            <div class="balance-card" style="
+                background: var(--gold-gradient);
+                color: var(--text-dark);
+                border-radius: 20px;
+                padding: 24px;
+                margin-bottom: 24px;
+                text-align: center;
+                box-shadow: var(--shadow-gold);
+            ">
+                <div style="font-size: 2.5rem; font-weight: 900; margin-bottom: 8px;">
+                    ${this.userBalance}
+                </div>
+                <div style="font-size: 1.1rem; font-weight: 600; text-transform: uppercase;">
+                    Бесплатных консультаций
+                </div>
+            </div>
+            
+            <div class="usage-stats" style="
+                background: rgba(26, 26, 26, 0.8);
+                border: 1px solid var(--border-light);
+                border-radius: 16px;
+                padding: 20px;
+                margin-bottom: 24px;
+            ">
+                <h3 style="
+                    color: var(--text-gold);
+                    margin-bottom: 16px;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    font-size: 1rem;
+                ">📊 Статистика использования</h3>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                    <span style="color: var(--text-muted);">Всего получено:</span>
+                    <span style="color: var(--text-light); font-weight: 600;">${this.consultationsHistory.length}</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                    <span style="color: var(--text-muted);">Использовано:</span>
+                    <span style="color: var(--text-light); font-weight: 600;">${this.consultationsUsed}</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Осталось:</span>
+                    <span style="color: var(--text-gold); font-weight: 600;">${this.userBalance}</span>
+                </div>
+            </div>
+            
+            <div class="add-balance-section">
+                <button id="add-balance-btn" class="action-btn" style="
+                    width: 100%;
+                    margin-bottom: 16px;
+                    background: rgba(26, 26, 26, 0.8);
+                    border: 2px solid var(--border-gold);
+                    color: var(--text-gold);
+                ">
+                    <span class="icon">➕</span>
+                    Добавить консультации
+                </button>
+                
+                <div style="
+                    background: rgba(212, 175, 55, 0.1);
+                    border: 1px solid var(--border-gold);
+                    border-radius: 12px;
+                    padding: 16px;
+                    text-align: center;
+                ">
+                    <div style="
+                        color: var(--text-gold);
+                        font-weight: 600;
+                        margin-bottom: 8px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        font-size: 0.9rem;
+                    ">💡 Информация</div>
+                    <div style="
+                        color: var(--text-light);
+                        font-size: 0.9rem;
+                        line-height: 1.4;
+                    ">
+                        Каждый новый пользователь получает 100 бесплатных консультаций. 
+                        После их использования можно приобрести дополнительные пакеты 
+                        или поддержать проект добровольным пожертвованием.
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Добавляем обработчик для кнопки пополнения
+        document.getElementById('add-balance-btn').addEventListener('click', () => {
+            this.showAddBalanceModal();
+        });
+    }
+
+    // 💰 Модальное окно пополнения баланса
+    showAddBalanceModal() {
+        this.showNotification('🚧 Функция в разработке. Скоро будет доступна оплата!', 'info', 4000);
+        this.triggerHapticFeedback('warning');
+        
+        // Пока что добавляем 10 консультаций бесплатно для тестирования
+        setTimeout(() => {
+            this.userBalance += 10;
+            this.saveUserData();
+            this.showBalanceSection();
+            this.showNotification('🎁 Добавлено 10 бесплатных консультаций!', 'success');
+            this.triggerHapticFeedback('success');
+        }, 1000);
+    }
+
+    // 📄 Просмотр консультации
+    viewConsultation(index) {
+        const consultation = this.consultationsHistory[index];
+        if (!consultation) return;
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2 class="modal-title">Консультация #${index + 1}</h2>
+                    <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="
+                        background: rgba(212, 175, 55, 0.1);
+                        border: 1px solid var(--border-gold);
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 16px;
+                    ">
+                        <div style="color: var(--text-gold); font-weight: 600; margin-bottom: 8px;">
+                            📅 ${new Date(consultation.timestamp).toLocaleString('ru-RU')}
+                        </div>
+                        <div style="color: var(--text-light); margin-bottom: 4px;">
+                            <strong>Повод:</strong> ${consultation.occasion}
+                        </div>
+                        ${consultation.preferences ? `
+                            <div style="color: var(--text-light);">
+                                <strong>Предпочтения:</strong> ${consultation.preferences}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="result-content">
+                        ${consultation.advice}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
         this.triggerHapticFeedback('light');
     }
 
-    replaceImage(imgElement) {
-        const container = imgElement.closest('.upload-area, .compare-slot');
-        
-        if (container.classList.contains('compare-slot')) {
-            const slotIndex = parseInt(container.dataset.slot);
-            const input = document.getElementById(`compare-file-input-${slotIndex}`);
-            input.click();
-        } else if (container.id === 'single-preview') {
-            const input = document.getElementById('single-file-input');
-            input.click();
+    // 💾 Управление данными пользователя
+    loadUserData() {
+        try {
+            const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
+            this.userBalance = data.balance || 100;
+            this.consultationsHistory = data.history || [];
+            this.consultationsUsed = data.used || 0;
+            
+            console.log('📊 Данные пользователя загружены:', {
+                balance: this.userBalance,
+                history: this.consultationsHistory.length,
+                used: this.consultationsUsed
+            });
+        } catch (error) {
+            console.error('❌ Ошибка загрузки данных пользователя:', error);
+            this.initializeUserData();
         }
+    }
+
+    saveUserData() {
+        try {
+            const data = {
+                balance: this.userBalance,
+                history: this.consultationsHistory,
+                used: this.consultationsUsed,
+                lastSaved: Date.now()
+            };
+            
+            localStorage.setItem('mishura_user_data', JSON.stringify(data));
+            console.log('💾 Данные пользователя сохранены');
+        } catch (error) {
+            console.error('❌ Ошибка сохранения данных пользователя:', error);
+        }
+    }
+
+    initializeUserData() {
+        this.userBalance = 100;
+        this.consultationsHistory = [];
+        this.consultationsUsed = 0;
+        this.saveUserData();
+        
+        console.log('🆕 Инициализированы данные нового пользователя');
+        this.showNotification('🎉 Добро пожаловать! У вас 100 бесплатных консультаций!', 'success', 5000);
     }
 
     // 🔧 Настройка обработчиков
@@ -475,383 +478,431 @@ class MishuraApp {
         const compareBtn = document.getElementById('compare-mode-btn');
         
         if (singleBtn) {
-            singleBtn.addEventListener('click', () => {
+            const handleSingleClick = () => {
                 console.log('🔥 Single Mode button clicked');
                 this.triggerHapticFeedback('light');
                 this.openSingleModal();
-            });
+            };
+            singleBtn.addEventListener('click', handleSingleClick);
+        } else {
+            console.warn('⚠️ Single button не найден');
         }
 
         if (compareBtn) {
-            compareBtn.addEventListener('click', () => {
+            const handleCompareClick = () => {
                 console.log('🔄 Compare Mode button clicked');
                 this.triggerHapticFeedback('light');
                 this.openCompareModal();
-            });
+            };
+            compareBtn.addEventListener('click', handleCompareClick);
+        } else {
+            console.warn('⚠️ Compare button не найден');
         }
+        
+        console.log('✅ Mode buttons настроены');
     }
 
     setupCloseButtons() {
-        const cancelBtns = ['consultation-cancel', 'form-cancel'];
-        cancelBtns.forEach(id => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.addEventListener('click', () => {
-                    this.triggerHapticFeedback('light');
-                    this.closeModal();
-                });
+        document.addEventListener('click', (event) => {
+            if (event.target.matches('#consultation-cancel, .close-btn, #form-cancel')) {
+                this.closeModal();
+                this.triggerHapticFeedback('light');
             }
         });
     }
 
     setupSubmitButton() {
-        const submitBtn = document.getElementById('form-submit');
-        if (submitBtn) {
-            submitBtn.addEventListener('click', () => {
-                this.triggerHapticFeedback('medium');
+        document.addEventListener('click', (event) => {
+            if (event.target.matches('#form-submit')) {
+                event.preventDefault();
                 this.submit();
-            });
-        }
-    }
-
-    // 🚀 Основная логика приложения
-    openSingleModal() {
-        console.log('🔥 Opening Single Modal');
-        this.currentMode = 'single';
-        this.openModal();
-        this.activateSingleMode();
-        this.clearForm();
-        this.updateTelegramMainButton();
-        console.log('✅ Single режим открыт');
-    }
-
-    openCompareModal() {
-        console.log('🔄 Opening Compare Modal');
-        this.currentMode = 'compare';
-        this.openModal();
-        this.activateCompareMode();
-        this.clearForm();
-        this.updateTelegramMainButton();
-        console.log('✅ Compare режим открыт');
-    }
-
-    openModal() {
-        const modal = document.getElementById('consultation-overlay');
-        if (modal) {
-            modal.classList.add('active');
-            console.log('✅ Modal открыт');
-        }
-    }
-
-    activateSingleMode() {
-        const singleMode = document.getElementById('single-mode');
-        const compareMode = document.getElementById('compare-mode');
-        const modalTitle = document.getElementById('modal-title');
+            }
+        });
         
-        if (singleMode) singleMode.classList.add('active');
-        if (compareMode) compareMode.classList.remove('active');
-        if (modalTitle) modalTitle.textContent = '📷 Анализ одного образа';
+        document.addEventListener('input', (event) => {
+            if (['occasion', 'preferences'].includes(event.target.id)) {
+                this.updateSubmitButton();
+            }
+        });
     }
 
-    activateCompareMode() {
-        const singleMode = document.getElementById('single-mode');
-        const compareMode = document.getElementById('compare-mode');
-        const modalTitle = document.getElementById('modal-title');
-        
-        if (compareMode) compareMode.classList.add('active');
-        if (singleMode) singleMode.classList.remove('active');
-        if (modalTitle) modalTitle.textContent = '🔄 Сравнение образов';
+    // 📋 Настройка выпадающего списка поводов
+    setupOccasionDropdown() {
+        document.addEventListener('click', (event) => {
+            const occasionInput = document.getElementById('occasion');
+            const optionsContainer = document.getElementById('occasion-options');
+            
+            if (!occasionInput || !optionsContainer) return;
+            
+            if (event.target === occasionInput) {
+                // Создаем опции если их нет
+                if (optionsContainer.children.length === 0) {
+                    this.occasionOptions.forEach(option => {
+                        const optionElement = document.createElement('div');
+                        optionElement.className = 'occasion-option';
+                        optionElement.textContent = option;
+                        optionElement.addEventListener('click', () => {
+                            occasionInput.value = option;
+                            optionsContainer.classList.remove('active');
+                            this.updateSubmitButton();
+                            this.triggerHapticFeedback('light');
+                        });
+                        optionsContainer.appendChild(optionElement);
+                    });
+                }
+                
+                optionsContainer.classList.toggle('active');
+                this.triggerHapticFeedback('light');
+            } else if (!event.target.closest('.occasion-dropdown')) {
+                optionsContainer.classList.remove('active');
+            }
+        });
     }
 
-    closeModal() {
-        const modal = document.getElementById('consultation-overlay');
-        if (modal) {
-            modal.classList.remove('active');
-            console.log('✅ Modal закрыт');
-        }
-        this.currentMode = null;
-        this.clearForm();
-        this.updateTelegramMainButton();
-    }
-
-    updateTelegramMainButton() {
+    // 📱 Telegram интеграция
+    setupTelegramIntegration() {
         if (window.Telegram && window.Telegram.WebApp) {
             const tg = window.Telegram.WebApp;
             
-            if (this.currentMode) {
-                tg.MainButton.show();
-                tg.MainButton.enable();
-            } else {
-                tg.MainButton.hide();
-            }
+            tg.ready();
+            tg.expand();
+            
+            tg.MainButton.setText('Получить консультацию');
+            tg.MainButton.show();
+            
+            tg.MainButton.onClick(() => {
+                if (this.currentSection === 'home') {
+                    this.openSingleModal();
+                } else {
+                    this.navigateToSection('home');
+                }
+            });
+            
+            console.log('📱 Telegram WebApp интегрирован');
         }
     }
 
-    clearForm() {
-        // Очищаем поля формы
-        const occasionInput = document.getElementById('occasion');
-        const preferencesInput = document.getElementById('preferences');
+    // 🎮 Haptic Feedback
+    triggerHapticFeedback(type = 'light') {
+        try {
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                const feedback = window.Telegram.WebApp.HapticFeedback;
+                
+                switch (type) {
+                    case 'light':
+                        feedback.impactOccurred('light');
+                        break;
+                    case 'medium':
+                        feedback.impactOccurred('medium');
+                        break;
+                    case 'heavy':
+                        feedback.impactOccurred('heavy');
+                        break;
+                    case 'success':
+                        feedback.notificationOccurred('success');
+                        break;
+                    case 'warning':
+                        feedback.notificationOccurred('warning');
+                        break;
+                    case 'error':
+                        feedback.notificationOccurred('error');
+                        break;
+                }
+            }
+        } catch (error) {
+            // Игнорируем ошибки haptic feedback
+        }
+    }
+
+    // 🖱️ Drag & Drop функциональность
+    setupDragAndDrop() {
+        // Single режим
+        const singlePreview = document.getElementById('single-preview');
+        if (singlePreview) {
+            this.setupDragDropForElement(singlePreview, (file) => {
+                this.handleSingleFile(file);
+            });
+        }
         
-        if (occasionInput) occasionInput.value = '';
-        if (preferencesInput) preferencesInput.value = '';
-        
-        // Скрываем секции
-        const sections = ['consultation-form', 'loading', 'result'];
-        sections.forEach(sectionId => {
-            const section = document.getElementById(sectionId);
-            if (section) section.classList.remove('active');
+        // Compare режим
+        document.querySelectorAll('.compare-slot').forEach((slot, index) => {
+            this.setupDragDropForElement(slot, (file) => {
+                this.handleCompareFile(file, index);
+            });
         });
         
-        // Очищаем изображения
-        this.clearImages();
+        console.log('🖱️ Drag & Drop настроен');
+    }
+
+    setupDragDropForElement(element, onDrop) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            element.addEventListener(eventName, this.preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            element.addEventListener(eventName, () => {
+                element.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            element.addEventListener(eventName, () => {
+                element.classList.remove('drag-over');
+            }, false);
+        });
+
+        element.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                onDrop(files[0]);
+            }
+        }, false);
+    }
+
+    preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // ⌨️ Клавиатурные сокращения
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (event) => {
+            // ESC - закрыть модальное окно
+            if (event.key === 'Escape') {
+                this.closeModal();
+            }
+            
+            // Enter - отправить форму (если активна)
+            if (event.key === 'Enter' && event.ctrlKey) {
+                const submitBtn = document.getElementById('form-submit');
+                if (submitBtn && !submitBtn.disabled) {
+                    this.submit();
+                }
+            }
+            
+            // S - открыть single режим
+            if (event.key === 's' || event.key === 'ы') {
+                if (this.currentSection === 'home' && !document.querySelector('.modal-overlay.active')) {
+                    this.openSingleModal();
+                }
+            }
+            
+            // C - открыть compare режим  
+            if (event.key === 'c' || event.key === 'с') {
+                if (this.currentSection === 'home' && !document.querySelector('.modal-overlay.active')) {
+                    this.openCompareModal();
+                }
+            }
+        });
         
-        console.log('🧹 Форма очищена');
+        console.log('⌨️ Клавиатурные сокращения настроены');
+    }
+
+    // 🖱️ Контекстное меню
+    setupContextMenu() {
+        document.addEventListener('contextmenu', (event) => {
+            // Отключаем стандартное контекстное меню на превью изображений
+            if (event.target.closest('.upload-preview, .compare-slot img')) {
+                event.preventDefault();
+                this.showImageContextMenu(event);
+            }
+        });
+    }
+
+    showImageContextMenu(event) {
+        // Простое контекстное меню для изображений
+        const menu = document.createElement('div');
+        menu.style.cssText = `
+            position: fixed;
+            top: ${event.clientY}px;
+            left: ${event.clientX}px;
+            background: var(--secondary-black);
+            border: 1px solid var(--border-gold);
+            border-radius: 8px;
+            padding: 8px 0;
+            z-index: 10000;
+            min-width: 150px;
+            box-shadow: var(--shadow-black);
+        `;
+        
+        const actions = [
+            { text: '🔄 Заменить', action: () => this.replaceImage(event.target) },
+            { text: '❌ Удалить', action: () => this.removeImage(event.target) }
+        ];
+        
+        actions.forEach(({ text, action }) => {
+            const item = document.createElement('div');
+            item.textContent = text;
+            item.style.cssText = `
+                padding: 8px 16px;
+                cursor: pointer;
+                color: var(--text-light);
+                transition: background-color 0.2s;
+            `;
+            
+            item.addEventListener('mouseenter', () => {
+                item.style.backgroundColor = 'rgba(212, 175, 55, 0.1)';
+            });
+            
+            item.addEventListener('mouseleave', () => {
+                item.style.backgroundColor = 'transparent';
+            });
+            
+            item.addEventListener('click', () => {
+                action();
+                menu.remove();
+            });
+            
+            menu.appendChild(item);
+        });
+        
+        document.body.appendChild(menu);
+        
+        // Удаляем меню при клике вне его
+        setTimeout(() => {
+            document.addEventListener('click', () => menu.remove(), { once: true });
+        }, 100);
+    }
+
+    replaceImage(imgElement) {
+        // Определяем тип изображения и заменяем
+        const slot = imgElement.closest('.compare-slot');
+        if (slot) {
+            const slotIndex = parseInt(slot.dataset.slot);
+            const fileInput = document.getElementById(`compare-file-input-${slotIndex}`);
+            if (fileInput) fileInput.click();
+        } else {
+            // Single режим
+            const fileInput = document.getElementById('single-file-input');
+            if (fileInput) fileInput.click();
+        }
+    }
+
+    removeImage(imgElement) {
+        const slot = imgElement.closest('.compare-slot');
+        if (slot) {
+            // Compare режим
+            const slotIndex = parseInt(slot.dataset.slot);
+            this.compareImages[slotIndex] = null;
+            slot.innerHTML = `
+                <span class="slot-number">${slotIndex + 1}</span>
+                <span class="add-icon">+</span>
+            `;
+            slot.classList.remove('has-image');
+        } else {
+            // Single режим
+            this.singleImage = null;
+            const preview = document.getElementById('single-preview');
+            if (preview) {
+                preview.innerHTML = '<div class="upload-text">Нажмите для выбора фото</div>';
+                preview.classList.remove('has-image');
+            }
+        }
+        
+        this.updateSubmitButton();
+        this.triggerHapticFeedback('light');
+    }
+
+    // 🎯 Методы модального окна
+    openSingleModal() {
+        this.currentMode = 'single';
+        document.getElementById('modal-title').textContent = 'Анализ образа';
+        this.showModal('single-mode');
+    }
+
+    openCompareModal() {
+        this.currentMode = 'compare';
+        document.getElementById('modal-title').textContent = 'Сравнение образов';
+        this.showModal('compare-mode');
+    }
+
+    showModal(mode) {
+        const overlay = document.getElementById('consultation-overlay');
+        const modes = document.querySelectorAll('.upload-mode');
+        
+        modes.forEach(m => m.classList.remove('active'));
+        document.getElementById(mode).classList.add('active');
+        
+        overlay.classList.add('active');
+        this.clearForm();
+        this.hideForm();
+        this.hideLoading();
+        this.hideResult();
+    }
+
+    closeModal() {
+        const overlay = document.getElementById('consultation-overlay');
+        overlay.classList.remove('active');
+        this.clearForm();
+        this.clearImages();
+    }
+
+    // 🎯 Управление состоянием формы
+    clearForm() {
+        const occasion = document.getElementById('occasion');
+        const preferences = document.getElementById('preferences');
+        const options = document.getElementById('occasion-options');
+        
+        if (occasion) occasion.value = '';
+        if (preferences) preferences.value = '';
+        if (options) options.classList.remove('active');
+        
+        this.updateSubmitButton();
     }
 
     clearImages() {
-        // Single изображение
         this.singleImage = null;
+        this.compareImages = [null, null, null, null];
+        
+        // Очищаем превью
         const singlePreview = document.getElementById('single-preview');
         if (singlePreview) {
             singlePreview.innerHTML = '<div class="upload-text">Нажмите для выбора фото</div>';
             singlePreview.classList.remove('has-image');
         }
+        
+        // Очищаем слоты сравнения
+        document.querySelectorAll('.compare-slot').forEach((slot, index) => {
+            slot.innerHTML = `
+                <span class="slot-number">${index + 1}</span>
+                <span class="add-icon">+</span>
+            `;
+            slot.classList.remove('has-image');
+        });
+    }
 
-        // Compare изображения
-        this.compareImages = [null, null, null, null];
-        for (let i = 0; i < 4; i++) {
-            const slot = document.querySelector(`[data-slot="${i}"]`);
-            if (slot) {
-                slot.innerHTML = `
-                    <span class="slot-number">${i + 1}</span>
-                    <span class="add-icon">+</span>
-                `;
-                slot.classList.remove('has-image');
-            }
+    updateSubmitButton() {
+        const submitBtn = document.getElementById('form-submit');
+        const occasion = document.getElementById('occasion')?.value?.trim() || '';
+        
+        let hasImages = false;
+        if (this.currentMode === 'single') {
+            hasImages = this.singleImage !== null;
+        } else if (this.currentMode === 'compare') {
+            hasImages = this.compareImages.filter(img => img !== null).length >= 2;
+        }
+        
+        if (submitBtn) {
+            submitBtn.disabled = !hasImages || !occasion;
         }
     }
 
-    // 📁 Инициализация загрузчиков файлов
-    initUploaders() {
-        this.initSingleUploader();
-        this.initCompareUploaders();
-        console.log('✅ Загрузчики файлов настроены');
-    }
-
-    initSingleUploader() {
-        const singlePreview = document.getElementById('single-preview');
-        const singleInput = document.getElementById('single-file-input');
-        
-        if (singlePreview && singleInput) {
-            singlePreview.addEventListener('click', () => {
-                console.log('📁 Выбор файла для Single режима');
-                singleInput.click();
-            });
-            
-            singleInput.addEventListener('change', (e) => {
-                if (e.target.files[0]) {
-                    this.handleSingleUpload(e.target.files[0]);
-                }
-            });
-        }
-    }
-
-    initCompareUploaders() {
-        for (let i = 0; i < 4; i++) {
-            const slot = document.querySelector(`[data-slot="${i}"]`);
-            const input = document.getElementById(`compare-file-input-${i}`);
-            
-            if (slot && input) {
-                slot.addEventListener('click', () => {
-                    console.log(`📁 Выбор файла для слота ${i + 1}`);
-                    input.click();
-                });
-                
-                input.addEventListener('change', (e) => {
-                    if (e.target.files[0]) {
-                        this.handleCompareUpload(e.target.files[0], i);
-                    }
-                });
-            }
-        }
-    }
-
-    // 🖼️ Обработка загрузки изображений
-    async handleSingleUpload(file) {
-        console.log(`📷 Single файл загружен: ${file.name}`);
-        
-        // Валидация
-        const validation = this.api.validateImage(file);
-        if (!validation.isValid) {
-            this.showNotification(validation.errors[0], 'error');
-            return;
-        }
-        
-        this.singleImage = file;
-        this.analytics.imagesUploaded++;
-        
-        // Показ превью
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const preview = document.getElementById('single-preview');
-            if (preview) {
-                preview.innerHTML = `<img src="${e.target.result}" alt="Превью" class="upload-preview">`;
-                preview.classList.add('has-image');
-            }
-            
-            this.updateSingleSubmitButton();
-            this.showForm();
-            this.triggerHapticFeedback('success');
-        };
-        reader.readAsDataURL(file);
-    }
-
-    async handleCompareUpload(file, index) {
-        console.log(`📷 Файл загружен в слот ${index + 1}: ${file.name}`);
-        
-        // Валидация
-        const validation = this.api.validateImage(file);
-        if (!validation.isValid) {
-            this.showNotification(validation.errors[0], 'error');
-            return;
-        }
-        
-        this.compareImages[index] = file;
-        this.analytics.imagesUploaded++;
-        
-        // Показ превью
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const slot = document.querySelector(`[data-slot="${index}"]`);
-            if (slot) {
-                slot.innerHTML = `
-                    <span class="slot-number">${index + 1}</span>
-                    <img src="${e.target.result}" alt="Превью ${index + 1}">
-                `;
-                slot.classList.add('has-image');
-            }
-            
-            this.updateCompareSubmitButton();
-            this.showForm();
-            this.triggerHapticFeedback('success');
-        };
-        reader.readAsDataURL(file);
-    }
-
-    // 🔘 Управление кнопками
-    updateSingleSubmitButton() {
-        const btn = document.getElementById('form-submit');
-        if (btn) {
-            btn.disabled = !this.singleImage;
-            console.log(`🔘 Single submit кнопка: ${btn.disabled ? 'неактивна' : 'АКТИВНА'}`);
-        }
-        this.updateTelegramMainButton();
-    }
-
-    updateCompareSubmitButton() {
-        const uploadedCount = this.compareImages.filter(img => img !== null).length;
-        const btn = document.getElementById('form-submit');
-        
-        if (btn) {
-            btn.disabled = uploadedCount < 2;
-            console.log(`🔘 Compare submit кнопка: ${btn.disabled ? 'неактивна' : 'АКТИВНА'} (${uploadedCount}/4 изображений)`);
-        }
-        this.updateTelegramMainButton();
+    hideForm() {
+        const form = document.getElementById('consultation-form');
+        if (form) form.classList.remove('active');
     }
 
     showForm() {
         const form = document.getElementById('consultation-form');
-        if (form && !form.classList.contains('active')) {
-            form.classList.add('active');
-            console.log('✅ Форма показана');
-        }
+        if (form) form.classList.add('active');
+        this.updateSubmitButton();
     }
 
-    // 🚀 Отправка данных
-    async submit() {
-        if (this.isLoading) {
-            console.log('⏳ Запрос уже выполняется');
-            return;
-        }
-        
-        const occasion = document.getElementById('occasion')?.value?.trim() || '';
-        const preferences = document.getElementById('preferences')?.value?.trim() || '';
-        
-        if (!occasion) {
-            this.showNotification('Пожалуйста, укажите повод', 'error');
-            this.triggerHapticFeedback('error');
-            return;
-        }
-        
-        this.analytics.analysisRequested++;
-        
-        if (this.currentMode === 'single') {
-            await this.submitSingle(occasion, preferences);
-        } else if (this.currentMode === 'compare') {
-            await this.submitCompare(occasion, preferences);
-        }
+    hideLoading() {
+        const loading = document.getElementById('loading');
+        if (loading) loading.classList.remove('active');
     }
 
-    async submitSingle(occasion, preferences) {
-        console.log('🚀 Single submit начался');
-        
-        if (!this.singleImage) {
-            this.showNotification('Загрузите изображение', 'error');
-            this.triggerHapticFeedback('error');
-            return;
-        }
-        
-        this.showLoading();
-        this.triggerHapticFeedback('medium');
-        
-        try {
-            const result = await this.api.analyzeSingle(this.singleImage, occasion, preferences);
-            console.log('✅ Single результат получен:', result);
-            
-            this.lastAnalysisResult = result;
-            this.analytics.successfulAnalysis++;
-            this.showResult(result);
-            this.triggerHapticFeedback('success');
-            
-        } catch (error) {
-            console.error('❌ Single ошибка:', error);
-            this.analytics.errors++;
-            this.showError(error.message);
-            this.triggerHapticFeedback('error');
-        }
-    }
-
-    async submitCompare(occasion, preferences) {
-        const images = this.compareImages.filter(img => img !== null);
-        
-        if (images.length < 2) {
-            this.showNotification('Загрузите минимум 2 изображения', 'error');
-            this.triggerHapticFeedback('error');
-            return;
-        }
-        
-        console.log(`🚀 Compare submit: отправка ${images.length} изображений`);
-        this.showLoading();
-        this.triggerHapticFeedback('medium');
-        
-        try {
-            const result = await this.api.analyzeCompare(images, occasion, preferences);
-            console.log('✅ Compare результат получен:', result);
-            
-            this.lastAnalysisResult = result;
-            this.analytics.successfulAnalysis++;
-            this.showResult(result);
-            this.triggerHapticFeedback('success');
-            
-        } catch (error) {
-            console.error('❌ Compare ошибка:', error);
-            this.analytics.errors++;
-            this.showError(error.message);
-            this.triggerHapticFeedback('error');
-        }
-    }
-
-    // 📱 Отображение состояний
     showLoading() {
         this.isLoading = true;
         
@@ -867,11 +918,11 @@ class MishuraApp {
                 element.classList.toggle('active', show);
             }
         });
-        
-        // Обновляем Telegram кнопку
-        if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.MainButton.showProgress();
-        }
+    }
+
+    hideResult() {
+        const result = document.getElementById('result');
+        if (result) result.classList.remove('active');
     }
 
     showResult(result) {
@@ -897,11 +948,29 @@ class MishuraApp {
             content.innerHTML = this.formatAdvice(advice);
         }
         
-        // Обновляем Telegram кнопку
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            tg.MainButton.hideProgress();
-            tg.MainButton.setText('Новая консультация');
+        // Сохраняем консультацию в историю
+        const consultation = {
+            id: Date.now(),
+            type: this.currentMode,
+            occasion: document.getElementById('occasion')?.value || '',
+            preferences: document.getElementById('preferences')?.value || '',
+            advice: result.advice || result.message || '',
+            timestamp: new Date().toISOString(),
+            imagesCount: this.currentMode === 'compare' ? 
+                this.compareImages.filter(img => img !== null).length : 1
+        };
+        
+        // Списываем консультацию
+        this.userBalance--;
+        this.consultationsUsed++;
+        this.consultationsHistory.push(consultation);
+        this.saveUserData();
+        
+        // Показываем обновленный баланс
+        if (this.userBalance <= 10) {
+            setTimeout(() => {
+                this.showNotification(`⚠️ Осталось ${this.userBalance} консультаций`, 'warning', 4000);
+            }, 2000);
         }
     }
 
@@ -910,8 +979,8 @@ class MishuraApp {
         
         const sections = {
             loading: false,
-            'consultation-form': false,
-            result: true
+            'consultation-form': true,
+            result: false
         };
         
         Object.entries(sections).forEach(([id, show]) => {
@@ -921,19 +990,10 @@ class MishuraApp {
             }
         });
         
-        const content = document.getElementById('result-content');
-        if (content) {
-            content.innerHTML = `<div class="error-message">❌ ${message}</div>`;
-        }
-        
-        // Обновляем Telegram кнопку
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            tg.MainButton.hideProgress();
-            tg.MainButton.setText('Попробовать снова');
-        }
+        this.showNotification(message, 'error');
     }
 
+    // ✨ Форматирование ответов
     formatAdvice(advice) {
         // Определяем названия образов на основе цветов в тексте
         const colorMapping = {
@@ -1024,116 +1084,344 @@ class MishuraApp {
             .replace(/([.!?])\s+([А-ЯЁ])/g, '$1</p><p>$2');
     }
 
-    // 🔔 Система уведомлений
-    showNotification(message, type = 'info', duration = 3000) {
-        console.log(`📢 ${type.toUpperCase()}: ${message}`);
+    // 📤 Отправка форм
+    async submit() {
+        if (this.isLoading) {
+            console.log('⏳ Запрос уже выполняется');
+            return;
+        }
         
+        const occasion = document.getElementById('occasion')?.value?.trim() || '';
+        const preferences = document.getElementById('preferences')?.value?.trim() || '';
+        
+        if (!occasion) {
+            this.showNotification('Пожалуйста, укажите повод', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        // Проверяем баланс
+        if (this.userBalance <= 0) {
+            this.showNotification('❌ Консультации закончились! Пополните баланс', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        this.analytics.analysisRequested++;
+        
+        if (this.currentMode === 'single') {
+            await this.submitSingle(occasion, preferences);
+        } else if (this.currentMode === 'compare') {
+            await this.submitCompare(occasion, preferences);
+        }
+    }
+
+    async submitSingle(occasion, preferences) {
+        console.log('🚀 Single submit начался');
+        
+        if (!this.singleImage) {
+            this.showNotification('Загрузите изображение', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        // Проверяем API
+        if (!this.api) {
+            this.showNotification('❌ API не подключен', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        this.showLoading();
+        this.triggerHapticFeedback('medium');
+        
+        try {
+            console.log('📡 Отправляем запрос к API...');
+            console.log('🔍 Используем метод:', 'analyzeSingle');
+            
+            const result = await this.api.analyzeSingle(this.singleImage, occasion, preferences);
+            console.log('✅ Single результат получен:', result);
+            
+            this.lastAnalysisResult = result;
+            this.analytics.successfulAnalysis++;
+            this.showResult(result);
+            this.triggerHapticFeedback('success');
+            
+        } catch (error) {
+            console.error('❌ Single ошибка:', error);
+            this.analytics.errors++;
+            this.showError(`Ошибка анализа: ${error.message}`);
+            this.triggerHapticFeedback('error');
+        }
+    }
+
+    async submitCompare(occasion, preferences) {
+        const images = this.compareImages.filter(img => img !== null);
+        
+        if (images.length < 2) {
+            this.showNotification('Загрузите минимум 2 изображения', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        // Проверяем API
+        if (!this.api) {
+            this.showNotification('❌ API не подключен', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        console.log(`🚀 Compare submit: отправка ${images.length} изображений`);
+        this.showLoading();
+        this.triggerHapticFeedback('medium');
+        
+        try {
+            console.log('📡 Отправляем запрос к API...');
+            console.log('🔍 Используем метод:', 'analyzeCompare');
+            
+            const result = await this.api.analyzeCompare(images, occasion, preferences);
+            console.log('✅ Compare результат получен:', result);
+            
+            this.lastAnalysisResult = result;
+            this.analytics.successfulAnalysis++;
+            this.showResult(result);
+            this.triggerHapticFeedback('success');
+            
+        } catch (error) {
+            console.error('❌ Compare ошибка:', error);
+            this.analytics.errors++;
+            this.showError(`Ошибка сравнения: ${error.message}`);
+            this.triggerHapticFeedback('error');
+        }
+    }
+
+    // 📁 Инициализация загрузчиков
+    initUploaders() {
+        // Single режим
+        this.setupSingleUploader();
+        
+        // Compare режим  
+        this.setupCompareUploader();
+        
+        console.log('📁 Загрузчики файлов настроены');
+    }
+
+    // 📷 Single загрузчик
+    setupSingleUploader() {
+        const preview = document.getElementById('single-preview');
+        const fileInput = document.getElementById('single-file-input');
+        
+        if (preview) {
+            preview.addEventListener('click', () => {
+                console.log('📁 Выбор файла для Single режима');
+                if (fileInput) {
+                    fileInput.click();
+                }
+            });
+        }
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    this.handleSingleFile(file);
+                }
+            });
+        }
+    }
+
+    // 🔄 Compare загрузчик
+    setupCompareUploader() {
+        document.querySelectorAll('.compare-slot').forEach((slot, index) => {
+            slot.addEventListener('click', () => {
+                console.log(`📁 Выбор файла для Compare слота ${index}`);
+                const fileInput = document.getElementById(`compare-file-input-${index}`);
+                if (fileInput) {
+                    fileInput.click();
+                }
+            });
+        });
+        
+        // Обработчики файлов для каждого слота
+        for (let i = 0; i < 4; i++) {
+            const fileInput = document.getElementById(`compare-file-input-${i}`);
+            if (fileInput) {
+                fileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.handleCompareFile(file, i);
+                    }
+                });
+            }
+        }
+    }
+
+    // 📷 Обработка Single файла
+    async handleSingleFile(file) {
+        console.log('📷 Single файл загружен:', file.name);
+        
+        // Валидация
+        if (!this.validateFile(file)) {
+            return;
+        }
+        
+        try {
+            // Оптимизация изображения
+            const optimizedFile = await this.optimizeImage(file);
+            this.singleImage = optimizedFile;
+            
+            // Показ превью
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.getElementById('single-preview');
+                if (preview) {
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Превью" class="upload-preview">`;
+                    preview.classList.add('has-image');
+                }
+                
+                this.updateSubmitButton();
+                this.showForm();
+                this.triggerHapticFeedback('success');
+            };
+            reader.readAsDataURL(optimizedFile);
+            
+        } catch (error) {
+            console.error('❌ Ошибка обработки файла:', error);
+            this.showNotification('Ошибка обработки изображения', 'error');
+        }
+    }
+
+    // 🔄 Обработка Compare файла
+    async handleCompareFile(file, slotIndex) {
+        console.log(`🔄 Compare файл загружен для слота ${slotIndex}:`, file.name);
+        
+        // Валидация
+        if (!this.validateFile(file)) {
+            return;
+        }
+        
+        try {
+            // Оптимизация изображения
+            const optimizedFile = await this.optimizeImage(file);
+            this.compareImages[slotIndex] = optimizedFile;
+            
+            // Показ превью
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const slot = document.querySelector(`[data-slot="${slotIndex}"]`);
+                if (slot) {
+                    slot.innerHTML = `
+                        <span class="slot-number">${slotIndex + 1}</span>
+                        <img src="${e.target.result}" alt="Превью ${slotIndex + 1}">
+                    `;
+                    slot.classList.add('has-image');
+                }
+                
+                this.updateSubmitButton();
+                this.updateCompareForm();
+                this.triggerHapticFeedback('success');
+            };
+            reader.readAsDataURL(optimizedFile);
+            
+        } catch (error) {
+            console.error('❌ Ошибка обработки файла:', error);
+            this.showNotification('Ошибка обработки изображения', 'error');
+        }
+    }
+
+    // ✅ Валидация файлов
+    validateFile(file) {
+        const maxSize = 20 * 1024 * 1024; // 20MB
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        
+        if (!allowedTypes.includes(file.type)) {
+            this.showNotification('Поддерживаются только JPG, PNG и WebP', 'error');
+            this.triggerHapticFeedback('error');
+            return false;
+        }
+        
+        if (file.size > maxSize) {
+            this.showNotification('Файл слишком большой (максимум 20MB)', 'error');
+            this.triggerHapticFeedback('error');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // 🎨 Оптимизация изображений
+    async optimizeImage(file) {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = () => {
+                // Максимальные размеры
+                const maxWidth = 1920;
+                const maxHeight = 1920;
+                
+                let { width, height } = img;
+                
+                // Пропорциональное масштабирование
+                if (width > maxWidth || height > maxHeight) {
+                    const ratio = Math.min(maxWidth / width, maxHeight / height);
+                    width *= ratio;
+                    height *= ratio;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Рисуем изображение
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Конвертируем в blob
+                canvas.toBlob((blob) => {
+                    const optimizedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    
+                    console.log(`🎨 Изображение оптимизировано: ${file.size} → ${optimizedFile.size} байт`);
+                    resolve(optimizedFile);
+                }, 'image/jpeg', 0.85);
+            };
+            
+            img.src = URL.createObjectURL(file);
+        });
+    }
+
+    // 🔄 Обновление формы сравнения
+    updateCompareForm() {
+        const imageCount = this.compareImages.filter(img => img !== null).length;
+        
+        if (imageCount >= 2) {
+            this.showForm();
+        }
+        
+        console.log(`🔄 Compare: загружено ${imageCount} изображений`);
+    }
+
+    // 🔔 Уведомления
+    showNotification(message, type = 'info', duration = 3000) {
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.textContent = message;
         
         document.body.appendChild(notification);
         
-        // Автоудаление
         setTimeout(() => {
-            notification.style.animation = 'slideOutRight 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-            setTimeout(() => notification.remove(), 400);
+            notification.remove();
         }, duration);
         
-        // CSS анимация выхода
-        if (!document.querySelector('#notification-styles')) {
-            const style = document.createElement('style');
-            style.id = 'notification-styles';
-            style.textContent = `
-                @keyframes slideOutRight {
-                    to {
-                        opacity: 0;
-                        transform: translateX(100%);
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-    }
-
-    // 📊 Аналитика и отслеживание
-    trackSession() {
-        this.analytics.sessionsStarted++;
-        console.log('📊 Сессия отслеживается:', this.analytics);
-    }
-
-    getAnalytics() {
-        return {
-            ...this.analytics,
-            sessionDuration: Date.now() - this.sessionStart,
-            currentMode: this.currentMode,
-            hasResult: !!this.lastAnalysisResult
-        };
-    }
-
-    // 🔧 Debug функции
-    enableDebugMode() {
-        this.settings.debugMode = true;
-        console.log('🔧 Debug режим включен');
-        
-        // Добавляем debug панель
-        const debugPanel = document.createElement('div');
-        debugPanel.id = 'debug-panel';
-        debugPanel.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 10px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 9999;
-        `;
-        debugPanel.innerHTML = `
-            <div>Mode: <span id="debug-mode">${this.currentMode || 'none'}</span></div>
-            <div>Images: <span id="debug-images">S:${!!this.singleImage} C:${this.compareImages.filter(Boolean).length}</span></div>
-            <div>Loading: <span id="debug-loading">${this.isLoading}</span></div>
-        `;
-        document.body.appendChild(debugPanel);
-        
-        // Обновляем debug info каждую секунду
-        setInterval(() => {
-            const debugMode = document.getElementById('debug-mode');
-            const debugImages = document.getElementById('debug-images');
-            const debugLoading = document.getElementById('debug-loading');
-            
-            if (debugMode) debugMode.textContent = this.currentMode || 'none';
-            if (debugImages) debugImages.textContent = `S:${!!this.singleImage} C:${this.compareImages.filter(Boolean).length}`;
-            if (debugLoading) debugLoading.textContent = this.isLoading;
-        }, 1000);
+        console.log(`🔔 ${type.toUpperCase()}: ${message}`);
     }
 }
 
-// 🌍 Глобальный экспорт и инициализация
-window.MishuraApp = MishuraApp;
-console.log('✅ Ультимативный MishuraApp доступен в window');
-
-// 🚀 Автоинициализация при загрузке DOM
+// 🎉 Запуск приложения
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🔄 DOM загружен, создание ультимативного приложения...');
-    
-    try {
-        window.mishuraApp = new MishuraApp();
-        
-        // Включаем debug режим в development
-        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-            window.mishuraApp.enableDebugMode();
-        }
-        
-        console.log('🎉 🌟 МИШУРА - ЛУЧШИЙ TMA В МИРЕ ГОТОВ! 🌟');
-        
-        // Глобальные функции для удобства отладки
-        window.debugMishura = () => window.mishuraApp.getAnalytics();
-        window.clearMishura = () => window.mishuraApp.clearForm();
-        
-    } catch (error) {
-        console.error('💥 Критическая ошибка инициализации:', error);
-    }
+    console.log('📱 DOM готов, создаем приложение...');
+    window.mishuraApp = new MishuraApp();
+    console.log('✅ Приложение МИШУРА запущено!');
 });

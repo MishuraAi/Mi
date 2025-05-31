@@ -1,4 +1,3 @@
-
 // 🎯 УЛЬТИМАТИВНОЕ ПРИЛОЖЕНИЕ - webapp/app.js
 // Версия: 3.0.0 - Лучший TMA в мире с премиум функциями
 console.log('🚀 Ультимативное приложение загружается...');
@@ -460,4 +459,534 @@ class MishuraApp {
     }
 
     openCompareModal() {
-        console.log('
+        console.log('🔄 Opening Compare Modal');
+        this.currentMode = 'compare';
+        this.openModal();
+        this.activateCompareMode();
+        this.clearForm();
+        this.updateTelegramMainButton();
+        console.log('✅ Compare режим открыт');
+    }
+
+    openModal() {
+        const modal = document.getElementById('consultation-overlay');
+        if (modal) {
+            modal.classList.add('active');
+            console.log('✅ Modal открыт');
+        }
+    }
+
+    activateSingleMode() {
+        const singleMode = document.getElementById('single-mode');
+        const compareMode = document.getElementById('compare-mode');
+        const modalTitle = document.getElementById('modal-title');
+        
+        if (singleMode) singleMode.classList.add('active');
+        if (compareMode) compareMode.classList.remove('active');
+        if (modalTitle) modalTitle.textContent = '📷 Анализ одного образа';
+    }
+
+    activateCompareMode() {
+        const singleMode = document.getElementById('single-mode');
+        const compareMode = document.getElementById('compare-mode');
+        const modalTitle = document.getElementById('modal-title');
+        
+        if (compareMode) compareMode.classList.add('active');
+        if (singleMode) singleMode.classList.remove('active');
+        if (modalTitle) modalTitle.textContent = '🔄 Сравнение образов';
+    }
+
+    closeModal() {
+        const modal = document.getElementById('consultation-overlay');
+        if (modal) {
+            modal.classList.remove('active');
+            console.log('✅ Modal закрыт');
+        }
+        this.currentMode = null;
+        this.clearForm();
+        this.updateTelegramMainButton();
+    }
+
+    updateTelegramMainButton() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            
+            if (this.currentMode) {
+                tg.MainButton.show();
+                tg.MainButton.enable();
+            } else {
+                tg.MainButton.hide();
+            }
+        }
+    }
+
+    clearForm() {
+        // Очищаем поля формы
+        const occasionInput = document.getElementById('occasion');
+        const preferencesInput = document.getElementById('preferences');
+        
+        if (occasionInput) occasionInput.value = '';
+        if (preferencesInput) preferencesInput.value = '';
+        
+        // Скрываем секции
+        const sections = ['consultation-form', 'loading', 'result'];
+        sections.forEach(sectionId => {
+            const section = document.getElementById(sectionId);
+            if (section) section.classList.remove('active');
+        });
+        
+        // Очищаем изображения
+        this.clearImages();
+        
+        console.log('🧹 Форма очищена');
+    }
+
+    clearImages() {
+        // Single изображение
+        this.singleImage = null;
+        const singlePreview = document.getElementById('single-preview');
+        if (singlePreview) {
+            singlePreview.innerHTML = '<div class="upload-text">Нажмите для выбора фото</div>';
+            singlePreview.classList.remove('has-image');
+        }
+
+        // Compare изображения
+        this.compareImages = [null, null, null, null];
+        for (let i = 0; i < 4; i++) {
+            const slot = document.querySelector(`[data-slot="${i}"]`);
+            if (slot) {
+                slot.innerHTML = `
+                    <span class="slot-number">${i + 1}</span>
+                    <span class="add-icon">+</span>
+                `;
+                slot.classList.remove('has-image');
+            }
+        }
+    }
+
+    // 📁 Инициализация загрузчиков файлов
+    initUploaders() {
+        this.initSingleUploader();
+        this.initCompareUploaders();
+        console.log('✅ Загрузчики файлов настроены');
+    }
+
+    initSingleUploader() {
+        const singlePreview = document.getElementById('single-preview');
+        const singleInput = document.getElementById('single-file-input');
+        
+        if (singlePreview && singleInput) {
+            singlePreview.addEventListener('click', () => {
+                console.log('📁 Выбор файла для Single режима');
+                singleInput.click();
+            });
+            
+            singleInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    this.handleSingleUpload(e.target.files[0]);
+                }
+            });
+        }
+    }
+
+    initCompareUploaders() {
+        for (let i = 0; i < 4; i++) {
+            const slot = document.querySelector(`[data-slot="${i}"]`);
+            const input = document.getElementById(`compare-file-input-${i}`);
+            
+            if (slot && input) {
+                slot.addEventListener('click', () => {
+                    console.log(`📁 Выбор файла для слота ${i + 1}`);
+                    input.click();
+                });
+                
+                input.addEventListener('change', (e) => {
+                    if (e.target.files[0]) {
+                        this.handleCompareUpload(e.target.files[0], i);
+                    }
+                });
+            }
+        }
+    }
+
+    // 🖼️ Обработка загрузки изображений
+    async handleSingleUpload(file) {
+        console.log(`📷 Single файл загружен: ${file.name}`);
+        
+        // Валидация
+        const validation = this.api.validateImage(file);
+        if (!validation.isValid) {
+            this.showNotification(validation.errors[0], 'error');
+            return;
+        }
+        
+        this.singleImage = file;
+        this.analytics.imagesUploaded++;
+        
+        // Показ превью
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = document.getElementById('single-preview');
+            if (preview) {
+                preview.innerHTML = `<img src="${e.target.result}" alt="Превью" class="upload-preview">`;
+                preview.classList.add('has-image');
+            }
+            
+            this.updateSingleSubmitButton();
+            this.showForm();
+            this.triggerHapticFeedback('success');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async handleCompareUpload(file, index) {
+        console.log(`📷 Файл загружен в слот ${index + 1}: ${file.name}`);
+        
+        // Валидация
+        const validation = this.api.validateImage(file);
+        if (!validation.isValid) {
+            this.showNotification(validation.errors[0], 'error');
+            return;
+        }
+        
+        this.compareImages[index] = file;
+        this.analytics.imagesUploaded++;
+        
+        // Показ превью
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const slot = document.querySelector(`[data-slot="${index}"]`);
+            if (slot) {
+                slot.innerHTML = `
+                    <span class="slot-number">${index + 1}</span>
+                    <img src="${e.target.result}" alt="Превью ${index + 1}">
+                `;
+                slot.classList.add('has-image');
+            }
+            
+            this.updateCompareSubmitButton();
+            this.showForm();
+            this.triggerHapticFeedback('success');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 🔘 Управление кнопками
+    updateSingleSubmitButton() {
+        const btn = document.getElementById('form-submit');
+        if (btn) {
+            btn.disabled = !this.singleImage;
+            console.log(`🔘 Single submit кнопка: ${btn.disabled ? 'неактивна' : 'АКТИВНА'}`);
+        }
+        this.updateTelegramMainButton();
+    }
+
+    updateCompareSubmitButton() {
+        const uploadedCount = this.compareImages.filter(img => img !== null).length;
+        const btn = document.getElementById('form-submit');
+        
+        if (btn) {
+            btn.disabled = uploadedCount < 2;
+            console.log(`🔘 Compare submit кнопка: ${btn.disabled ? 'неактивна' : 'АКТИВНА'} (${uploadedCount}/4 изображений)`);
+        }
+        this.updateTelegramMainButton();
+    }
+
+    showForm() {
+        const form = document.getElementById('consultation-form');
+        if (form && !form.classList.contains('active')) {
+            form.classList.add('active');
+            console.log('✅ Форма показана');
+        }
+    }
+
+    // 🚀 Отправка данных
+    async submit() {
+        if (this.isLoading) {
+            console.log('⏳ Запрос уже выполняется');
+            return;
+        }
+        
+        const occasion = document.getElementById('occasion')?.value?.trim() || '';
+        const preferences = document.getElementById('preferences')?.value?.trim() || '';
+        
+        if (!occasion) {
+            this.showNotification('Пожалуйста, укажите повод', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        this.analytics.analysisRequested++;
+        
+        if (this.currentMode === 'single') {
+            await this.submitSingle(occasion, preferences);
+        } else if (this.currentMode === 'compare') {
+            await this.submitCompare(occasion, preferences);
+        }
+    }
+
+    async submitSingle(occasion, preferences) {
+        console.log('🚀 Single submit начался');
+        
+        if (!this.singleImage) {
+            this.showNotification('Загрузите изображение', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        this.showLoading();
+        this.triggerHapticFeedback('medium');
+        
+        try {
+            const result = await this.api.analyzeSingle(this.singleImage, occasion, preferences);
+            console.log('✅ Single результат получен:', result);
+            
+            this.lastAnalysisResult = result;
+            this.analytics.successfulAnalysis++;
+            this.showResult(result);
+            this.triggerHapticFeedback('success');
+            
+        } catch (error) {
+            console.error('❌ Single ошибка:', error);
+            this.analytics.errors++;
+            this.showError(error.message);
+            this.triggerHapticFeedback('error');
+        }
+    }
+
+    async submitCompare(occasion, preferences) {
+        const images = this.compareImages.filter(img => img !== null);
+        
+        if (images.length < 2) {
+            this.showNotification('Загрузите минимум 2 изображения', 'error');
+            this.triggerHapticFeedback('error');
+            return;
+        }
+        
+        console.log(`🚀 Compare submit: отправка ${images.length} изображений`);
+        this.showLoading();
+        this.triggerHapticFeedback('medium');
+        
+        try {
+            const result = await this.api.analyzeCompare(images, occasion, preferences);
+            console.log('✅ Compare результат получен:', result);
+            
+            this.lastAnalysisResult = result;
+            this.analytics.successfulAnalysis++;
+            this.showResult(result);
+            this.triggerHapticFeedback('success');
+            
+        } catch (error) {
+            console.error('❌ Compare ошибка:', error);
+            this.analytics.errors++;
+            this.showError(error.message);
+            this.triggerHapticFeedback('error');
+        }
+    }
+
+    // 📱 Отображение состояний
+    showLoading() {
+        this.isLoading = true;
+        
+        const sections = {
+            loading: true,
+            'consultation-form': false,
+            result: false
+        };
+        
+        Object.entries(sections).forEach(([id, show]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.classList.toggle('active', show);
+            }
+        });
+        
+        // Обновляем Telegram кнопку
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.MainButton.showProgress();
+        }
+    }
+
+    showResult(result) {
+        this.isLoading = false;
+        
+        const sections = {
+            loading: false,
+            'consultation-form': false,
+            result: true
+        };
+        
+        Object.entries(sections).forEach(([id, show]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.classList.toggle('active', show);
+            }
+        });
+        
+        // Контент результата
+        const content = document.getElementById('result-content');
+        if (content) {
+            const advice = result.advice || result.message || 'Анализ получен';
+            content.innerHTML = this.formatAdvice(advice);
+        }
+        
+        // Обновляем Telegram кнопку
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.MainButton.hideProgress();
+            tg.MainButton.setText('Новая консультация');
+        }
+    }
+
+    showError(message) {
+        this.isLoading = false;
+        
+        const sections = {
+            loading: false,
+            'consultation-form': false,
+            result: true
+        };
+        
+        Object.entries(sections).forEach(([id, show]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.classList.toggle('active', show);
+            }
+        });
+        
+        const content = document.getElementById('result-content');
+        if (content) {
+            content.innerHTML = `<div class="error-message">❌ ${message}</div>`;
+        }
+        
+        // Обновляем Telegram кнопку
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.MainButton.hideProgress();
+            tg.MainButton.setText('Попробовать снова');
+        }
+    }
+
+    formatAdvice(advice) {
+        // Форматируем текст совета для лучшего отображения
+        return advice
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/^/, '<p>')
+            .replace(/$/, '</p>');
+    }
+
+    // 🔔 Система уведомлений
+    showNotification(message, type = 'info', duration = 3000) {
+        console.log(`📢 ${type.toUpperCase()}: ${message}`);
+        
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        // Автоудаление
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+            setTimeout(() => notification.remove(), 400);
+        }, duration);
+        
+        // CSS анимация выхода
+        if (!document.querySelector('#notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'notification-styles';
+            style.textContent = `
+                @keyframes slideOutRight {
+                    to {
+                        opacity: 0;
+                        transform: translateX(100%);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    // 📊 Аналитика и отслеживание
+    trackSession() {
+        this.analytics.sessionsStarted++;
+        console.log('📊 Сессия отслеживается:', this.analytics);
+    }
+
+    getAnalytics() {
+        return {
+            ...this.analytics,
+            sessionDuration: Date.now() - this.sessionStart,
+            currentMode: this.currentMode,
+            hasResult: !!this.lastAnalysisResult
+        };
+    }
+
+    // 🔧 Debug функции
+    enableDebugMode() {
+        this.settings.debugMode = true;
+        console.log('🔧 Debug режим включен');
+        
+        // Добавляем debug панель
+        const debugPanel = document.createElement('div');
+        debugPanel.id = 'debug-panel';
+        debugPanel.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 9999;
+        `;
+        debugPanel.innerHTML = `
+            <div>Mode: <span id="debug-mode">${this.currentMode || 'none'}</span></div>
+            <div>Images: <span id="debug-images">S:${!!this.singleImage} C:${this.compareImages.filter(Boolean).length}</span></div>
+            <div>Loading: <span id="debug-loading">${this.isLoading}</span></div>
+        `;
+        document.body.appendChild(debugPanel);
+        
+        // Обновляем debug info каждую секунду
+        setInterval(() => {
+            const debugMode = document.getElementById('debug-mode');
+            const debugImages = document.getElementById('debug-images');
+            const debugLoading = document.getElementById('debug-loading');
+            
+            if (debugMode) debugMode.textContent = this.currentMode || 'none';
+            if (debugImages) debugImages.textContent = `S:${!!this.singleImage} C:${this.compareImages.filter(Boolean).length}`;
+            if (debugLoading) debugLoading.textContent = this.isLoading;
+        }, 1000);
+    }
+}
+
+// 🌍 Глобальный экспорт и инициализация
+window.MishuraApp = MishuraApp;
+console.log('✅ Ультимативный MishuraApp доступен в window');
+
+// 🚀 Автоинициализация при загрузке DOM
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🔄 DOM загружен, создание ультимативного приложения...');
+    
+    try {
+        window.mishuraApp = new MishuraApp();
+        
+        // Включаем debug режим в development
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            window.mishuraApp.enableDebugMode();
+        }
+        
+        console.log('🎉 🌟 МИШУРА - ЛУЧШИЙ TMA В МИРЕ ГОТОВ! 🌟');
+        
+        // Глобальные функции для удобства отладки
+        window.debugMishura = () => window.mishuraApp.getAnalytics();
+        window.clearMishura = () => window.mishuraApp.clearForm();
+        
+    } catch (error) {
+        console.error('💥 Критическая ошибка инициализации:', error);
+    }
+});

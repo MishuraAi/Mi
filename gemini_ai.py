@@ -2,8 +2,8 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Модуль ИИ (gemini_ai.py)
-ВЕРСИЯ: 0.3.1 (Базовый функционал)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-22
+ВЕРСИЯ: 0.3.2 (ИСПРАВЛЕНА ОШИБКА DummyCacheManager)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-31
 
 МЕТОДОЛОГИЯ РАБОТЫ И ОБНОВЛЕНИЯ КОДА:
 1.  Целостность Обновлений: Любые изменения файлов предоставляются целиком.
@@ -16,6 +16,10 @@
 НАЗНАЧЕНИЕ ФАЙЛА:
 Модуль для взаимодействия с Gemini AI API. Обеспечивает анализ одежды
 и сравнение образов. Использует кэширование для оптимизации запросов.
+
+ИСПРАВЛЕНИЯ В ВЕРСИИ 0.3.2:
+- Перемещен класс DummyCacheManager перед его использованием
+- Исправлена ошибка NameError: name 'DummyCacheManager' is not defined
 ==========================================================================================
 """
 import os
@@ -44,6 +48,18 @@ logger_gemini.info("Инициализация модуля интеграции
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# ИСПРАВЛЕНИЕ: Определяем класс DummyCacheManager ПЕРЕД его использованием
+class DummyCacheManager:
+    """Простой заглушка кеш-менеджера"""
+    def __init__(self):
+        logger_gemini.info("DummyCacheManager инициализирован")
+    
+    def get_from_cache(self, *args, **kwargs):
+        return None
+    
+    def save_to_cache(self, *args, **kwargs):
+        pass
+
 # Конфигурация Gemini API
 API_CONFIGURED_SUCCESSFULLY = False
 if not GEMINI_API_KEY:
@@ -68,13 +84,7 @@ RETRY_DELAY = 5 # Немного увеличена задержка для ст
 # Инициализация менеджера кэша
 CACHE_ENABLED = False # По умолчанию кэш выключен, если менеджер не инициализируется
 # cache_manager = AnalysisCacheManager() # Временно отключено
-cache_manager = DummyCacheManager()
-
-class DummyCacheManager:
-    def get_from_cache(self, *args, **kwargs):
-        return None
-    def save_to_cache(self, *args, **kwargs):
-        pass
+cache_manager = DummyCacheManager()  # Теперь класс уже определен выше
 
 async def test_gemini_connection() -> Tuple[bool, str]:
     """
@@ -561,4 +571,4 @@ if __name__ == "__main__":
     asyncio.run(main_test())
 
 # Для информации о версии модуля, если потребуется
-__version__ = "0.3.1.4"
+__version__ = "0.3.2"

@@ -503,6 +503,16 @@ async def not_found_handler(request: Request, exc):
         }
     )
 
+# --- Исправленная обработка порта ---
+def get_clean_port():
+    raw_port = os.getenv("PORT", os.getenv("BACKEND_PORT", "8000"))
+    # Удаляем комментарии и пробелы
+    clean_port = raw_port.split("#")[0].strip()
+    try:
+        return int(clean_port)
+    except Exception:
+        return 8000  # fallback
+
 if __name__ == "__main__":
     # Проверяем наличие Gemini API ключа при запуске
     gemini_key = os.getenv("GEMINI_API_KEY")
@@ -511,7 +521,7 @@ if __name__ == "__main__":
         logger.warning("Добавьте GEMINI_API_KEY в файл .env для работы с Gemini AI")
     
     # Определяем порт для локальной разработки и продакшна
-    port = int(os.getenv("PORT", os.getenv("BACKEND_PORT", "8000")))
+    port = get_clean_port()
     logger.info(f"Запуск API сервера на порту {port}")
     
     # Запускаем сервер

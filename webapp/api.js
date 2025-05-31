@@ -171,12 +171,13 @@ class MishuraAPIService {
             }
             
             formData.append('occasion', occasion.trim());
-            formData.append('preferences', preferences.trim());
+            formData.append('preferences', `${preferences.trim()}. ВАЖНО: Используй короткие названия образов по цветам (например "Синий образ", "Красный образ") вместо подробного описания одежды. Структурируй ответ логически с заголовками разделов.`);
             formData.append('metadata', JSON.stringify({
                 count: imageFiles.length,
                 timestamp: new Date().toISOString(),
                 userAgent: navigator.userAgent,
-                viewport: `${window.innerWidth}x${window.innerHeight}`
+                viewport: `${window.innerWidth}x${window.innerHeight}`,
+                formatRequest: 'structured_with_short_titles'
             }));
 
             console.log('📤 Структура FormData для отправки:');
@@ -248,13 +249,14 @@ class MishuraAPIService {
             const formData = new FormData();
             formData.append('image', optimizedImage || imageFile);
             formData.append('occasion', occasion.trim());
-            formData.append('preferences', preferences.trim());
+            formData.append('preferences', `${preferences.trim()}. ВАЖНО: Используй короткие названия образа по основному цвету (например "Синий образ") вместо подробного описания одежды. Структурируй ответ с четкими разделами и заголовками.`);
             formData.append('metadata', JSON.stringify({
                 originalSize: imageFile.size,
                 optimizedSize: optimizedImage ? optimizedImage.size : imageFile.size,
                 timestamp: new Date().toISOString(),
                 userAgent: navigator.userAgent,
-                viewport: `${window.innerWidth}x${window.innerHeight}`
+                viewport: `${window.innerWidth}x${window.innerHeight}`,
+                formatRequest: 'structured_with_short_title'
             }));
 
             console.log('📤 Структура FormData:');

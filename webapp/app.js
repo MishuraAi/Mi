@@ -12,6 +12,26 @@ class MishuraApp {
         this.compareImages = [null, null, null, null];
         this.singleImage = null;
         
+        // Варианты поводов
+        this.occasionOptions = [
+            '💼 Деловая встреча',
+            '❤️ Свидание', 
+            '🚶 Повседневная прогулка',
+            '🎉 Вечеринка',
+            '👔 Собеседование',
+            '🍽️ Ужин в ресторане',
+            '🎭 Театр/концерт',
+            '🏋️ Спортзал/тренировка',
+            '🛍️ Шоппинг',
+            '✈️ Путешествие',
+            '🎓 Учеба/университет',
+            '🏠 Дома/отдых',
+            '🌞 Пляж/отпуск',
+            '❄️ Зимняя прогулка',
+            '🌧️ Дождливая погода',
+            '🎪 Мероприятие на свежем воздухе'
+        ];
+        
         // Состояние приложения
         this.isLoading = false;
         this.lastAnalysisResult = null;
@@ -50,6 +70,7 @@ class MishuraApp {
         this.setupKeyboardShortcuts();
         this.setupDragAndDrop();
         this.setupContextMenu();
+        this.setupOccasionDropdown();
         
         // Системные проверки
         await this.performSystemChecks();
@@ -258,6 +279,52 @@ class MishuraApp {
         });
     }
 
+    // 📋 Настройка выпадающего списка поводов
+    setupOccasionDropdown() {
+        const occasionInput = document.getElementById('occasion');
+        const optionsContainer = document.getElementById('occasion-options');
+        
+        if (!occasionInput || !optionsContainer) return;
+        
+        // Создаем опции
+        this.occasionOptions.forEach(option => {
+            const optionElement = document.createElement('div');
+            optionElement.className = 'occasion-option';
+            optionElement.textContent = option;
+            optionElement.addEventListener('click', () => {
+                occasionInput.value = option;
+                optionsContainer.classList.remove('active');
+                this.triggerHapticFeedback('light');
+            });
+            optionsContainer.appendChild(optionElement);
+        });
+        
+        // Показываем/скрываем опции
+        occasionInput.addEventListener('click', () => {
+            optionsContainer.classList.toggle('active');
+            this.triggerHapticFeedback('light');
+        });
+        
+        // Скрываем при клике вне
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.occasion-dropdown')) {
+                optionsContainer.classList.remove('active');
+            }
+        });
+        
+        // Позволяем ввод custom значения
+        occasionInput.addEventListener('input', () => {
+            if (occasionInput.value.length > 0) {
+                occasionInput.removeAttribute('readonly');
+            }
+        });
+        
+        occasionInput.addEventListener('focus', () => {
+            if (occasionInput.hasAttribute('readonly')) {
+                optionsContainer.classList.add('active');
+            }
+        });
+    }
     // 🖱️ Drag & Drop функциональность
     setupDragAndDrop() {
         const dropZones = [
@@ -868,13 +935,93 @@ class MishuraApp {
     }
 
     formatAdvice(advice) {
-        // Форматируем текст совета для лучшего отображения
-        return advice
+        // Определяем названия образов на основе цветов в тексте
+        const colorMapping = {
+            'синий': 'Синий образ',
+            'синем': 'Синий образ', 
+            'синяя': 'Синий образ',
+            'красный': 'Красный образ',
+            'красном': 'Красный образ',
+            'красная': 'Красный образ',
+            'белый': 'Белый образ',
+            'белом': 'Белый образ',
+            'белая': 'Белый образ',
+            'черный': 'Черный образ',
+            'черном': 'Черный образ',
+            'черная': 'Черный образ',
+            'зеленый': 'Зеленый образ',
+            'зеленом': 'Зеленый образ',
+            'зеленая': 'Зеленый образ',
+            'желтый': 'Желтый образ',
+            'желтом': 'Желтый образ',
+            'желтая': 'Желтый образ',
+            'розовый': 'Розовый образ',
+            'розовом': 'Розовый образ',
+            'розовая': 'Розовый образ',
+            'серый': 'Серый образ',
+            'сером': 'Серый образ',
+            'серая': 'Серый образ',
+            'коричневый': 'Коричневый образ',
+            'коричневом': 'Коричневый образ',
+            'коричневая': 'Коричневый образ',
+            'оранжевый': 'Оранжевый образ',
+            'оранжевом': 'Оранжевый образ',
+            'оранжевая': 'Оранжевый образ',
+            'фиолетовый': 'Фиолетовый образ',
+            'фиолетовом': 'Фиолетовый образ',
+            'фиолетовая': 'Фиолетовый образ'
+        };
+        
+        let processedAdvice = advice;
+        
+        // Убираем избыточные описания того, что надето
+        const descriptionsToRemove = [
+            /На первом.*?изображении.*?\./gi,
+            /На втором.*?изображении.*?\./gi,
+            /На третьем.*?изображении.*?\./gi,
+            /На четвертом.*?изображении.*?\./gi,
+            /На фото.*?вы.*?одеты.*?\./gi,
+            /Я вижу.*?что.*?на.*?\./gi,
+            /Рассматривая.*?изображение.*?\./gi
+        ];
+        
+        descriptionsToRemove.forEach(pattern => {
+            processedAdvice = processedAdvice.replace(pattern, '');
+        });
+        
+        // Заменяем цветовые описания на короткие названия образов
+        Object.entries(colorMapping).forEach(([color, title]) => {
+            const regex = new RegExp(`(в|на)\\s+${color}[а-я]*\\s+(платье|рубашке|футболке|блузке|костюме|жакете|пиджаке|брюках|джинсах|юбке|шортах|топе|кардигане|свитере|пальто|куртке)`, 'gi');
+            processedAdvice = processedAdvice.replace(regex, `<span class="outfit-title">${title}</span>`);
+        });
+        
+        // Разбиваем на логические блоки и добавляем заголовки
+        const sections = processedAdvice.split(/\n\n|\. [А-ЯЁ]/).map(section => section.trim()).filter(s => s.length > 10);
+        
+        let formattedAdvice = '';
+        sections.forEach((section, index) => {
+            if (section.toLowerCase().includes('рекомендую') || section.toLowerCase().includes('советую')) {
+                formattedAdvice += `<h4>💡 Рекомендации</h4><p>${section}</p>`;
+            } else if (section.toLowerCase().includes('подойдет') || section.toLowerCase().includes('лучше')) {
+                formattedAdvice += `<h4>✨ Что подойдет</h4><p>${section}</p>`;
+            } else if (section.toLowerCase().includes('аксессуары') || section.toLowerCase().includes('украшения')) {
+                formattedAdvice += `<h4>💎 Аксессуары</h4><p>${section}</p>`;
+            } else if (section.toLowerCase().includes('цвет') || section.toLowerCase().includes('оттенок')) {
+                formattedAdvice += `<h4>🎨 Цветовые решения</h4><p>${section}</p>`;
+            } else if (section.toLowerCase().includes('обувь') || section.toLowerCase().includes('туфли')) {
+                formattedAdvice += `<h4>👠 Обувь</h4><p>${section}</p>`;
+            } else if (index === 0) {
+                formattedAdvice += `<h4>📋 Общий анализ</h4><p>${section}</p>`;
+            } else {
+                formattedAdvice += `<p>${section}</p>`;
+            }
+        });
+        
+        // Дополнительное форматирование
+        return formattedAdvice
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/^/, '<p>')
-            .replace(/$/, '</p>');
+            .replace(/([.!?])\s+([А-ЯЁ])/g, '$1</p><p>$2');
     }
 
     // 🔔 Система уведомлений

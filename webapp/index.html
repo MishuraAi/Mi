@@ -2,518 +2,520 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#000000">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="msapplication-tap-highlight" content="no">
-    <title>МИШУРА - Ваш персональный стилист</title>
-    <link rel="icon" type="image/svg+xml" href="images/single-mode-icon.svg">
-    <link rel="icon" type="image/png" href="images/single-mode-icon.svg">
-    <link rel="stylesheet" href="css/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>МИШУРА - ИИ Стилист</title>
     <style>
-        /* Предотвращение FOUC (Flash Of Unstyled Content) */
-        body { display: none; opacity: 0; transition: opacity 0.2s ease-in-out; }
-        body.loaded { display: flex; opacity: 1; }
-        .hidden { display: none; }
-        /* Исправление для кнопки удаления изображений */
-        .image-slot .delete-image {
-            z-index: 15 !important;
-            pointer-events: auto !important;
-        }
-        .image-slot {
-            position: relative !important;
-            overflow: hidden !important;
-            min-height: 150px !important;
-            border: 2px dashed #d4af37 !important;
-            border-radius: 10px !important;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        .image-slot .preview-image {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover !important;
-            display: block !important;
-            opacity: 1 !important;
-            z-index: 15 !important;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
         }
 
-        .image-slot.filled .visible-compare-button {
-            display: none !important;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            background: white;
+            border: none;
+            padding: 20px 30px;
+            border-radius: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            min-width: 200px;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .action-btn.single {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .action-btn.compare {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        /* Модальное окно */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 5px;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        /* Режимы загрузки */
+        .upload-mode {
+            display: none;
+        }
+
+        .upload-mode.active {
+            display: block;
+        }
+
+        /* Single режим */
+        .single-upload {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            border-color: #4facfe;
+            background: #f8fffe;
+        }
+
+        .upload-area.has-image {
+            border-color: #43e97b;
+            background: #f8fff9;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        /* Compare режим */
+        .compare-upload {
+            margin-bottom: 30px;
+        }
+
+        .compare-slots {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .compare-slot {
+            aspect-ratio: 1;
+            border: 2px dashed #ddd;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .compare-slot:hover {
+            border-color: #43e97b;
+            background: #f8fff9;
+        }
+
+        .compare-slot.has-image {
+            border-color: #43e97b;
+            border-style: solid;
+        }
+
+        .compare-slot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .slot-number {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .add-icon {
+            font-size: 2rem;
+            color: #ddd;
+        }
+
+        /* Форма */
+        .consultation-form {
+            display: none;
+        }
+
+        .consultation-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #eee;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Кнопки действий */
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-cancel {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-cancel:hover {
+            background: #eee;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn-submit:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Результат */
+        .result-section {
+            display: none;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .result-section.active {
+            display: block;
+        }
+
+        .result-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .result-content {
+            line-height: 1.6;
+            color: #555;
+        }
+
+        /* Загрузка */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Скрытые файловые инпуты */
+        .hidden-input {
+            display: none;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .action-btn {
+                min-width: 250px;
+            }
+
+            .modal-content {
+                margin: 10px;
+                padding: 20px;
+            }
+
+            .compare-slots {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="phone-container">
-        <div class="app-container">
-            <div class="shimmer-effect"></div>
-            <!-- Gold accent lines -->
-            <div class="gold-accent gold-accent-1"></div>
-            <div class="gold-accent gold-accent-2"></div>
+    <div class="container">
+        <header class="header">
+            <h1>✨ МИШУРА</h1>
+            <p>Ваш персональный ИИ-стилист</p>
+        </header>
 
-            <!-- Header -->
-            <header class="app-header">
-                <h1 class="app-logo">МИШУРА</h1>
-                <p class="app-tagline">Ваш персональный стилист</p>
-            </header>
-
-            <main class="main-content">
-                <!-- Главная страница -->
-                <div id="home-section" class="content-section">
-                    <div class="main-buttons">
-                        <button class="main-button" id="consultation-button">
-                            <div class="main-button-icon">
-                                <svg class="heart-icon" viewBox="0 0 24 24">
-                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                                </svg>
-                            </div>
-                            <div class="main-button-title">Получить консультацию</div>
-                            <div class="main-button-description">Получите персональные рекомендации от вашего стилиста</div>
-                        </button>
-                        
-                        <button class="main-button" id="compare-button">
-                            <div class="main-button-icon">
-                                <svg class="compare-icon" viewBox="0 0 24 24">
-                                    <path d="M9 3H7v2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h2v2h2V3zm0 6H7v6h2V9zm4-6h2v2h2c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2h-2v2h-2V3zm0 6h2v6h-2V9z"/>
-                                </svg>
-                            </div>
-                            <div class="main-button-title">Сравнить образы</div>
-                            <div class="main-button-description">Загрузите несколько фото и узнайте, какой образ лучше</div>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- История консультаций -->
-                <div id="history-section" class="content-section hidden">
-                    <div class="history-list">
-                        <!-- Здесь будет динамически добавляться история консультаций -->
-                    </div>
-                </div>
-
-                <!-- Советы -->
-                <div id="tips-section" class="content-section hidden">
-                    <div class="tips-container">
-                        <div class="tip-card">
-                            <div class="tip-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                                </svg>
-                            </div>
-                            <h3 class="tip-title">Как сделать хорошее фото</h3>
-                            <p class="tip-text">Убедитесь, что предмет одежды хорошо освещен и занимает большую часть кадра. Избегайте теней и бликов.</p>
-                        </div>
-                        
-                        <div class="tip-card">
-                            <div class="tip-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                                </svg>
-                            </div>
-                            <h3 class="tip-title">Дополнительная информация</h3>
-                            <p class="tip-text">Укажите, для какого случая вы подбираете образ. Это поможет стилисту дать более точные рекомендации.</p>
-                        </div>
-                        
-                        <div class="tip-card">
-                            <div class="tip-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                                </svg>
-                            </div>
-                            <h3 class="tip-title">Сравнение образов</h3>
-                            <p class="tip-text">Загрузите несколько фотографий, чтобы сравнить разные варианты и получить рекомендации по выбору лучшего образа.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Сравнение образов -->
-                <div id="compare-section" class="content-section hidden">
-                    <div class="compare-main-container">
-                        <div class="compare-header">
-                            <h2 class="compare-title">Сравнение образов</h2>
-                            <p class="compare-description">Загрузите от 2 до 4 фотографий для сравнения</p>
-                        </div>
-                        
-                        <div class="compare-slots-wrapper">
-                            <div class="image-slots">
-                                <!-- Слоты для загрузки изображений -->
-                                <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 1">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="0" style="display: none;">
-                                </div>
-                                <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 2">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="1" style="display: none;">
-                                </div>
-                                <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 3">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="2" style="display: none;">
-                                </div>
-                                <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 4">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="3" style="display: none;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="compare-form" style="display: none;">
-                            <label for="compare-occasion-selector" class="input-label">Выберите повод:</label>
-                            <select class="occasion-selector" id="compare-occasion-selector" aria-label="Выберите повод">
-                                <option value="повседневный">Повседневный</option>
-                                <option value="деловой">Деловой</option>
-                                <option value="вечеринка">Вечеринка</option>
-                                <option value="свидание">Свидание</option>
-                                <option value="спорт">Спорт/Активный отдых</option>
-                                <option value="особый случай">Особый случай</option>
-                            </select>
-                            
-                            <label for="compare-preferences-input" class="input-label">Ваши предпочтения:</label>
-                            <textarea class="preferences-input" id="compare-preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
-                            
-                            <div class="dialog-footer">
-                                <button class="btn btn-primary" id="compare-submit" type="button">Сравнить образы</button>
-                                <button class="btn btn-secondary" id="compare-cancel" type="button">Отмена</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Баланс -->
-                <div id="balance-section" class="content-section hidden">
-                    <div class="balance-container">
-                        <div class="balance-header">
-                            <h2 class="balance-title">Баланс консультаций</h2>
-                            <div class="current-balance">
-                                <span class="balance-label">Доступно консультаций:</span>
-                                <span class="balance-value" id="balance-value">0</span>
-                            </div>
-                        </div>
-                        
-                        <div class="balance-content">
-                            <div class="balance-card">
-                                <h3 class="card-title">Пополнить баланс</h3>
-                                <div class="payment-options">
-                                    <button class="payment-btn card-payment" data-method="card">
-                                        <div class="payment-icon">
-                                            <svg viewBox="0 0 24 24">
-                                                <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
-                                            </svg>
-                                        </div>
-                                        <span>Банковская карта</span>
-                                    </button>
-                                    <button class="payment-btn crypto-payment" data-method="crypto">
-                                        <div class="payment-icon">
-                                            <svg viewBox="0 0 24 24">
-                                                <path d="M17.06 11.57l.59-.59.59.59c1.56 1.56 1.56 4.09 0 5.66l-.59.59-.59-.59c-1.56-1.56-1.56-4.1 0-5.66zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zm-7 8L12 13.5 15.5 16 12 18.5 8.5 16z"/>
-                                            </svg>
-                                        </div>
-                                        <span>Криптовалюта</span>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div class="balance-card">
-                                <h3 class="card-title">Реферальная программа</h3>
-                                <div class="referral-section">
-                                    <div class="referral-input-group">
-                                        <input type="text" id="referral-code-input" class="referral-input" placeholder="Введите реферальный код">
-                                        <button class="btn btn-secondary" id="apply-referral">Применить</button>
-                                    </div>
-                                    <div class="referral-info">
-                                        <p>Ваш реферальный код: <strong id="user-referral-code">LOADING...</strong></p>
-                                        <p class="referral-description">Поделитесь кодом с друзьями и получите бонусные консультации!</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="balance-card">
-                                <h3 class="card-title">История транзакций</h3>
-                                <div class="transaction-history" id="transaction-history">
-                                    <div class="transaction-item">
-                                        <span class="transaction-type">Пополнение</span>
-                                        <span class="transaction-amount">+5</span>
-                                        <span class="transaction-date">24.05.2025</span>
-                                    </div>
-                                    <div class="transaction-item">
-                                        <span class="transaction-type">Консультация</span>
-                                        <span class="transaction-amount">-1</span>
-                                        <span class="transaction-date">23.05.2025</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Гардероб -->
-                <div id="wardrobe-section" class="content-section hidden">
-                    <div class="wardrobe-container">
-                        <div class="wardrobe-header">
-                            <h2 class="wardrobe-title">Мой гардероб</h2>
-                            <button class="btn btn-primary" id="add-wardrobe-item">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                                </svg>
-                                Добавить предмет
-                            </button>
-                        </div>
-                        
-                        <div class="wardrobe-content">
-                            <div class="wardrobe-filters">
-                                <select class="wardrobe-filter" id="wardrobe-category-filter">
-                                    <option value="">Все категории</option>
-                                    <option value="верх">Верхняя одежда</option>
-                                    <option value="низ">Нижняя одежда</option>
-                                    <option value="обувь">Обувь</option>
-                                    <option value="аксессуары">Аксессуары</option>
-                                </select>
-                                <input type="text" class="wardrobe-search" id="wardrobe-search" placeholder="Поиск по названию...">
-                            </div>
-                            
-                            <div class="wardrobe-grid" id="wardrobe-grid">
-                                <!-- Здесь будут динамически добавляться предметы гардероба -->
-                                <div class="wardrobe-item-placeholder">
-                                    <div class="placeholder-icon">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-                                        </svg>
-                                    </div>
-                                    <p>Ваш гардероб пуст</p>
-                                    <p class="placeholder-subtitle">Добавьте первый предмет одежды</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            <nav class="nav-bar">
-                <a href="#" class="nav-item active" data-page="home">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                        </svg>
-                    </div>
-                    <span class="nav-label">Главная</span>
-                </a>
-                <a href="#" class="nav-item" data-page="history">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M13 3c-4.97 0-9 4.03-9 9H1l4 3.99L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.25 2.52.77-1.28-3.52-2.09V8z"/>
-                        </svg>
-                    </div>
-                    <span class="nav-label">История</span>
-                </a>
-                <a href="#" class="nav-item" data-page="balance">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"/>
-                        </svg>
-                    </div>
-                    <span class="nav-label">Баланс</span>
-                </a>
-                <a href="#" class="nav-item" data-page="wardrobe">
-                    <div class="nav-icon">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M22 2v20l-6-6-6 6-6-6-6 6V2h24zm-11 5H7v2h4V7zm6 0h-4v2h4V7zm-6 4H7v2h4v-2zm6 0h-4v2h4v-2z"/>
-                        </svg>
-                    </div>
-                    <span class="nav-label">Гардероб</span>
-                </a>
-            </nav>
+        <div class="action-buttons">
+            <button id="single-mode-btn" class="action-btn single">
+                📷 Анализ одного образа
+            </button>
+            <button id="compare-mode-btn" class="action-btn compare">
+                🔄 Сравнение образов
+            </button>
         </div>
     </div>
 
-    <!-- Модальные окна -->
-    <div class="overlay" id="consultation-overlay" role="dialog" aria-labelledby="consultation-dialog-title" aria-modal="true">
-        <div class="dialog">
-            <div class="dialog-header">
-                <div class="dialog-title" id="consultation-dialog-title">Получить консультацию</div>
-                <div class="dialog-subtitle">Загрузите фото одежды для анализа</div>
+    <!-- Модальное окно консультации -->
+    <div id="consultation-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title" class="modal-title">Консультация стилиста</h2>
+                <button id="consultation-cancel" class="close-btn">&times;</button>
             </div>
-            <div class="dialog-content">
-                <form id="consultation-form">
-                    <div id="single-analysis-mode" class="analysis-mode" role="tabpanel">
-                        <div class="upload-area" id="single-upload-area" role="button" tabindex="0" aria-label="Загрузить одно фото">
-                            <div class="upload-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" width="36" height="36">
-                                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                </svg>
-                            </div>
-                            <div class="upload-text">Нажмите, чтобы выбрать фото<br>или перетащите файл сюда</div>
-                            <input type="file" id="single-upload-input" class="upload-input" accept="image/*" style="display:none">
-                        </div>
-                        <div class="image-preview-container" id="single-preview-container">
-                            <img id="single-preview-image" class="image-preview" alt="Предпросмотр загруженного изображения">
-                            <div class="delete-image" data-target="single" role="button" tabindex="0" aria-label="Удалить изображение">✕</div>
+
+            <!-- Single режим -->
+            <div id="single-mode" class="upload-mode">
+                <div class="single-upload">
+                    <div id="single-upload-area" class="upload-area">
+                        <div id="single-preview"></div>
+                        <div id="single-upload-text" class="upload-text">
+                            Нажмите или перетащите фото одежды
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div id="compare-analysis-mode" class="analysis-mode hidden" role="tabpanel">
-                        <div class="compare-container">
-                            <div class="image-slots" aria-label="Слоты для сравнения изображений">
-                                <div class="image-slot" data-slot="0" role="button" tabindex="0" aria-label="Загрузить фото 1 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 1">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="0" style="display: none;">
-                                </div>
-                                <div class="image-slot" data-slot="1" role="button" tabindex="0" aria-label="Загрузить фото 2 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 2">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="1" style="display: none;">
-                                </div>
-                                <div class="image-slot" data-slot="2" role="button" tabindex="0" aria-label="Загрузить фото 3 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 3">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="2" style="display: none;">
-                                </div>
-                                <div class="image-slot" data-slot="3" role="button" tabindex="0" aria-label="Загрузить фото 4 для сравнения">
-                                    <div class="upload-icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="24" height="24">
-                                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                                        </svg>
-                                    </div>
-                                    <img class="preview-image" style="display: none;" alt="Предпросмотр изображения 4">
-                                    <input type="file" class="compare-upload-input" accept="image/*" data-slot="3" style="display: none;">
-                                </div>
-                            </div>
-                            <div class="upload-text">Загрузите от 2 до 4 фотографий для сравнения</div>
+            <!-- Compare режим -->
+            <div id="compare-mode" class="upload-mode">
+                <div class="compare-upload">
+                    <h3>Загрузите 2-4 фото для сравнения</h3>
+                    <div class="compare-slots">
+                        <div class="compare-slot" data-slot="0">
+                            <span class="slot-number">1</span>
+                            <span class="add-icon">+</span>
+                        </div>
+                        <div class="compare-slot" data-slot="1">
+                            <span class="slot-number">2</span>
+                            <span class="add-icon">+</span>
+                        </div>
+                        <div class="compare-slot" data-slot="2">
+                            <span class="slot-number">3</span>
+                            <span class="add-icon">+</span>
+                        </div>
+                        <div class="compare-slot" data-slot="3">
+                            <span class="slot-number">4</span>
+                            <span class="add-icon">+</span>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <label for="occasion-selector" class="input-label hidden">Выберите повод:</label>
-                    <select class="occasion-selector" id="occasion-selector" aria-label="Выберите повод">
-                        <option value="повседневный">Повседневный</option>
-                        <option value="деловой">Деловой</option>
-                        <option value="вечеринка">Вечеринка</option>
-                        <option value="свидание">Свидание</option>
-                        <option value="спорт">Спорт/Активный отдых</option>
-                        <option value="особый случай">Особый случай</option>
-                    </select>
+            <!-- Форма консультации -->
+            <div id="consultation-form" class="consultation-form">
+                <div class="form-group">
+                    <label class="form-label" for="occasion">Повод/мероприятие</label>
+                    <input type="text" id="occasion" class="form-input" placeholder="Например: деловая встреча, свидание, прогулка...">
+                </div>
 
-                    <label for="preferences-input" class="input-label hidden">Ваши предпочтения:</label>
-                    <textarea class="preferences-input" id="preferences-input" placeholder="Ваши предпочтения (например: 'люблю яркие цвета', 'ищу деловой образ', 'избегаю облегающего' и т.д.)" aria-label="Ваши предпочтения"></textarea>
+                <div class="form-group">
+                    <label class="form-label" for="preferences">Ваши предпочтения (необязательно)</label>
+                    <textarea id="preferences" class="form-textarea" placeholder="Расскажите о своем стиле, цветовых предпочтениях, особенностях фигуры..."></textarea>
+                </div>
 
-                    <div class="dialog-footer">
-                        <button class="btn btn-primary" id="submit-consultation" type="submit">Проанализировать</button>
-                        <button class="btn btn-secondary" id="consultation-cancel" type="button">Отмена</button>
-                    </div>
-                </form>
+                <div class="form-actions">
+                    <button id="form-cancel" class="btn btn-cancel">Отмена</button>
+                    <button id="form-submit" class="btn btn-submit" disabled>Получить совет</button>
+                </div>
+            </div>
+
+            <!-- Загрузка -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Анализируем ваш образ...</p>
+            </div>
+
+            <!-- Результат -->
+            <div id="result" class="result-section">
+                <h3 class="result-title">Совет стилиста</h3>
+                <div id="result-content" class="result-content"></div>
             </div>
         </div>
     </div>
 
-    <div class="overlay" id="results-overlay" role="dialog" aria-labelledby="results-dialog-title" aria-modal="true">
-        <div class="dialog">
-            <div class="dialog-header">
-                <div class="dialog-title" id="results-dialog-title">Результаты анализа от Мишуры</div>
-            </div>
-            <div class="dialog-content" id="results-container" aria-live="polite"></div>
-            <div class="dialog-footer">
-                <button class="btn btn-primary" id="results-close" role="button">Закрыть</button>
-            </div>
-        </div>
-    </div>
+    <!-- Скрытые file inputs -->
+    <input type="file" id="single-file-input" class="hidden-input" accept="image/*">
+    <input type="file" id="compare-file-input-0" class="hidden-input" accept="image/*">
+    <input type="file" id="compare-file-input-1" class="hidden-input" accept="image/*">
+    <input type="file" id="compare-file-input-2" class="hidden-input" accept="image/*">
+    <input type="file" id="compare-file-input-3" class="hidden-input" accept="image/*">
 
-    <div class="overlay" id="loading-overlay" role="alertdialog" aria-busy="true" aria-live="assertive">
-        <div class="dialog loading-dialog">
-            <div class="loading-indicator">
-                <div class="loading-spinner" aria-hidden="true"></div>
-                <p id="loading-text">Загрузка...</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-    <!-- Скрипты - загружаем в ПРАВИЛЬНОМ порядке -->
-    <script src="js/config.js"></script>
-    <script src="js/utils/logger.js"></script>
-    <script src="js/utils/device-detect.js"></script>
-    <script src="js/utils/ui-helpers.js"></script>
-    <script src="js/utils/api.js"></script>
-    <script src="js/components/modals.js"></script>
-    <script src="js/components/navigation.js"></script>
-    <script src="js/components/image-upload.js"></script>
-    <!-- API Service -->
-    <script src="js/services/api.js"></script>
-    <!-- Компоненты -->
-    <script src="js/features/consultation.js"></script>
-    <script src="js/features/comparison.js"></script>
-    <script src="js/app-init.js"></script>
-    <script src="js/app.js"></script>
-
-    <script>
-        // Единая инициализация приложения
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM загружен, запуск МИШУРА');
-            
-            // Показываем контент после загрузки
-            document.body.classList.add('loaded');
-            
-            // Инициализируем приложение только один раз
-            if (window.MishuraApp && window.MishuraApp.app) {
-                window.MishuraApp.app.init();
-                console.log('🎉 МИШУРА инициализирован');
-            } else {
-                console.error('МИШУРА App не найден!');
-            }
-
-            // Плавная прокрутка для якорных ссылок
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    const href = this.getAttribute('href');
-                    if (href && href !== '#' && href.length > 1) {
-                        e.preventDefault();
-                        const target = document.querySelector(href);
-                        if (target) {
-                            target.scrollIntoView({
-                                behavior: 'smooth'
-                            });
-                        }
-                    }
-                });
-            });
-        });
-    </script>
-
-    <!-- Luxury gold shimmer -->
-    <div class="luxury-shimmer"></div>
+    <script src="logger.js"></script>
+    <script src="api.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

@@ -2,11 +2,13 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Главное приложение (app.js)
-ВЕРСИЯ: 1.1.0 (ИСПРАВЛЕНА ИНИЦИАЛИЗАЦИЯ)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-27
+ВЕРСИЯ: 1.2.0 (ИСПРАВЛЕНА ИНИЦИАЛИЗАЦИЯ API SERVICE)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-31
 
-НАЗНАЧЕНИЕ ФАЙЛА:
-Главный файл приложения, отвечающий за инициализацию всех модулей и координацию их работы.
+ИСПРАВЛЕНИЯ:
+- Исправлена инициализация API Service (правильный путь)
+- Добавлена проверка доступности consultation модуля
+- Улучшена обработка ошибок инициализации
 ==========================================================================================
 */
 
@@ -30,7 +32,7 @@ window.MishuraApp.app = (function() {
             return;
         }
 
-        console.log('🚀 Начало инициализации приложения МИШУРА (app.js v1.1.0)');
+        console.log('🚀 Начало инициализации приложения МИШУРА (app.js v1.2.0)');
         
         // Инициализируем модули по порядку с проверками
         initializeLogger();
@@ -58,7 +60,6 @@ window.MishuraApp.app = (function() {
     
     function initializeLogger() {
         try {
-            // Безопасная проверка существования utils
             if (window.MishuraApp && 
                 window.MishuraApp.utils && 
                 window.MishuraApp.utils.logger) {
@@ -112,16 +113,21 @@ window.MishuraApp.app = (function() {
     
     function initializeAPIService() {
         try {
+            // ИСПРАВЛЕНО: Правильный путь к API Service
             if (window.MishuraApp && 
-                window.MishuraApp.api && 
-                window.MishuraApp.api.service) {
-                apiService = window.MishuraApp.api.service;
+                window.MishuraApp.services && 
+                window.MishuraApp.services.api) {
+                apiService = window.MishuraApp.services.api;
                 if (typeof apiService.init === 'function') {
-                    apiService.init(window.MishuraApp.config);
+                    apiService.init();
                 }
-                console.log('App.js: API Service инициализирован');
+                console.log('App.js: API Service (services.api) инициализирован');
+            } else if (window.MishuraApp && window.MishuraApp.api) {
+                // Fallback: проверяем глобальный API объект
+                apiService = window.MishuraApp.api;
+                console.log('App.js: API Service (global api) найден');
             } else {
-                console.error('App.js: API Service не найден');
+                console.warn('App.js: API Service не найден ни в services, ни в global api');
             }
         } catch (error) {
             console.error('App.js: Ошибка при инициализации API Service:', error);
@@ -175,11 +181,43 @@ window.MishuraApp.app = (function() {
                 }
                 console.log('App.js: Consultation инициализирован');
             } else {
-                console.error('App.js: Consultation не найден');
+                console.error('App.js: Consultation не найден в features');
+                
+                // ДОБАВЛЕНО: Попытка создать fallback consultation
+                console.warn('App.js: Создаем fallback consultation module');
+                createFallbackConsultation();
             }
         } catch (error) {
             console.error('App.js: Ошибка при инициализации Consultation:', error);
+            createFallbackConsultation();
         }
+    }
+    
+    function createFallbackConsultation() {
+        consultation = {
+            openConsultationModal: function(mode = 'single') {
+                console.log('Fallback: Открытие модального окна консультации');
+                
+                if (modals && typeof modals.openConsultationModal === 'function') {
+                    modals.openConsultationModal();
+                    
+                    setTimeout(() => {
+                        setModalMode(mode);
+                    }, 100);
+                } else {
+                    console.error('Fallback: Modals не найден');
+                    if (uiHelpers && typeof uiHelpers.showToast === 'function') {
+                        uiHelpers.showToast('Модальные окна не доступны');
+                    } else {
+                        alert('Модальные окна не доступны');
+                    }
+                }
+            },
+            init: function() {
+                console.log('Fallback consultation init');
+            }
+        };
+        console.log('App.js: Fallback consultation создан');
     }
     
     function initializeComparison() {
@@ -233,16 +271,10 @@ window.MishuraApp.app = (function() {
                 if (dialogTitle) dialogTitle.textContent = 'Сравнить образы';
                 if (dialogSubtitle) dialogSubtitle.textContent = 'Загрузите от 2 до 4 фотографий для сравнения';
             }
-            
-            // ИСПРАВЛЕНИЕ: Stabilize layout после изменений
-            const overlay = document.getElementById('consultation-overlay');
-            if (overlay) {
-                overlay.style.contain = 'layout style';
-            }
         });
         
         document.dispatchEvent(new CustomEvent('modeChanged', { detail: { mode: mode } }));
-        console.log(`App.js: Режим ${mode} установлен без layout shifts`);
+        console.log(`App.js: Режим ${mode} установлен и событие отправлено`);
     }
     
     // Обработчики событий для кнопок
@@ -251,8 +283,7 @@ window.MishuraApp.app = (function() {
         console.log('App.js: Нажата кнопка консультации (single mode)');
         
         if (consultation && typeof consultation.openConsultationModal === 'function') {
-            consultation.openConsultationModal();
-            setTimeout(() => setModalMode('single'), 50);
+            consultation.openConsultationModal('single');
         } else {
             console.error('App.js: Consultation module не найден или метод openConsultationModal недоступен');
             if (uiHelpers && typeof uiHelpers.showToast === 'function') {
@@ -266,8 +297,7 @@ window.MishuraApp.app = (function() {
         console.log('App.js: Нажата кнопка сравнения образов (compare mode)');
         
         if (consultation && typeof consultation.openConsultationModal === 'function') {
-            consultation.openConsultationModal();
-            setTimeout(() => setModalMode('compare'), 50);
+            consultation.openConsultationModal('compare');
         } else {
             console.error('App.js: Consultation module не найден или метод openConsultationModal недоступен');
             if (uiHelpers && typeof uiHelpers.showToast === 'function') {

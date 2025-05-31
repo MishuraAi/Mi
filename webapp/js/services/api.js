@@ -2,10 +2,13 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: API Service - интеграция с Gemini AI (api.js)
-ВЕРСИЯ: 1.0.8 (ПОЛНАЯ ИНТЕГРАЦИЯ)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-29
+ВЕРСИЯ: 1.1.0 (ИСПРАВЛЕНЫ ЭНДПОИНТЫ)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-31
 
-ФУНКЦИИ: Прямая работа с Gemini API через бэкенд на порту 8001
+ИСПРАВЛЕНИЯ:
+- Исправлены URL эндпоинтов в соответствии с бэкендом
+- Обновлен порядок проверки портов
+- Улучшена обработка ошибок
 ==========================================================================================
 */
 
@@ -21,8 +24,8 @@ window.MishuraApp.services.api = (function() {
     // Конфигурация с правильными портами
     const CONFIG = {
         possibleUrls: [
-            'http://localhost:8001/api/v1',  // Основной порт для api.py
-            'http://localhost:8000/api/v1',  // Резервный порт
+            'http://localhost:8000/api/v1',  // ОСНОВНОЙ порт (работает согласно логам)
+            'http://localhost:8001/api/v1',  // Резервный порт
             'https://style-ai-bot.onrender.com/api/v1'  // Продакшн
         ],
         baseUrl: null,
@@ -30,15 +33,15 @@ window.MishuraApp.services.api = (function() {
         retries: 3
     };
     
-    // Endpoints
+    // ИСПРАВЛЕННЫЕ Endpoints в соответствии с бэкендом
     const ENDPOINTS = {
         health: '/health',
-        singleAnalysis: '/analyze/single',
-        compareAnalysis: '/analyze/compare',
+        singleAnalysis: '/analyze-outfit',    // ✅ ИСПРАВЛЕНО
+        compareAnalysis: '/compare-outfits',  // ✅ ИСПРАВЛЕНО
         geminiDirect: '/gemini/analyze'
     };
     
-    // ИСПРАВЛЕННАЯ функция проверки здоровья API
+    // Функция проверки здоровья API
     async function detectWorkingApiUrl() {
         logger.debug('🔍 Автоопределение рабочего API адреса...');
         
@@ -47,7 +50,7 @@ window.MishuraApp.services.api = (function() {
                 logger.debug(`⏳ Проверка ${url}...`);
                 
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000); // Уменьшили таймаут
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
                 
                 const response = await fetch(`${url}/health`, {
                     method: 'GET',
@@ -60,7 +63,7 @@ window.MishuraApp.services.api = (function() {
                 if (response.ok) {
                     const data = await response.json();
                     
-                    // ДОБАВИТЬ: Проверка доступности Gemini через health endpoint
+                    // Проверка доступности Gemini через health endpoint
                     if (data.gemini_ai && data.gemini_ai.status === 'active') {
                         CONFIG.baseUrl = url;
                         logger.info(`✅ Найден рабочий API с активным Gemini: ${url}`);
@@ -92,7 +95,7 @@ window.MishuraApp.services.api = (function() {
         }
         
         logger = window.MishuraApp.utils?.logger || createFallbackLogger();
-        logger.info("🚀 Инициализация API Service v1.0.9 (Auto-detect)");
+        logger.info("🚀 Инициализация API Service v1.1.0 (Fixed Endpoints)");
         
         try {
             // Автоопределяем рабочий API URL
@@ -204,6 +207,7 @@ window.MishuraApp.services.api = (function() {
             formData.append('metadata', JSON.stringify(metadata));
             
             logger.debug("📤 Отправка запроса на анализ...");
+            logger.debug(`🔗 URL: ${CONFIG.baseUrl}${ENDPOINTS.singleAnalysis}`);
             
             const response = await fetchWithTimeout(`${CONFIG.baseUrl}${ENDPOINTS.singleAnalysis}`, {
                 method: 'POST',
@@ -213,6 +217,7 @@ window.MishuraApp.services.api = (function() {
             
             if (!response.ok) {
                 const errorText = await response.text();
+                logger.error(`❌ HTTP ${response.status}: ${errorText}`);
                 throw new Error(`Ошибка анализа: ${response.status} - ${errorText}`);
             }
             
@@ -263,6 +268,7 @@ window.MishuraApp.services.api = (function() {
             formData.append('metadata', JSON.stringify(metadata));
             
             logger.debug("📤 Отправка запроса на сравнение...");
+            logger.debug(`🔗 URL: ${CONFIG.baseUrl}${ENDPOINTS.compareAnalysis}`);
             
             const response = await fetchWithTimeout(`${CONFIG.baseUrl}${ENDPOINTS.compareAnalysis}`, {
                 method: 'POST',
@@ -271,6 +277,7 @@ window.MishuraApp.services.api = (function() {
             
             if (!response.ok) {
                 const errorText = await response.text();
+                logger.error(`❌ HTTP ${response.status}: ${errorText}`);
                 throw new Error(`Ошибка сравнения: ${response.status} - ${errorText}`);
             }
             
@@ -302,14 +309,14 @@ window.MishuraApp.services.api = (function() {
                 return new Promise(resolve => {
                     setTimeout(() => {
                         resolve(getMockSingleAnalysis(imageFile, options));
-                    }, 2000); // Имитируем задержку API
+                    }, 2000);
                 });
             },
             compareImages: (imageFiles, options) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
                         resolve(getMockCompareAnalysis(imageFiles, options));
-                    }, 3000); // Имитируем задержку API
+                    }, 3000);
                 });
             },
             isHealthy: () => Promise.resolve({ status: 'mock', mode: 'demonstration' }),

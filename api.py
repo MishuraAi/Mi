@@ -2,14 +2,14 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: API Сервер (api.py)
-ВЕРСИЯ: 0.5.0 (ИСПРАВЛЕНА СВЯЗЬ С GEMINI)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-27
+ВЕРСИЯ: 0.6.0 (ИСПРАВЛЕНЫ ЭНДПОИНТЫ И ПОРТЫ)
+ДАТА ОБНОВЛЕНИЯ: 2025-05-31
 
 ИСПРАВЛЕНИЯ:
-- Восстановлена связь с Gemini AI
-- Исправлены эндпоинты для фронтенда
-- Улучшена обработка ошибок
-- Добавлена валидация файлов
+- Добавлены эндпоинты /analyze/single и /analyze/compare для фронтенда
+- Исправлен порт с 8001 на 8000 (соответствие .env)
+- Улучшена проверка Gemini connection
+- Добавлен async test_gemini_connection
 ==========================================================================================
 """
 import os
@@ -79,7 +79,7 @@ if not os.path.exists(index_html_path) or not os.path.isfile(index_html_path):
 app = FastAPI(
     title="МИШУРА - API ИИ-Стилиста",
     description="API для поддержки Telegram Mini App 'МИШУРА', предоставляющего консультации по стилю с использованием Gemini AI.",
-    version="0.5.0"
+    version="0.6.0"
 )
 
 # Настройка CORS - РАСШИРЕННАЯ для фронтенда
@@ -87,10 +87,12 @@ CORS_ORIGINS = [
     "https://style-ai-bot.onrender.com",
     "https://web.telegram.org",
     "https://t.me",
-    "http://localhost:8000",  # Для фронтенда
-    "http://localhost:8001",  # Для API
+    "http://localhost:8000",  # Для фронтенда и API
+    "http://localhost:8001",  # Для резервного API
+    "http://localhost:3000",  # Для фронтенда разработки
     "http://127.0.0.1:8000",
-    "http://127.0.0.1:8001"
+    "http://127.0.0.1:8001",
+    "http://127.0.0.1:3000"
 ]
 
 app.add_middleware(
@@ -119,6 +121,28 @@ class AnalysisRequest(BaseModel):
 class ComparisonRequest(BaseModel):
     occasion: str
     preferences: Optional[str] = ""
+
+# Функция тестирования Gemini connection
+async def test_gemini_connection():
+    """Тестирует соединение с Gemini AI"""
+    try:
+        if not GEMINI_AVAILABLE:
+            return False, "Gemini модуль не импортирован"
+        
+        # Создаем тестовое изображение (1x1 пиксель PNG)
+        test_image_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xddɎ\xdb\x00\x00\x00\x00IEND\xaeB`\x82'
+        
+        # Быстрый тест анализа
+        result = await analyze_clothing_image(test_image_data, "тест", "")
+        
+        if "ошибка" in result.lower() or "error" in result.lower():
+            return False, result
+        
+        return True, "Gemini AI доступен и работает"
+        
+    except Exception as e:
+        logger.error(f"Ошибка тестирования Gemini: {e}")
+        return False, f"Ошибка подключения: {str(e)}"
 
 # Корневой маршрут для перенаправления на веб-приложение
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -182,6 +206,8 @@ async def api_root():
         "redoc_url": "/redoc"
     }
 
+# === ОСНОВНЫЕ ЭНДПОИНТЫ (НОВЫЕ) ===
+
 @api_v1.post("/analyze-outfit", summary="Анализ одного предмета одежды", tags=["AI Analysis"])
 async def analyze_outfit_endpoint(
     image: UploadFile = File(...),
@@ -199,29 +225,7 @@ async def analyze_outfit_endpoint(
                 content={
                     "status": "error", 
                     "message": "ИИ-сервис временно недоступен. Проверьте GEMINI_API_KEY в настройках.",
-                    "code": "GEMINI_UNAVAILABLE",
-                    "details": {
-                        "service": "Gemini AI",
-                        "reason": "API ключ не настроен или недействителен"
-                    }
-                }
-            )
-
-        # Тест соединения перед анализом
-        connection_ok, connection_msg = await test_gemini_connection()
-        if not connection_ok:
-            logger.error(f"Gemini недоступен: {connection_msg}")
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "error",
-                    "message": f"ИИ-сервис недоступен: {connection_msg}",
-                    "code": "GEMINI_CONNECTION_FAILED",
-                    "details": {
-                        "service": "Gemini AI",
-                        "error": connection_msg,
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    "code": "GEMINI_UNAVAILABLE"
                 }
             )
 
@@ -233,52 +237,15 @@ async def analyze_outfit_endpoint(
                 content={
                     "status": "error", 
                     "message": "Некорректный файл изображения",
-                    "code": "INVALID_IMAGE",
-                    "details": {
-                        "allowed_types": ["image/jpeg", "image/png", "image/webp"],
-                        "max_size": "10MB",
-                        "received_type": image.content_type,
-                        "received_size": f"{image.size} bytes" if hasattr(image, 'size') else "unknown"
-                    }
+                    "code": "INVALID_IMAGE"
                 }
             )
 
         # Читаем и анализируем
-        try:
-            image_data = await image.read()
-            logger.info(f"Изображение прочитано, размер: {len(image_data)} байт")
-        except Exception as e:
-            logger.error(f"Ошибка чтения файла: {e}")
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "status": "error",
-                    "message": "Не удалось прочитать файл изображения",
-                    "code": "FILE_READ_ERROR",
-                    "details": {
-                        "error": str(e),
-                        "file_name": image.filename
-                    }
-                }
-            )
+        image_data = await image.read()
+        logger.info(f"Изображение прочитано, размер: {len(image_data)} байт")
         
-        try:
-            advice = await analyze_clothing_image(image_data, occasion, preferences)
-        except Exception as e:
-            logger.error(f"Ошибка при анализе изображения: {e}")
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "error",
-                    "message": "Ошибка при обработке изображения ИИ-моделью",
-                    "code": "AI_PROCESSING_ERROR",
-                    "details": {
-                        "error": str(e),
-                        "occasion": occasion,
-                        "timestamp": datetime.now().isoformat()
-                    }
-                }
-            )
+        advice = await analyze_clothing_image(image_data, occasion, preferences)
         
         # Проверка на ошибки в ответе ИИ
         if is_error_message(advice):
@@ -288,12 +255,7 @@ async def analyze_outfit_endpoint(
                 content={
                     "status": "error", 
                     "message": advice,
-                    "code": "AI_RESPONSE_ERROR",
-                    "details": {
-                        "raw_response": advice,
-                        "occasion": occasion,
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    "code": "AI_RESPONSE_ERROR"
                 }
             )
         
@@ -316,20 +278,15 @@ async def analyze_outfit_endpoint(
             content={
                 "status": "error", 
                 "message": "Внутренняя ошибка сервера при обработке изображения",
-                "code": "INTERNAL_ERROR",
-                "details": {
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "timestamp": datetime.now().isoformat()
-                }
+                "code": "INTERNAL_ERROR"
             }
         )
 
 @api_v1.post("/compare-outfits", summary="Сравнение нескольких предметов одежды", tags=["AI Analysis"])
 async def compare_outfits_endpoint(
-    images: List[UploadFile] = File(..., description="Список из 2-5 фотографий предметов одежды для сравнения."),
-    occasion: str = Form(..., description="Повод/ситуация, для которой подбирается одежда."),
-    preferences: str = Form("", description="Дополнительные предпочтения пользователя (опционально).")
+    images: List[UploadFile] = File(...),
+    occasion: str = Form(...),
+    preferences: str = Form("")
 ):
     logger.info(f"Получен запрос на сравнение. Количество изображений: {len(images)}, Повод: '{occasion}'")
     
@@ -390,16 +347,61 @@ async def compare_outfits_endpoint(
             content={"status": "error", "message": f"Внутренняя ошибка сервера: {str(e)}"}
         )
 
+# === ФРОНТЕНД ЭНДПОИНТЫ (НОВЫЕ - для совместимости с api.js) ===
+
+@api_v1.post("/analyze/single", summary="Анализ одного предмета одежды (Frontend)", tags=["Frontend API"])
+async def analyze_single_frontend(
+    image: UploadFile = File(...),
+    occasion: str = Form(""),
+    preferences: str = Form(""),
+    metadata: str = Form("{}")
+):
+    """Эндпоинт специально для фронтенда - /api/v1/analyze/single"""
+    logger.info(f"Получен запрос от фронтенда на анализ. Повод: '{occasion}'")
+    
+    # Перенаправляем на основной обработчик
+    return await analyze_outfit_endpoint(image, occasion, preferences)
+
+@api_v1.post("/analyze/compare", summary="Сравнение нескольких предметов одежды (Frontend)", tags=["Frontend API"])
+async def analyze_compare_frontend(
+    image_0: UploadFile = File(...),
+    image_1: UploadFile = File(...),
+    image_2: UploadFile = File(None),
+    image_3: UploadFile = File(None),
+    image_4: UploadFile = File(None),
+    occasion: str = Form(""),
+    preferences: str = Form(""),
+    metadata: str = Form("{}")
+):
+    """Эндпоинт специально для фронтенда - /api/v1/analyze/compare"""
+    logger.info(f"Получен запрос от фронтенда на сравнение. Повод: '{occasion}'")
+    
+    # Собираем только загруженные изображения
+    images = [image_0, image_1]
+    for img in [image_2, image_3, image_4]:
+        if img and img.filename:
+            images.append(img)
+    
+    logger.info(f"Обработка {len(images)} изображений для сравнения")
+    
+    # Перенаправляем на основной обработчик
+    return await compare_outfits_endpoint(images, occasion, preferences)
+
 @api_v1.get("/health", summary="Проверка состояния сервера", tags=["System"])
 async def health_check():
     """Эндпоинт для проверки состояния сервера"""
+    
+    # Проверяем Gemini connection
+    gemini_connection, gemini_message = await test_gemini_connection()
+    
     health_status = {
         "status": "healthy",
         "version": app.version,
         "timestamp": datetime.now().isoformat(),
         "gemini_ai": {
             "available": GEMINI_AVAILABLE,
-            "status": "active" if GEMINI_AVAILABLE else "unavailable"
+            "status": "active" if gemini_connection else "unavailable",
+            "message": gemini_message
         },
         "system": {
             "platform": platform.platform(),
@@ -408,16 +410,17 @@ async def health_check():
     }
     
     # Если Gemini недоступен, возвращаем предупреждение, но сервер считается работающим
-    if not GEMINI_AVAILABLE:
-        health_status["warnings"] = ["Gemini AI module not available - check GEMINI_API_KEY"]
+    if not GEMINI_AVAILABLE or not gemini_connection:
+        health_status["warnings"] = [gemini_message]
     
     return health_status
 
 # Подключаем роутер API v1 к основному приложению
 app.include_router(api_v1)
 
-# Добавляем endpoint'ы для обратной совместимости с веб-приложением
-@app.post("/api/analyze", summary="Анализ одного предмета одежды (совместимость)", tags=["AI Analysis"])
+# === LEGACY ЭНДПОИНТЫ (для обратной совместимости) ===
+
+@app.post("/api/analyze", summary="Анализ одного предмета одежды (совместимость)", tags=["Legacy API"])
 async def analyze_outfit_legacy(
     image: UploadFile = File(...),
     occasion: str = Form(...),
@@ -430,7 +433,7 @@ async def analyze_outfit_legacy(
     # Перенаправляем на новый endpoint
     return await analyze_outfit_endpoint(image, occasion, preferences)
 
-@app.post("/api/compare", summary="Сравнение нескольких предметов одежды (совместимость)", tags=["AI Analysis"])
+@app.post("/api/compare", summary="Сравнение нескольких предметов одежды (совместимость)", tags=["Legacy API"])
 async def compare_outfits_legacy(
     images: List[UploadFile] = File(...),
     occasion: str = Form(...),
@@ -465,7 +468,16 @@ async def debug_info():
             "webapp_directory": WEBAPP_DIR,
             "webapp_exists": os.path.exists(WEBAPP_DIR)
         },
-        "cors_origins": CORS_ORIGINS
+        "cors_origins": CORS_ORIGINS,
+        "available_endpoints": {
+            "api_v1": "/api/v1/",
+            "health": "/api/v1/health",
+            "analyze_outfit": "/api/v1/analyze-outfit",
+            "compare_outfits": "/api/v1/compare-outfits",
+            "analyze_single": "/api/v1/analyze/single",
+            "analyze_compare": "/api/v1/analyze/compare",
+            "webapp": "/webapp/"
+        }
     }
 
 # Обработчик ошибок 404
@@ -481,6 +493,8 @@ async def not_found_handler(request: Request, exc):
                 "health": "/api/v1/health",
                 "analyze": "/api/v1/analyze-outfit",
                 "compare": "/api/v1/compare-outfits",
+                "analyze_single": "/api/v1/analyze/single",  # ✅ ДОБАВЛЕНО
+                "analyze_compare": "/api/v1/analyze/compare", # ✅ ДОБАВЛЕНО
                 "webapp": "/webapp/"
             }
         }
@@ -493,11 +507,15 @@ if __name__ == "__main__":
         logger.warning("GEMINI_API_KEY не установлен! ИИ функции будут недоступны.")
         logger.warning("Добавьте GEMINI_API_KEY в файл .env для работы с Gemini AI")
     
+    # ИСПРАВЛЕНО: Порт изменен с 8001 на 8000 (соответствие .env)
+    port = int(os.getenv("BACKEND_PORT", "8000"))
+    logger.info(f"Запуск API сервера на порту {port}")
+    
     # Запускаем сервер
     uvicorn.run(
         "api:app",
         host="0.0.0.0",
-        port=8001,  # Порт 8001 для API
+        port=port,  # ✅ ИСПРАВЛЕНО: Теперь используется порт 8000
         reload=True,
         log_level="info"
     )

@@ -28,7 +28,7 @@ from PIL import Image, ImageOps, ImageDraw # ImageDraw для тестового
 from io import BytesIO
 from typing import Optional, List, Tuple, Union, Dict, Any
 from fastapi import UploadFile  # Добавлен импорт UploadFile
-from cache_manager import AnalysisCacheManager # Предполагаем, что он есть и работает
+# from cache_manager import AnalysisCacheManager # Временно отключено для запуска без ошибок
 
 # Настройка логирования
 logger_gemini = logging.getLogger(__name__)
@@ -67,31 +67,14 @@ RETRY_DELAY = 5 # Немного увеличена задержка для ст
 
 # Инициализация менеджера кэша
 CACHE_ENABLED = False # По умолчанию кэш выключен, если менеджер не инициализируется
-cache_manager = None
-try:
-    cache_manager = AnalysisCacheManager() # Используем параметры по умолчанию из cache_manager.py
-    CACHE_ENABLED = True
-    logger_gemini.info("Менеджер кэша AnalysisCacheManager успешно инициализирован.")
-except ImportError:
-    logger_gemini.warning("Модуль cache_manager.py не найден. Кэширование будет ОТКЛЮЧЕНО.")
-    class DummyCacheManager: # Заглушка для работы без кэша
-        def get_from_cache(self, *args: Any, **kwargs: Any) -> None: 
-            logger_gemini.debug("DummyCache: get_from_cache вызван.")
-            return None
-        def save_to_cache(self, *args: Any, **kwargs: Any) -> None: 
-            logger_gemini.debug("DummyCache: save_to_cache вызван.")
-    cache_manager = DummyCacheManager()
-except Exception as e_cache:
-    logger_gemini.error(f"Ошибка при инициализации AnalysisCacheManager: {e_cache}. Кэширование будет ОТКЛЮЧЕНО.", exc_info=True)
-    if not isinstance(cache_manager, DummyCacheManager): # Если заглушка не была создана
-        class DummyCacheManagerOnError:
-            def get_from_cache(self, *args: Any, **kwargs: Any) -> None: 
-                logger_gemini.debug("DummyCacheOnError: get_from_cache вызван.")
-                return None
-            def save_to_cache(self, *args: Any, **kwargs: Any) -> None: 
-                logger_gemini.debug("DummyCacheOnError: save_to_cache вызван.")
-        cache_manager = DummyCacheManagerOnError()
+# cache_manager = AnalysisCacheManager() # Временно отключено
+cache_manager = DummyCacheManager()
 
+class DummyCacheManager:
+    def get_from_cache(self, *args, **kwargs):
+        return None
+    def save_to_cache(self, *args, **kwargs):
+        pass
 
 async def test_gemini_connection() -> Tuple[bool, str]:
     """

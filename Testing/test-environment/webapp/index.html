@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>✨ МИШУРА - Твой ИИ-Стилист</title>
+    <title>✨ МИШУРА - Твой Стилист</title>
     <style>
         :root {
             /* Luxury Black & Gold Theme */
@@ -830,7 +830,6 @@
             line-height: 1.7;
             color: var(--text-light);
             border-left: 4px solid var(--gold-primary);
-            margin-bottom: 20px;
         }
 
         .result-content h4 {
@@ -879,52 +878,6 @@
             border-radius: 12px;
             border-left: 4px solid #dc3545;
             font-weight: 500;
-        }
-
-        /* НОВОЕ: Кнопки навигации результатов (из тестирования) */
-        .result-navigation {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin-top: 20px;
-        }
-
-        .result-nav-btn {
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 0.9rem;
-            position: relative;
-            z-index: 10001;
-        }
-
-        .result-nav-btn.secondary {
-            background: var(--accent-black);
-            color: var(--text-light);
-            border: 1px solid var(--border-gold);
-        }
-
-        .result-nav-btn.secondary:hover {
-            background: var(--secondary-black);
-            border-color: var(--gold-secondary);
-            color: var(--gold-secondary);
-        }
-
-        .result-nav-btn.primary {
-            background: var(--gold-gradient);
-            color: var(--text-dark);
-            border: none;
-            box-shadow: var(--shadow-gold);
-        }
-
-        .result-nav-btn.primary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--glow-gold), var(--shadow-black);
-            filter: brightness(1.1);
         }
 
         /* Notifications */
@@ -1002,10 +955,6 @@
                 flex-direction: column;
             }
 
-            .result-navigation {
-                flex-direction: column;
-            }
-
             .notification {
                 right: 12px;
                 left: 12px;
@@ -1032,8 +981,7 @@
         @media (hover: none) and (pointer: coarse) {
             .action-btn:active,
             .nav-btn:active,
-            .btn:active,
-            .result-nav-btn:active {
+            .btn:active {
                 transform: scale(0.95);
                 transition: transform 0.1s ease;
             }
@@ -1228,20 +1176,10 @@
                 <p class="loading-text">Анализируем ваш образ...</p>
             </div>
 
-            <!-- Результат с навигационными кнопками (НОВОЕ ИЗ ТЕСТИРОВАНИЯ) -->
+            <!-- Результат -->
             <div id="result" class="result-section">
                 <h3 class="result-title">💎 Совет стилиста</h3>
                 <div id="result-content" class="result-content"></div>
-                
-                <!-- Кнопки навигации после результата -->
-                <div class="result-navigation">
-                    <button id="result-back" class="result-nav-btn secondary">
-                        ← Назад к выбору
-                    </button>
-                    <button id="result-new" class="result-nav-btn primary">
-                        🆕 Новый анализ
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -1253,9 +1191,7 @@
     <input type="file" id="compare-file-input-2" class="hidden-input" accept="image/jpeg,image/png,image/webp">
     <input type="file" id="compare-file-input-3" class="hidden-input" accept="image/jpeg,image/png,image/webp">
 
-    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ -->
     <script src="logger.js"></script>
-    <script src="mock-api.js"></script>
     <script src="api.js"></script>
     <script src="app.js"></script>
 </body>

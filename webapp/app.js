@@ -1566,15 +1566,28 @@ class MishuraApp {
         }
     }
 
-    // 🔄 Compare загрузчик
+    // 🔄 Compare загрузчик (ИСПРАВЛЕННАЯ ВЕРСИЯ)
     setupCompareUploader() {
-        for (let i = 0; i < 4; i++) {
-            const slot = document.getElementById(`compare-slot-${i}`);
+        // ИСПРАВЛЕНИЕ: Используем querySelectorAll и добавляем ID если нет
+        const slots = document.querySelectorAll('.compare-slot');
+        
+        slots.forEach((slot, i) => {
+            // Убеждаемся что у слота есть ID
+            if (!slot.id) {
+                slot.id = `compare-slot-${i}`;
+                console.log(`🔧 Добавлен ID: compare-slot-${i}`);
+            }
+            
             const fileInput = document.getElementById(`compare-file-input-${i}`);
             
             if (slot && fileInput) {
+                // Удаляем старые обработчики клонированием
+                const newSlot = slot.cloneNode(true);
+                slot.parentNode.replaceChild(newSlot, slot);
+                
                 // Клик по слоту открывает файловый диалог
-                slot.addEventListener('click', () => {
+                newSlot.addEventListener('click', () => {
+                    console.log(`🔄 Клик по слоту ${i}`);
                     fileInput.click();
                 });
                 
@@ -1582,11 +1595,20 @@ class MishuraApp {
                 fileInput.addEventListener('change', (event) => {
                     const file = event.target.files[0];
                     if (file) {
+                        console.log(`📁 Файл выбран для слота ${i}:`, file.name);
                         this.handleCompareFile(file, i);
                     }
+                    // Очищаем input для возможности повторного выбора того же файла
+                    event.target.value = '';
                 });
+                
+                console.log(`✅ Слот ${i} настроен с ID`);
+            } else {
+                console.warn(`⚠️ Слот ${i} или input не найден`);
             }
-        }
+        });
+        
+        console.log('🔄 Compare uploader настроен с автоматическим добавлением ID');
     }
 
     // 📷 Обработка одного файла

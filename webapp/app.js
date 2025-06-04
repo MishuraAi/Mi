@@ -1549,3 +1549,407 @@ class MishuraApp {
     setupSingleUploader() {
         const preview = document.getElementById('single-preview');
         const fileInput = document.getElementById('single-file-input');
+        
+        if (preview && fileInput) {
+            // Клик по превью открывает файловый диалог
+            preview.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            // Обработка выбора файла
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    this.handleSingleFile(file);
+                }
+            });
+        }
+    }
+
+    // 🔄 Compare загрузчик
+    setupCompareUploader() {
+        for (let i = 0; i < 4; i++) {
+            const slot = document.getElementById(`compare-slot-${i}`);
+            const fileInput = document.getElementById(`compare-file-input-${i}`);
+            
+            if (slot && fileInput) {
+                // Клик по слоту открывает файловый диалог
+                slot.addEventListener('click', () => {
+                    fileInput.click();
+                });
+                
+                // Обработка выбора файла
+                fileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.handleCompareFile(file, i);
+                    }
+                });
+            }
+        }
+    }
+
+    // 📷 Обработка одного файла
+    handleSingleFile(file) {
+        console.log('📷 Обработка single файла:', file.name);
+        
+        if (!this.validateFile(file)) return;
+        
+        this.singleImage = file;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = document.getElementById('single-preview');
+            if (preview) {
+                preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    border-radius: 12px;
+                ">`;
+                preview.classList.add('has-image');
+            }
+            
+            this.showForm();
+            this.updateSubmitButton();
+            this.triggerHapticFeedback('light');
+        };
+        
+        reader.readAsDataURL(file);
+    }
+
+    // 🔄 Обработка файла для сравнения
+    handleCompareFile(file, slotIndex) {
+        console.log(`🔄 Обработка compare файла в слот ${slotIndex}:`, file.name);
+        
+        if (!this.validateFile(file)) return;
+        
+        this.compareImages[slotIndex] = file;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const slot = document.getElementById(`compare-slot-${slotIndex}`);
+            if (slot) {
+                slot.innerHTML = `<img src="${e.target.result}" alt="Compare ${slotIndex + 1}" style="
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    border-radius: 12px;
+                ">`;
+                slot.classList.add('has-image');
+            }
+            
+            // Показываем форму если загружено минимум 2 изображения
+            const loadedImages = this.compareImages.filter(img => img !== null).length;
+            if (loadedImages >= 2) {
+                this.showForm();
+            }
+            
+            this.updateSubmitButton();
+            this.triggerHapticFeedback('light');
+        };
+        
+        reader.readAsDataURL(file);
+    }
+
+    // ✅ Валидация файлов
+    validateFile(file) {
+        // Проверка типа файла
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            this.showNotification('❌ Поддерживаются только JPEG, PNG и WebP форматы', 'error');
+            this.triggerHapticFeedback('error');
+            return false;
+        }
+        
+        // Проверка размера файла (максимум 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            this.showNotification('❌ Размер файла не должен превышать 10MB', 'error');
+            this.triggerHapticFeedback('error');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // 📢 Система уведомлений
+    showNotification(message, type = 'info', duration = 3000) {
+        // Удаляем существующие уведомления
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(notif => notif.remove());
+        
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        
+        const icons = {
+            'success': '✅',
+            'error': '❌',
+            'warning': '⚠️',
+            'info': 'ℹ️'
+        };
+        
+        const colors = {
+            'success': '#10B981',
+            'error': '#EF4444',
+            'warning': '#F59E0B',
+            'info': '#3B82F6'
+        };
+        
+        notification.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${colors[type]};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                max-width: 90vw;
+                animation: slideInDown 0.3s ease;
+            ">
+                <span>${icons[type]}</span>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        // Добавляем стили анимации если их нет
+        if (!document.getElementById('notification-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'notification-styles';
+            styles.textContent = `
+                @keyframes slideInDown {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-100%);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+                
+                @keyframes slideOutUp {
+                    from {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                    to {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-100%);
+                    }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        document.body.appendChild(notification);
+        
+        // Автоматическое скрытие
+        setTimeout(() => {
+            const notificationElement = notification.querySelector('div');
+            if (notificationElement) {
+                notificationElement.style.animation = 'slideOutUp 0.3s ease forwards';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }
+        }, duration);
+    }
+
+    // 📊 Получение аналитики
+    getAnalytics() {
+        return {
+            ...this.analytics,
+            uptime: Date.now() - this.analytics.appStartTime,
+            userBalance: this.userBalance,
+            consultationsTotal: this.consultationsHistory.length,
+            currentMode: this.currentMode,
+            currentSection: this.currentSection,
+            apiStatus: this.api ? 'connected' : 'disconnected',
+            isMockAPI: this.api && this.api.isMock || false
+        };
+    }
+
+    // 🎯 Сброс приложения в исходное состояние
+    reset() {
+        console.log('🔄 Сброс приложения...');
+        
+        this.closeModal();
+        this.clearImages();
+        this.currentMode = null;
+        this.isLoading = false;
+        this.lastAnalysisResult = null;
+        
+        // Возвращаемся на главную
+        this.navigateToSection('home');
+        
+        console.log('✅ Приложение сброшено');
+    }
+
+    // 🔧 Диагностика
+    diagnose() {
+        const diagnosis = {
+            timestamp: new Date().toISOString(),
+            version: '2.1.0',
+            initialization: this.initializationComplete,
+            api: {
+                connected: !!this.api,
+                type: this.api ? (this.api.isMock ? 'Mock' : 'Real') : 'None',
+                methods: this.api ? Object.getOwnPropertyNames(Object.getPrototypeOf(this.api)) : []
+            },
+            state: {
+                currentMode: this.currentMode,
+                currentSection: this.currentSection,
+                isLoading: this.isLoading,
+                hasImages: {
+                    single: !!this.singleImage,
+                    compare: this.compareImages.filter(img => img !== null).length
+                }
+            },
+            user: {
+                balance: this.userBalance,
+                consultationsUsed: this.consultationsUsed,
+                historyCount: this.consultationsHistory.length
+            },
+            analytics: this.getAnalytics(),
+            domElements: {
+                overlay: !!document.getElementById('consultation-overlay'),
+                singlePreview: !!document.getElementById('single-preview'),
+                compareSlots: document.querySelectorAll('.compare-slot').length,
+                form: !!document.getElementById('consultation-form'),
+                submitButton: !!document.getElementById('form-submit')
+            }
+        };
+        
+        console.log('🔧 Диагностика МИШУРЫ:', diagnosis);
+        return diagnosis;
+    }
+}
+
+// === ИНИЦИАЛИЗАЦИЯ И ЭКСПОРТ ===
+
+// Ждем загрузки DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeMishuraApp();
+    });
+} else {
+    // DOM уже загружен
+    initializeMishuraApp();
+}
+
+function initializeMishuraApp() {
+    try {
+        // ПАТЧ V2: Проверяем что приложение еще не создано
+        if (window.mishuraApp) {
+            console.log('⚠️ MishuraApp уже существует, пропускаем создание');
+            return;
+        }
+        
+        console.log('🎬 Создание экземпляра MishuraApp...');
+        window.mishuraApp = new MishuraApp();
+        
+        // Глобальные утилиты для отладки
+        window.mishuraUtils = {
+            diagnose: () => window.mishuraApp.diagnose(),
+            reset: () => window.mishuraApp.reset(),
+            analytics: () => window.mishuraApp.getAnalytics(),
+            testNotification: (message, type) => window.mishuraApp.showNotification(message, type),
+            
+            // Быстрые тесты
+            testSingle: () => {
+                window.mishuraApp.openSingleModal();
+                setTimeout(() => {
+                    const occasionInput = document.getElementById('occasion');
+                    if (occasionInput) occasionInput.value = '💼 Деловая встреча';
+                    window.mishuraApp.updateSubmitButton();
+                }, 100);
+            },
+            
+            testCompare: () => {
+                window.mishuraApp.openCompareModal();
+                setTimeout(() => {
+                    const occasionInput = document.getElementById('occasion');
+                    if (occasionInput) occasionInput.value = '🎉 Вечеринка';
+                    window.mishuraApp.updateSubmitButton();
+                }, 100);
+            }
+        };
+        
+        console.log(`
+🎉 === МИШУРА ГОТОВА К РАБОТЕ ===
+
+📋 ДОСТУПНЫЕ КОМАНДЫ В КОНСОЛИ:
+• mishuraUtils.diagnose() - диагностика приложения
+• mishuraUtils.analytics() - статистика использования  
+• mishuraUtils.reset() - сброс состояния
+• mishuraUtils.testSingle() - тест single режима
+• mishuraUtils.testCompare() - тест compare режима
+
+🎯 ТЕКУЩЕЕ СОСТОЯНИЕ:
+• Версия: 2.1.0 с патчами V2
+• API: ${window.mishuraApp.api ? (window.mishuraApp.api.isMock ? 'Mock (демо)' : 'Реальный') : 'Не подключен'}
+• Баланс: ${window.mishuraApp.userBalance} консультаций
+• Timeout: ${window.mishuraApp.requestTimeout / 1000} секунд
+
+✨ Приложение полностью загружено и готово к использованию!
+        `);
+        
+    } catch (error) {
+        console.error('❌ Критическая ошибка инициализации МИШУРЫ:', error);
+        
+        // Показываем ошибку пользователю
+        document.body.innerHTML = `
+            <div style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                background: #1a1a1a;
+                color: #ffffff;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                text-align: center;
+                padding: 20px;
+            ">
+                <div style="font-size: 3rem; margin-bottom: 20px;">⚠️</div>
+                <h1 style="color: #ef4444; margin-bottom: 16px;">Ошибка загрузки МИШУРЫ</h1>
+                <p style="color: #a1a1aa; margin-bottom: 20px; max-width: 500px;">
+                    Произошла критическая ошибка при инициализации приложения. 
+                    Пожалуйста, обновите страницу или обратитесь к разработчику.
+                </p>
+                <button onclick="location.reload()" style="
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 600;
+                ">🔄 Обновить страницу</button>
+                <details style="margin-top: 20px; color: #71717a;">
+                    <summary style="cursor: pointer;">Техническая информация</summary>
+                    <pre style="
+                        background: #262626;
+                        padding: 12px;
+                        border-radius: 6px;
+                        margin-top: 8px;
+                        font-size: 0.8rem;
+                        text-align: left;
+                        overflow-x: auto;
+                    ">${error.stack || error.message}</pre>
+                </details>
+            </div>
+        `;
+    }
+}
+
+console.log('📦 МИШУРА App модуль загружен успешно!');

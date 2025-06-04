@@ -69,36 +69,34 @@ class MishuraApp {
         setTimeout(() => this.init(), 100);
     }
 
-    // ПАТЧ V2: Исправленная инициализация API с fallback на Mock
-    initializeAPI() {
+    // ПАТЧ V2: Асинхронная инициализация API с healthcheck и fallback на Mock
+    async initializeAPI() {
         try {
-            // Сначала пытаемся подключить реальный API
-            if (window.MishuraAPIService && !window.MishuraAPIService.isMock) {
+            // Проверяем доступность реального API через healthcheck
+            let healthCheck = null;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                healthCheck = await fetch('/api/v1/health', { signal: controller.signal });
+                clearTimeout(timeoutId);
+            } catch (e) {
+                healthCheck = null;
+            }
+
+            if (healthCheck && healthCheck.ok) {
+                // Используем реальный API
                 this.api = new window.MishuraAPIService();
-                console.log('✅ Реальный API экземпляр создан:', this.api);
-            } 
-            // Fallback на Mock API если реальный недоступен
-            else if (window.MockMishuraAPIService) {
+                console.log('✅ Реальный API подключен');
+            } else {
+                // Fallback на Mock API
                 this.api = new window.MockMishuraAPIService();
-                console.log('⚠️ Используется Mock API для демо-режима:', this.api);
-                this.showNotification('🧪 Демо-режим: используется Mock API', 'info', 3000);
-            } 
-            // Если есть старый API клиент
-            else if (window.mishuraAPI) {
-                this.api = window.mishuraAPI;
-                console.log('✅ Существующий API клиент подключен:', this.api);
-            } 
-            // Последняя попытка
-            else {
-                console.warn('⚠️ API клиент не найден, будет повторная попытка...');
-                // ПАТЧ V2: Повторная попытка через 1 секунду
-                setTimeout(() => {
-                    this.initializeAPI();
-                }, 1000);
+                console.log('🎭 Автоматический переход на Mock API');
+                this.showNotification('🧪 Демо-режим активирован', 'info', 3000);
             }
         } catch (error) {
-            console.error('❌ Ошибка инициализации API:', error);
-            this.api = null;
+            // В случае любой ошибки используем Mock
+            this.api = new window.MockMishuraAPIService();
+            console.log('🎭 Mock API активирован из-за ошибки:', error);
         }
     }
 

@@ -524,15 +524,19 @@ async def shutdown_event():
 if __name__ == "__main__":
     logger.info(f"🎯 Запуск в режиме: {ENVIRONMENT}")
     
-    # Render использует переменную PORT
+    # Render автоматически устанавливает переменную PORT
     render_port = os.environ.get('PORT')
     if render_port:
         PORT = int(render_port)
+        logger.info(f"🌐 Render PORT обнаружен: {PORT}")
+    else:
+        logger.info(f"🏠 Локальный PORT: {PORT}")
     
-    # Настройки для Render
+    # Настройки для uvicorn
     uvicorn.run(
         "api:app",
         host=HOST,
         port=PORT,
-        log_level="info" if ENVIRONMENT == "production" else "debug"
+        log_level="info" if ENVIRONMENT == "production" else "debug",
+        reload=False  # Отключаем reload в продакшне
     )

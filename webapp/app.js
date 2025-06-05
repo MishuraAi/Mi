@@ -72,13 +72,17 @@ class MishuraApp {
     // ПАТЧ V2: Асинхронная инициализация API с healthcheck и fallback на Mock
     async initializeAPI() {
         try {
-            // Проверяем доступность реального API через healthcheck
             let healthCheck = null;
+            
+            // Определяем URL API в зависимости от окружения
+            const apiUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:8080/api/v1/health'
+                : 'https://mishura-api.onrender.com/api/v1/health';  // ← Ваш API URL
+            
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                // ИСПРАВЛЕНО: Проверяем правильный порт 8080
-                healthCheck = await fetch('http://localhost:8080/api/v1/health', { signal: controller.signal });
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                healthCheck = await fetch(apiUrl, { signal: controller.signal });
                 clearTimeout(timeoutId);
             } catch (e) {
                 healthCheck = null;
@@ -92,10 +96,8 @@ class MishuraApp {
                 // Fallback на Mock API
                 this.api = new window.MockMishuraAPIService();
                 console.log('🎭 Автоматический переход на Mock API');
-                this.showNotification('🧪 Демо-режим активирован', 'info', 3000);
             }
         } catch (error) {
-            // В случае любой ошибки используем Mock
             this.api = new window.MockMishuraAPIService();
             console.log('🎭 Mock API активирован из-за ошибки:', error);
         }

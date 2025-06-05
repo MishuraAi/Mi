@@ -91,11 +91,13 @@ window.MishuraApp.config = (function() {
     }
     
     function detectApiUrl() {
-        // Для production принудительно используем localhost:8080
-        if (CONFIG.PRODUCTION || CONFIG.ENVIRONMENT === 'production') {
-            CONFIG.API.BASE_URL = 'http://localhost:8080/api/v1';
-            CONFIG.API.PORT = 8080;
-            logger.info('Production: API установлен на localhost:8080');
+        if (CONFIG.PRODUCTION) {
+            // На production используем внешний API
+            if (window.location.hostname === 'localhost') {
+                CONFIG.API.BASE_URL = 'http://localhost:8080/api/v1';
+            } else {
+                CONFIG.API.BASE_URL = 'https://mishura-api.onrender.com/api/v1';  // ← Ваш API URL
+            }
             return;
         }
         

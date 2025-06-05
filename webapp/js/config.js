@@ -18,12 +18,12 @@ window.MishuraApp.config = (function() {
     const CONFIG = {
         // API настройки для production
         API: {
-            POSSIBLE_PORTS: [8000, 8001],
+            POSSIBLE_PORTS: [8080, 8000, 8001],
             POSSIBLE_HOSTS: ['https://style-ai-bot.onrender.com'],
             VERSION: 'v1',
             TIMEOUT: 30000,
             RETRIES: 1,
-            BASE_URL: 'https://style-ai-bot.onrender.com/api/v1',
+            BASE_URL: 'http://localhost:8080/api/v1',
             PORT: 8000
         },
         
@@ -91,12 +91,15 @@ window.MishuraApp.config = (function() {
     }
     
     function detectApiUrl() {
-        if (CONFIG.PRODUCTION) {
-            CONFIG.API.BASE_URL = 'https://style-ai-bot.onrender.com/api/v1';
+        // Для production принудительно используем localhost:8080
+        if (CONFIG.PRODUCTION || CONFIG.ENVIRONMENT === 'production') {
+            CONFIG.API.BASE_URL = 'http://localhost:8080/api/v1';
+            CONFIG.API.PORT = 8080;
+            logger.info('Production: API установлен на localhost:8080');
             return;
         }
         
-        // Для development и demo пробуем локальные порты
+        // Для development и demo пробуем разные порты
         for (const port of CONFIG.API.POSSIBLE_PORTS) {
             const url = `http://localhost:${port}/api/v1`;
             
@@ -116,8 +119,8 @@ window.MishuraApp.config = (function() {
         }
         
         if (!CONFIG.API.BASE_URL) {
-            CONFIG.API.BASE_URL = 'http://localhost:8000/api/v1';
-            CONFIG.API.PORT = 8000;
+            CONFIG.API.BASE_URL = 'http://localhost:8080/api/v1';
+            CONFIG.API.PORT = 8080;
         }
     }
     

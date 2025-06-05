@@ -1,534 +1,523 @@
+#!/usr/bin/env python3
 """
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: API Сервер (api.py)
-ВЕРСИЯ: 0.6.1 (ИСПРАВЛЕНА СИНТАКСИЧЕСКАЯ ОШИБКА)
-ДАТА ОБНОВЛЕНИЯ: 2025-05-31
+КОМПОНЕНТ: Production API сервер (api.py)
+ВЕРСИЯ: 1.2.0
+ДАТА СОЗДАНИЯ: 2025-06-05
 
-ИСПРАВЛЕНИЯ:
-- Убрана проблемная байтовая строка
-- Упрощена функция test_gemini_connection
-- Исправлена совместимость с Python 3.11
-- Готово для продакшна и Render
+НАЗНАЧЕНИЕ:
+FastAPI сервер для обработки запросов анализа изображений через Gemini AI
+Предоставляет REST API для веб-приложения МИШУРЫ
+
+ЭНДПОИНТЫ:
+- GET /api/v1/health - проверка состояния сервера
+- POST /api/v1/analyze - анализ одного изображения
+- POST /api/v1/compare - сравнение нескольких изображений
+- GET /api/v1/status - статус Gemini AI
 ==========================================================================================
 """
+
 import os
-import logging
-import platform
 import sys
-from datetime import datetime
-from fastapi import FastAPI, File, UploadFile, Form, Request, APIRouter, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from dotenv import load_dotenv
-import uvicorn
-from pydantic import BaseModel
-from typing import Dict, Any, Optional, List
 import asyncio
+from datetime import datetime
+from pathlib import Path
+import logging
+import base64
+import json
+from typing import Optional, List, Dict, Any
+import uvicorn
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+import google.generativeai as genai
+from PIL import Image
+import io
 
-# Попытка импорта модулей проекта
+# Добавляем текущую директорию в путь для импорта database.py
+sys.path.append(str(Path(__file__).parent))
+
 try:
-    from gemini_ai import analyze_clothing_image, compare_clothing_images
-    GEMINI_AVAILABLE = True
-    logging.info("Gemini AI модуль успешно импортирован")
-except ImportError as e:
-    logging.critical(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось импортировать модуль gemini_ai. {e}")
-    GEMINI_AVAILABLE = False
-    
-    # Заглушки для функций ИИ
-    async def analyze_clothing_image(image_data, occasion, preferences=None):
-        logging.error("Функция analyze_clothing_image не доступна из-за ошибки импорта gemini_ai.")
-        return "Ошибка сервера: ИИ-модуль не инициализирован. Проверьте настройки Gemini API."
-    
-    async def compare_clothing_images(image_data_list, occasion, preferences=None):
-        logging.error("Функция compare_clothing_images не доступна из-за ошибки импорта gemini_ai.")
-        return "Ошибка сервера: ИИ-модуль не инициализирован. Проверьте настройки Gemini API."
+    import database
+except ImportError:
+    print("❌ ОШИБКА: Не удалось импортировать database.py")
+    print("💡 Убедитесь, что файл database.py находится в той же папке")
+    sys.exit(1)
 
-# Настройка стандартного логирования Python
+# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - [%(levelname)s] - %(name)s - (%(filename)s).%(funcName)s(%(lineno)d): %(message)s",
+    format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s',
+    handlers=[
+        logging.FileHandler('api_server.log', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger("MishuraAPI")
 
-logger.info("Запуск API сервера для проекта МИШУРА...")
+# Загрузка переменных окружения
+from dotenv import load_dotenv
+load_dotenv()
 
-# Загрузка переменных окружения из .env файла
-if load_dotenv():
-    logger.info("Переменные окружения из .env файла успешно загружены.")
-else:
-    logger.warning("Файл .env не найден или пуст. Используются системные переменные окружения (если установлены).")
+# Конфигурация
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+HOST = os.getenv('HOST', '0.0.0.0')
+PORT = int(os.getenv('BACKEND_PORT', 8000))
 
-# Директория веб-приложения
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-WEBAPP_DIR = os.path.join(BASE_DIR, "webapp")
-logger.info(f"Определена директория веб-приложения: {WEBAPP_DIR}")
-
-# Проверяем существование директории webapp
-if not os.path.exists(WEBAPP_DIR) or not os.path.isdir(WEBAPP_DIR):
-    logger.critical(f"Директория веб-приложения '{WEBAPP_DIR}' не найдена!")
-    raise RuntimeError(f"Директория веб-приложения '{WEBAPP_DIR}' не найдена!")
-
-# Проверяем существование index.html
-index_html_path = os.path.join(WEBAPP_DIR, "index.html")
-if not os.path.exists(index_html_path) or not os.path.isfile(index_html_path):
-    logger.critical(f"Основной файл webapp/index.html не найден по пути: {index_html_path}")
-    raise RuntimeError(f"Основной файл webapp/index.html не найден по пути: {index_html_path}")
-
+# Создание FastAPI приложения
 app = FastAPI(
-    title="МИШУРА - API ИИ-Стилиста",
-    description="API для поддержки Telegram Mini App 'МИШУРА', предоставляющего консультации по стилю с использованием Gemini AI.",
-    version="0.6.1"
+    title="МИШУРА ИИ-Стилист API",
+    description="API для анализа стиля одежды с помощью Google Gemini AI",
+    version="1.2.0",
+    docs_url="/api/v1/docs" if DEBUG else None,
+    redoc_url="/api/v1/redoc" if DEBUG else None
 )
 
-# Настройка CORS - РАСШИРЕННАЯ для фронтенда
-CORS_ORIGINS = [
-    "https://style-ai-bot.onrender.com",
-    "https://web.telegram.org",
-    "https://t.me",
-    "http://localhost:8000",  # Для фронтенда и API
-    "http://localhost:8001",  # Для резервного API
-    "http://localhost:3000",  # Для фронтенда разработки
-    "http://127.0.0.1:8000",
-    "http://127.0.0.1:8001",
-    "http://127.0.0.1:3000"
-]
+# Настройка CORS
+if ENVIRONMENT == 'production':
+    origins = [
+        "https://style-ai-bot.onrender.com",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"
+    ]
+else:
+    origins = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000"
+    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
-    allow_headers=[
-        "Content-Type",
-        "Authorization",
-        "Accept",
-        "Origin",
-        "X-Requested-With",
-        "X-Telegram-Init-Data"
-    ],
-    max_age=3600,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
 )
 
-logger.info(f"CORS middleware настроен. Разрешенные домены: {CORS_ORIGINS}")
+# Инициализация Gemini AI
+gemini_configured = False
+gemini_model = None
 
-# Модели данных для валидации
-class AnalysisRequest(BaseModel):
-    occasion: str
-    preferences: Optional[str] = ""
-
-class ComparisonRequest(BaseModel):
-    occasion: str
-    preferences: Optional[str] = ""
-
-# ИСПРАВЛЕННАЯ функция тестирования Gemini connection
-async def test_gemini_connection():
-    """Тестирует соединение с Gemini AI - упрощенная версия"""
+def init_gemini():
+    """Инициализация Gemini AI"""
+    global gemini_configured, gemini_model
+    
     try:
-        if not GEMINI_AVAILABLE:
-            return False, "Gemini модуль не импортирован"
+        if not GEMINI_API_KEY:
+            logger.error("❌ GEMINI_API_KEY не найден в переменных окружения")
+            return False
         
-        # Вместо тестового изображения просто проверяем доступность API ключа
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        if not gemini_key:
-            return False, "GEMINI_API_KEY не установлен"
+        genai.configure(api_key=GEMINI_API_KEY)
+        gemini_model = genai.GenerativeModel(GEMINI_MODEL)
         
-        if len(gemini_key) < 20:  # Минимальная проверка валидности ключа
-            return False, "GEMINI_API_KEY некорректен"
+        # Тестовый запрос
+        test_response = gemini_model.generate_content("Test connection")
         
-        # Если модуль импортирован и ключ есть, считаем что все ОК
-        return True, "Gemini AI доступен"
+        gemini_configured = True
+        logger.info(f"✅ Gemini AI подключен успешно (модель: {GEMINI_MODEL})")
+        return True
         
     except Exception as e:
-        logger.error(f"Ошибка тестирования Gemini: {e}")
-        return False, f"Ошибка подключения: {str(e)}"
-
-# Корневой маршрут для перенаправления на веб-приложение
-@app.get("/", response_class=HTMLResponse, include_in_schema=False)
-async def root():
-    logger.info("Обращение к корневому URL (/), перенаправление на /webapp/")
-    return HTMLResponse(content=f"""
-        <html>
-            <head>
-                <meta http-equiv="refresh" content="0;url=/webapp/">
-                <title>Перенаправление на МИШУРА</title>
-            </head>
-            <body>
-                <p>Перенаправление на <a href="/webapp/">МИШУРА - ИИ Стилист</a>...</p>
-            </body>
-        </html>
-    """)
-
-# Монтируем статические файлы
-app.mount("/webapp", StaticFiles(directory=WEBAPP_DIR, html=True), name="webapp")
-logger.info(f"Статические файлы из директории '{WEBAPP_DIR}' смонтированы по пути /webapp")
-
-# Создаем подгруппу API v1
-api_v1 = APIRouter(prefix="/api/v1")
-
-# Вспомогательные функции
-def validate_image_file(file: UploadFile) -> bool:
-    """Валидация загружаемого файла изображения"""
-    if not file:
+        logger.error(f"❌ Ошибка подключения к Gemini AI: {e}")
+        gemini_configured = False
         return False
+
+# Модели данных
+class AnalyzeRequest(BaseModel):
+    occasion: str = "повседневный"
+    preferences: Optional[str] = None
+    user_id: Optional[int] = None
+
+class CompareRequest(BaseModel):
+    occasion: str = "повседневный"
+    preferences: Optional[str] = None
+    user_id: Optional[int] = None
+
+class HealthResponse(BaseModel):
+    status: str
+    service: str
+    version: str
+    gemini_configured: bool
+    gemini_working: bool
+    environment: str
+    timestamp: str
+
+# Утилиты для работы с изображениями
+def process_image(image_data: bytes) -> Image.Image:
+    """Обработка изображения"""
+    try:
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Конвертируем в RGB если нужно
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Изменяем размер если изображение слишком большое
+        max_size = 1024
+        if max(image.size) > max_size:
+            image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        
+        return image
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка обработки изображения: {e}")
+        raise HTTPException(status_code=400, detail="Некорректный формат изображения")
+
+async def analyze_with_gemini(image: Image.Image, occasion: str, preferences: str = None) -> str:
+    """Анализ изображения с помощью Gemini AI"""
+    try:
+        if not gemini_configured:
+            raise HTTPException(status_code=503, detail="Gemini AI недоступен")
+        
+        # Формируем промпт для анализа
+        prompt = f"""
+Ты - профессиональный стилист МИШУРА. Проанализируй это изображение одежды и дай подробную консультацию.
+
+ПОВОД: {occasion}
+{'ПРЕДПОЧТЕНИЯ: ' + preferences if preferences else ''}
+
+Анализируй:
+1. Стиль и тип одежды
+2. Цветовая гамма и сочетания
+3. Соответствие поводу
+4. Аксессуары и дополнения
+5. Улучшения и рекомендации
+
+Ответь в формате markdown с заголовками и списками. Будь конкретным и полезным.
+Начни с эмодзи 🎭 и названия "Анализ от МИШУРЫ".
+"""
+        
+        # Отправляем запрос к Gemini
+        response = await asyncio.to_thread(
+            gemini_model.generate_content, 
+            [prompt, image]
+        )
+        
+        if not response.text:
+            raise Exception("Пустой ответ от Gemini")
+        
+        logger.info("✅ Анализ Gemini AI выполнен успешно")
+        return response.text
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка анализа Gemini: {e}")
+        # Возвращаем fallback ответ
+        return f"""
+# 🎭 Анализ от МИШУРЫ
+
+## ⚠️ Временные технические неполадки
+
+К сожалению, сейчас наш ИИ-стилист временно недоступен. 
+
+**Повод:** {occasion}
+
+**Общие рекомендации:**
+- Убедитесь, что одежда чистая и хорошо сидит
+- Сочетайте не более 3 основных цветов
+- Добавьте один яркий акцент
+- Не забудьте про аксессуары
+
+*Попробуйте анализ через несколько минут.*
+"""
+
+async def compare_with_gemini(images: List[Image.Image], occasion: str, preferences: str = None) -> str:
+    """Сравнение нескольких образов с помощью Gemini AI"""
+    try:
+        if not gemini_configured:
+            raise HTTPException(status_code=503, detail="Gemini AI недоступен")
+        
+        prompt = f"""
+Ты - профессиональный стилист МИШУРА. Сравни эти {len(images)} образа и определи лучший для данного случая.
+
+ПОВОД: {occasion}
+{'ПРЕДПОЧТЕНИЯ: ' + preferences if preferences else ''}
+
+Для каждого образа анализируй:
+1. Стиль и общее впечатление  
+2. Соответствие поводу
+3. Цветовые сочетания
+4. Практичность и комфорт
+
+Выведи результат:
+1. РЕЙТИНГ (от лучшего к худшему)
+2. ОБОСНОВАНИЕ выбора для каждого
+3. РЕКОМЕНДАЦИИ по улучшению
+
+Ответь в формате markdown. Начни с эмодзи 🏆 и "Сравнение образов от МИШУРЫ".
+"""
+        
+        # Подготавливаем контент для отправки
+        content = [prompt] + images
+        
+        response = await asyncio.to_thread(
+            gemini_model.generate_content,
+            content
+        )
+        
+        if not response.text:
+            raise Exception("Пустой ответ от Gemini")
+        
+        logger.info(f"✅ Сравнение {len(images)} образов выполнено успешно")
+        return response.text
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка сравнения Gemini: {e}")
+        return f"""
+# 🏆 Сравнение образов от МИШУРЫ
+
+## ⚠️ Временные технические неполадки
+
+Не удалось провести полное сравнение {len(images)} образов.
+
+**Повод:** {occasion}
+
+**Общие принципы выбора:**
+1. Соответствие дресс-коду события
+2. Комфорт и практичность
+3. Гармония цветов и стилей
+4. Ваша уверенность в образе
+
+*Попробуйте сравнение через несколько минут.*
+"""
+
+# API эндпоинты
+@app.get("/api/v1/health", response_model=HealthResponse)
+async def health_check():
+    """Проверка состояния сервера"""
     
-    # Проверяем MIME тип
-    allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
-    if file.content_type not in allowed_types:
-        return False
+    # Проверяем работоспособность Gemini
+    gemini_working = False
+    if gemini_configured:
+        try:
+            test_response = await asyncio.to_thread(
+                gemini_model.generate_content, 
+                "Test"
+            )
+            gemini_working = bool(test_response.text)
+        except:
+            gemini_working = False
     
-    # Проверяем размер (максимум 10MB)
-    if hasattr(file, 'size') and file.size > 10 * 1024 * 1024:
-        return False
-    
-    return True
+    return HealthResponse(
+        status="healthy",
+        service="МИШУРА ИИ-Стилист API",
+        version="1.2.0",
+        gemini_configured=gemini_configured,
+        gemini_working=gemini_working,
+        environment=ENVIRONMENT,
+        timestamp=datetime.now().isoformat()
+    )
 
-def is_error_message(text: str) -> bool:
-    """Проверяет, является ли текст сообщением об ошибке"""
-    error_indicators = [
-        "ошибка", "error", "не удалось", "failed", 
-        "недоступно", "unavailable", "превышен лимит",
-        "не инициализирован", "not initialized"
-    ]
-    return any(indicator in text.lower() for indicator in error_indicators)
-
-@api_v1.get("/", summary="Корневой эндпоинт API", tags=["General"])
-async def api_root():
-    logger.info("Обращение к корневому эндпоинту API (/api/v1/).")
-    return {
-        "project": "МИШУРА - ИИ Стилист",
-        "message": "API сервера 'МИШУРА' успешно запущен и готов к работе!",
-        "version": app.version,
-        "gemini_available": GEMINI_AVAILABLE,
-        "webapp_status": "Веб-приложение доступно по адресу /webapp/",
-        "docs_url": "/docs", 
-        "redoc_url": "/redoc"
-    }
-
-# === ОСНОВНЫЕ ЭНДПОИНТЫ (НОВЫЕ) ===
-
-@api_v1.post("/analyze-outfit", summary="Анализ одного предмета одежды", tags=["AI Analysis"])
-async def analyze_outfit_endpoint(
-    image: UploadFile = File(...),
-    occasion: str = Form(...),
-    preferences: str = Form(""),
+@app.post("/api/v1/analyze")
+async def analyze_clothing(
+    request: Request,
+    file: UploadFile = File(...),
+    occasion: str = Form("повседневный"),
+    preferences: Optional[str] = Form(None),
+    user_id: Optional[int] = Form(None)
 ):
-    logger.info(f"Получен запрос на анализ. Повод: '{occasion}'")
+    """Анализ одного изображения одежды"""
+    
+    logger.info(f"📤 Получен запрос на анализ: {file.filename}, повод: {occasion}")
     
     try:
-        # Проверка доступности Gemini перед обработкой
-        if not GEMINI_AVAILABLE:
-            logger.error("Gemini AI недоступен при запросе анализа")
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "error", 
-                    "message": "ИИ-сервис временно недоступен. Проверьте GEMINI_API_KEY в настройках.",
-                    "code": "GEMINI_UNAVAILABLE"
-                }
-            )
-
-        # Валидация файла
-        if not validate_image_file(image):
-            logger.error("Ошибка валидации файла изображения")
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "status": "error", 
-                    "message": "Некорректный файл изображения",
-                    "code": "INVALID_IMAGE"
-                }
-            )
-
-        # Читаем и анализируем
-        image_data = await image.read()
-        logger.info(f"Изображение прочитано, размер: {len(image_data)} байт")
+        # Проверяем тип файла
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="Файл должен быть изображением")
         
-        advice = await analyze_clothing_image(image_data, occasion, preferences)
+        # Читаем и обрабатываем изображение
+        image_data = await file.read()
+        image = process_image(image_data)
         
-        # Проверка на ошибки в ответе ИИ
-        if is_error_message(advice):
-            logger.error(f"Ошибка от ИИ-модуля: {advice}")
-            return JSONResponse(
-                status_code=503, 
-                content={
-                    "status": "error", 
-                    "message": advice,
-                    "code": "AI_RESPONSE_ERROR"
-                }
-            )
+        # Анализируем с помощью Gemini
+        advice = await analyze_with_gemini(image, occasion, preferences)
         
-        logger.info("Анализ от Gemini AI успешно получен")
-        return {
-            "status": "success", 
+        # Сохраняем консультацию в базу данных
+        consultation_id = None
+        if user_id:
+            try:
+                consultation_id = database.save_consultation(
+                    user_id=user_id,
+                    occasion=occasion,
+                    preferences=preferences,
+                    image_path=file.filename,
+                    advice=advice
+                )
+                
+                # Списываем баланс
+                database.update_user_balance(user_id, -1)
+                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на 1")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка сохранения в БД: {e}")
+        
+        response_data = {
+            "status": "success",
             "advice": advice,
             "metadata": {
+                "consultation_id": consultation_id,
                 "occasion": occasion,
                 "preferences": preferences,
                 "timestamp": datetime.now().isoformat(),
-                "processing_time": "~2-3 секунды"
+                "model": GEMINI_MODEL,
+                "environment": ENVIRONMENT
             }
         }
         
+        logger.info(f"✅ Анализ завершен успешно (ID: {consultation_id})")
+        return JSONResponse(content=response_data)
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Критическая ошибка при анализе: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error", 
-                "message": "Внутренняя ошибка сервера при обработке изображения",
-                "code": "INTERNAL_ERROR"
-            }
-        )
+        logger.error(f"❌ Ошибка анализа: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
 
-@api_v1.post("/compare-outfits", summary="Сравнение нескольких предметов одежды", tags=["AI Analysis"])
-async def compare_outfits_endpoint(
-    images: List[UploadFile] = File(...),
-    occasion: str = Form(...),
-    preferences: str = Form("")
+@app.post("/api/v1/compare")
+async def compare_clothing(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    occasion: str = Form("повседневный"),
+    preferences: Optional[str] = Form(None),
+    user_id: Optional[int] = Form(None)
 ):
-    logger.info(f"Получен запрос на сравнение. Количество изображений: {len(images)}, Повод: '{occasion}'")
+    """Сравнение нескольких образов"""
+    
+    logger.info(f"📤 Получен запрос на сравнение: {len(files)} изображений, повод: {occasion}")
     
     try:
-        # Валидация количества изображений
-        if len(images) < 2 or len(images) > 5:
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "message": "Необходимо загрузить от 2 до 5 изображений для сравнения."}
-            )
-
-        # Проверяем доступность Gemini
-        if not GEMINI_AVAILABLE:
-            logger.error("Gemini AI недоступен для сравнения")
-            return JSONResponse(
-                status_code=503,
-                content={"status": "error", "message": "ИИ-модуль временно недоступен. Проверьте настройки Gemini API."}
-            )
-
-        # Валидация и чтение файлов
-        image_data_list = []
-        for i, img_file in enumerate(images):
-            if not validate_image_file(img_file):
-                logger.error(f"Ошибка валидации файла {i+1}: {img_file.filename}")
-                return JSONResponse(
-                    status_code=400,
-                    content={"status": "error", "message": f"Некорректный файл изображения #{i+1}: {img_file.filename}"}
-                )
+        if len(files) < 2:
+            raise HTTPException(status_code=400, detail="Нужно минимум 2 изображения для сравнения")
+        
+        if len(files) > 4:
+            raise HTTPException(status_code=400, detail="Максимум 4 изображения для сравнения")
+        
+        # Обрабатываем все изображения
+        images = []
+        for file in files:
+            if not file.content_type.startswith('image/'):
+                raise HTTPException(status_code=400, detail=f"Файл {file.filename} не является изображением")
             
-            image_data = await img_file.read()
-            if not image_data:
-                return JSONResponse(
-                    status_code=400,
-                    content={"status": "error", "message": f"Файл изображения #{i+1} пуст."}
+            image_data = await file.read()
+            image = process_image(image_data)
+            images.append(image)
+        
+        # Сравниваем с помощью Gemini
+        advice = await compare_with_gemini(images, occasion, preferences)
+        
+        # Сохраняем консультацию в базу данных
+        consultation_id = None
+        if user_id:
+            try:
+                filenames = ", ".join([f.filename for f in files])
+                consultation_id = database.save_consultation(
+                    user_id=user_id,
+                    occasion=occasion,
+                    preferences=preferences,
+                    image_path=filenames,
+                    advice=advice
                 )
-            image_data_list.append(image_data)
+                
+                # Списываем баланс (сравнение стоит больше)
+                cost = len(files)  # 1 консультация за каждое изображение
+                database.update_user_balance(user_id, -cost)
+                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на {cost}")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка сохранения в БД: {e}")
         
-        logger.info(f"Все {len(image_data_list)} изображений прочитаны. Вызов Gemini AI...")
-        
-        # Вызываем сравнение
-        advice = await compare_clothing_images(image_data_list, occasion, preferences)
-        
-        # Проверяем на ошибки в ответе
-        if is_error_message(advice):
-            logger.error(f"Ошибка от ИИ-модуля при сравнении: {advice}")
-            return JSONResponse(
-                status_code=503, 
-                content={"status": "error", "message": advice}
-            )
-        
-        logger.info("Сравнение от Gemini AI успешно получено")
-        return {"status": "success", "advice": advice}
-        
-    except Exception as e:
-        logger.error(f"Критическая ошибка при обработке сравнения: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": f"Внутренняя ошибка сервера: {str(e)}"}
-        )
-
-# === ФРОНТЕНД ЭНДПОИНТЫ (НОВЫЕ - для совместимости с api.js) ===
-
-@api_v1.post("/analyze/single", summary="Анализ одного предмета одежды (Frontend)", tags=["Frontend API"])
-async def analyze_single_frontend(
-    image: UploadFile = File(...),
-    occasion: str = Form(""),
-    preferences: str = Form(""),
-    metadata: str = Form("{}")
-):
-    """Эндпоинт специально для фронтенда - /api/v1/analyze/single"""
-    logger.info(f"Получен запрос от фронтенда на анализ. Повод: '{occasion}'")
-    
-    # Перенаправляем на основной обработчик
-    return await analyze_outfit_endpoint(image, occasion, preferences)
-
-@api_v1.post("/analyze/compare", summary="Сравнение нескольких предметов одежды (Frontend)", tags=["Frontend API"])
-async def analyze_compare_frontend(
-    image_0: UploadFile = File(...),
-    image_1: UploadFile = File(...),
-    image_2: UploadFile = File(None),
-    image_3: UploadFile = File(None),
-    image_4: UploadFile = File(None),
-    occasion: str = Form(""),
-    preferences: str = Form(""),
-    metadata: str = Form("{}")
-):
-    """Эндпоинт специально для фронтенда - /api/v1/analyze/compare"""
-    logger.info(f"Получен запрос от фронтенда на сравнение. Повод: '{occasion}'")
-    
-    # Собираем только загруженные изображения
-    images = [image_0, image_1]
-    for img in [image_2, image_3, image_4]:
-        if img and img.filename:
-            images.append(img)
-    
-    logger.info(f"Обработка {len(images)} изображений для сравнения")
-    
-    # Перенаправляем на основной обработчик
-    return await compare_outfits_endpoint(images, occasion, preferences)
-
-# --- Новый универсальный health endpoint ---
-from fastapi import Request
-
-api_status = {
-    "gemini_working": True,  # Можно доработать динамически
-    "server_startup_time": datetime.now().isoformat(),
-    "total_requests": 0,
-    "successful_requests": 0,
-    "failed_requests": 0
-}
-API_CONFIGURED_SUCCESSFULLY = True  # Можно доработать динамически
-
-@app.get("/health")
-@app.head("/health")  # Добавляем поддержку HEAD запросов
-async def health_check(request: Request):
-    """Проверка состояния сервера (поддерживает GET и HEAD)"""
-    api_status["total_requests"] += 1
-    try:
-        api_status["successful_requests"] += 1
-        return JSONResponse({
-            "status": "healthy",
-            "service": "МИШУРА ИИ-Стилист API",
-            "version": "1.2.0",
-            "gemini_configured": API_CONFIGURED_SUCCESSFULLY,
-            "gemini_working": api_status["gemini_working"],
-            "uptime": api_status["server_startup_time"],
-            "statistics": {
-                "total_requests": api_status["total_requests"],
-                "successful_requests": api_status["successful_requests"],
-                "failed_requests": api_status["failed_requests"]
+        response_data = {
+            "status": "success",
+            "advice": advice,
+            "metadata": {
+                "consultation_id": consultation_id,
+                "occasion": occasion,
+                "preferences": preferences,
+                "images_count": len(files),
+                "timestamp": datetime.now().isoformat(),
+                "model": GEMINI_MODEL,
+                "environment": ENVIRONMENT
             }
-        })
-    except Exception:
-        api_status["failed_requests"] += 1
-        return JSONResponse({"status": "error"}, status_code=500)
-
-# Подключаем роутер API v1 к основному приложению
-app.include_router(api_v1)
-
-# === LEGACY ЭНДПОИНТЫ (для обратной совместимости) ===
-
-@app.post("/api/analyze", summary="Анализ одного предмета одежды (совместимость)", tags=["Legacy API"])
-async def analyze_outfit_legacy(
-    image: UploadFile = File(...),
-    occasion: str = Form(...),
-    preferences: str = Form(""),
-    mode: str = Form("single")
-):
-    """Endpoint для обратной совместимости с веб-приложением"""
-    logger.info(f"Получен запрос на /api/analyze (legacy). Режим: '{mode}', Повод: '{occasion}'")
-    
-    # Перенаправляем на новый endpoint
-    return await analyze_outfit_endpoint(image, occasion, preferences)
-
-@app.post("/api/compare", summary="Сравнение нескольких предметов одежды (совместимость)", tags=["Legacy API"])
-async def compare_outfits_legacy(
-    images: List[UploadFile] = File(...),
-    occasion: str = Form(...),
-    preferences: str = Form("")
-):
-    """Endpoint для обратной совместимости с веб-приложением"""
-    logger.info(f"Получен запрос на /api/compare (legacy). Количество изображений: {len(images)}")
-    
-    # Перенаправляем на новый endpoint
-    return await compare_outfits_endpoint(images, occasion, preferences)
-
-@app.get("/debug/info", summary="Отладочная информация", tags=["Debug"])
-async def debug_info():
-    logger.info("Запрошена отладочная информация (/debug/info).")
-    return {
-        "project_name": "МИШУРА - ИИ Стилист",
-        "api_version": app.version,
-        "timestamp_utc": datetime.utcnow().isoformat() + "Z",
-        "gemini_ai": {
-            "module_imported": GEMINI_AVAILABLE,
-            "status": "ready" if GEMINI_AVAILABLE else "not_available"
-        },
-        "environment": {
-            "python_version": sys.version,
-            "platform": platform.platform(),
-            "working_directory": os.getcwd(),
-            "webapp_directory": WEBAPP_DIR,
-            "webapp_exists": os.path.exists(WEBAPP_DIR)
-        },
-        "cors_origins": CORS_ORIGINS,
-        "available_endpoints": {
-            "api_v1": "/api/v1/",
-            "health": "/api/v1/health",
-            "analyze_outfit": "/api/v1/analyze-outfit",
-            "compare_outfits": "/api/v1/compare-outfits",
-            "analyze_single": "/api/v1/analyze/single",
-            "analyze_compare": "/api/v1/analyze/compare",
-            "webapp": "/webapp/"
         }
+        
+        logger.info(f"✅ Сравнение завершено успешно (ID: {consultation_id})")
+        return JSONResponse(content=response_data)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка сравнения: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сравнения: {str(e)}")
+
+@app.get("/api/v1/status")
+async def get_status():
+    """Получение статуса сервера и Gemini AI"""
+    return {
+        "api_status": "online",
+        "gemini_status": "connected" if gemini_configured else "disconnected",
+        "environment": ENVIRONMENT,
+        "model": GEMINI_MODEL if gemini_configured else None,
+        "timestamp": datetime.now().isoformat()
     }
 
-# Обработчик ошибок 404
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={
-            "status": "error",
-            "message": f"Эндпоинт {request.url.path} не найден",
-            "available_endpoints": {
-                "api_v1": "/api/v1/",
-                "health": "/api/v1/health",
-                "analyze": "/api/v1/analyze-outfit",
-                "compare": "/api/v1/compare-outfits",
-                "analyze_single": "/api/v1/analyze/single",
-                "analyze_compare": "/api/v1/analyze/compare",
-                "webapp": "/webapp/"
-            }
-        }
-    )
-
-# --- Исправленная обработка порта ---
-def get_clean_port():
-    raw_port = os.getenv("PORT", os.getenv("BACKEND_PORT", "8000"))
-    # Удаляем комментарии и пробелы
-    clean_port = raw_port.split("#")[0].strip()
+# События жизненного цикла
+@app.on_event("startup")
+async def startup_event():
+    """Инициализация при запуске сервера"""
+    logger.info("🚀 Запуск МИШУРА API сервера...")
+    logger.info(f"📋 Среда: {ENVIRONMENT}")
+    logger.info(f"🌐 Хост: {HOST}:{PORT}")
+    
+    # Инициализируем базу данных
     try:
-        return int(clean_port)
-    except Exception:
-        return 8000  # fallback
+        if database.init_db():
+            logger.info("✅ База данных инициализирована")
+        else:
+            logger.error("❌ Ошибка инициализации базы данных")
+    except Exception as e:
+        logger.error(f"❌ Ошибка подключения к БД: {e}")
+    
+    # Инициализируем Gemini AI
+    if init_gemini():
+        logger.info("✅ Gemini AI готов к работе")
+    else:
+        logger.warning("⚠️ Gemini AI недоступен, работаем в режиме fallback")
+    
+    logger.info("🎭 МИШУРА API сервер полностью готов!")
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Очистка ресурсов при остановке"""
+    logger.info("🛑 Остановка МИШУРА API сервера...")
+
+# Запуск сервера
 if __name__ == "__main__":
-    # Проверяем наличие Gemini API ключа при запуске
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if not gemini_key:
-        logger.warning("GEMINI_API_KEY не установлен! ИИ функции будут недоступны.")
-        logger.warning("Добавьте GEMINI_API_KEY в файл .env для работы с Gemini AI")
+    logger.info(f"🎯 Запуск в режиме: {ENVIRONMENT}")
     
-    # Определяем порт для локальной разработки и продакшна
-    port = get_clean_port()
-    logger.info(f"Запуск API сервера на порту {port}")
-    
-    # Запускаем сервер
-    uvicorn.run(
-        "api:app",
-        host="0.0.0.0",
-        port=port,
-        reload=True if os.getenv("ENVIRONMENT") != "production" else False,
-        log_level="info"
-    )
+    # Настройки для разных сред
+    if ENVIRONMENT == "production":
+        # Production настройки
+        uvicorn.run(
+            "api:app",
+            host=HOST,
+            port=PORT,
+            log_level="warning",
+            access_log=False,
+            reload=False
+        )
+    else:
+        # Development настройки
+        uvicorn.run(
+            "api:app",
+            host=HOST,
+            port=PORT,
+            log_level="info",
+            access_log=True,
+            reload=True
+        )

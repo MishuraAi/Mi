@@ -77,7 +77,8 @@ class MishuraApp {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                healthCheck = await fetch('/api/v1/health', { signal: controller.signal });
+                // ИСПРАВЛЕНО: Проверяем правильный порт 8080
+                healthCheck = await fetch('http://localhost:8080/api/v1/health', { signal: controller.signal });
                 clearTimeout(timeoutId);
             } catch (e) {
                 healthCheck = null;

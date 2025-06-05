@@ -1,4 +1,5 @@
 # Файлы с конфиденциальными данными
+mode_switch_windows.py
 .env
 *.env
 !.env.example

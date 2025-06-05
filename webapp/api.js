@@ -55,23 +55,25 @@ class MishuraAPIService {
     }
 
     detectBaseURL() {
-        // Определяем базовый URL для API
         const currentHost = window.location.hostname;
         const currentProtocol = window.location.protocol;
         
-        // Возможные варианты API URL (8080 первым!)
-        const possibleURLs = [
-            `${currentProtocol}//${currentHost}:8080`,  // ← API сервер
-            `${currentProtocol}//${currentHost}:8000`,  // ← Веб-приложение
-            `${currentProtocol}//${currentHost}:8001`, 
-            'http://localhost:8080',  // ← API сервер
-            'http://localhost:8000'   // ← Веб-приложение
-        ];
-
-        // Устанавливаем первый URL по умолчанию
-        this.baseURL = possibleURLs[0] + '/api/v1';
+        // Определяем среду и правильный URL
+        if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+            // Локальная разработка - ваш api.py на порту 8000
+            this.baseURL = `${currentProtocol}//localhost:8000/api/v1`;
+            console.log('🏠 Локальная разработка - API на порту 8000');
+        } else if (currentHost.includes('onrender.com') || currentHost.includes('render.com')) {
+            // Render.com - api.py обслуживает всё на том же домене
+            this.baseURL = `${currentProtocol}//${currentHost}/api/v1`;
+            console.log('☁️ Render.com - единое приложение');
+        } else {
+            // Другие продакшн среды
+            this.baseURL = `${currentProtocol}//${currentHost}/api/v1`;
+            console.log('🌐 Production environment');
+        }
         
-        console.log('🔍 Определен базовый URL:', this.baseURL);
+        console.log('🔍 Базовый URL API установлен:', this.baseURL);
     }
 
     async makeRequest(endpoint, options = {}) {

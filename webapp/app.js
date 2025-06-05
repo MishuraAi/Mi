@@ -74,17 +74,53 @@ class MishuraApp {
         try {
             let healthCheck = null;
             
-            // Определяем URL API в зависимости от окружения
-            const apiUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:8080/api/v1/health'
-                : 'https://mishura-api.onrender.com/api/v1/health';  // ← Ваш API URL
+            // ИСПРАВЛЕНО: Правильные порты для вашей конфигурации
+            let apiUrl;
+            
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // Локальная разработка - ваш api.py работает на порту 8000
+                apiUrl = 'http://localhost:8000/api/v1/health';
+            } else {
+                // Продакшн на Render - тот же домен (api.py обслуживает всё)
+                apiUrl = `${window.location.protocol}//${window.location.hostname}/api/v1/health`;
+            }
+            
+            console.log('🔍 Проверяем API по адресу:', apiUrl);
             
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
-                healthCheck = await fetch(apiUrl, { signal: controller.signal });
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // Увеличили до 15 сек
+                
+                const response = await fetch(apiUrl, { 
+                    signal: controller.signal,
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
                 clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    const healthData = await response.json();
+                    console.log('🏥 Статус API:', healthData);
+                    
+                    // Проверяем что Gemini работает
+                    if (healthData.gemini_working) {
+                        healthCheck = response;
+                        console.log('✅ Gemini AI доступен');
+                    } else {
+                        console.warn('⚠️ Gemini AI недоступен, используем Mock');
+                        healthCheck = null;
+                    }
+                } else {
+                    console.warn('⚠️ API вернул ошибку:', response.status, response.statusText);
+                    healthCheck = null;
+                }
+                
             } catch (e) {
+                console.warn('⚠️ Ошибка подключения к API:', e.message);
                 healthCheck = null;
             }
 
@@ -92,14 +128,51 @@ class MishuraApp {
                 // Используем реальный API
                 this.api = new window.MishuraAPIService();
                 console.log('✅ Реальный API подключен');
+                
+                // Проверяем что API действительно работает
+                try {
+                    const status = await this.api.getStatus();
+                    if (status && status.api_status === 'online') {
+                        console.log('🎯 API полностью работоспособен');
+                    } else {
+                        throw new Error('API не прошел проверку статуса');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ API недоступен при проверке, переключаемся на Mock');
+                    this.api = new window.MockMishuraAPIService();
+                    console.log('🎭 Автоматический переход на Mock API');
+                }
             } else {
                 // Fallback на Mock API
                 this.api = new window.MockMishuraAPIService();
                 console.log('🎭 Автоматический переход на Mock API');
             }
+            
+            // Обновляем UI в зависимости от типа API
+            this.updateAPIStatus();
+            
         } catch (error) {
             this.api = new window.MockMishuraAPIService();
             console.log('🎭 Mock API активирован из-за ошибки:', error);
+            this.updateAPIStatus();
+        }
+    }
+
+    // НОВЫЙ: Метод для обновления индикатора API в интерфейсе
+    updateAPIStatus() {
+        const isRealAPI = this.api && !this.api.isMock;
+        const statusElement = document.querySelector('.api-status');
+        
+        if (statusElement) {
+            statusElement.textContent = isRealAPI ? '🌐 Реальный API' : '🎭 Демо-режим';
+            statusElement.className = `api-status ${isRealAPI ? 'real' : 'demo'}`;
+        }
+        
+        // Показываем уведомление только в демо-режиме
+        if (!isRealAPI) {
+            setTimeout(() => {
+                this.showNotification('🔬 Работаем в демо-режиме с примерами ответов', 'info', 4000);
+            }, 2000);
         }
     }
 

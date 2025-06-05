@@ -30,11 +30,12 @@ from typing import Optional, List, Dict, Any
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 import google.generativeai as genai
 from PIL import Image
 import io
+from fastapi.staticfiles import StaticFiles
 
 # Добавляем текущую директорию в путь для импорта database.py
 sys.path.append(str(Path(__file__).parent))
@@ -286,6 +287,29 @@ async def compare_with_gemini(images: List[Image.Image], occasion: str, preferen
 
 *Попробуйте сравнение через несколько минут.*
 """
+
+# Подключаем статические файлы веб-приложения  
+app.mount("/webapp", StaticFiles(directory="webapp"), name="webapp")
+
+# Главная страница - редирект на веб-приложение
+@app.get("/")
+async def read_root():
+    return FileResponse('webapp/index.html')
+
+# Для всех остальных путей тоже отдаем index.html (SPA)
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    # Если это API запрос, пропускаем
+    if full_path.startswith('api/'):
+        raise HTTPException(status_code=404, detail="Not Found")
+    
+    # Проверяем, есть ли файл
+    file_path = Path("webapp") / full_path
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(file_path)
+    
+    # Иначе отдаем index.html (для SPA роутинга)
+    return FileResponse('webapp/index.html')
 
 # API эндпоинты
 @app.get("/api/v1/health", response_model=HealthResponse)

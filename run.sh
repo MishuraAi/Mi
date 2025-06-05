@@ -1,3 +1,10 @@
 #!/bin/bash
-pip install -r requirements.txt
-uvicorn api:app --host 0.0.0.0 --port $PORT
+# Определяем что запускать по переменной окружения
+if [ "$SERVICE_TYPE" = "webapp" ]; then
+    echo "Запуск веб-приложения..."
+    python webapp_server.py
+else
+    echo "Запуск API сервера..."
+    pip install -r requirements.txt
+    python api.py
+fi

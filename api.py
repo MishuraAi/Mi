@@ -296,21 +296,6 @@ app.mount("/webapp", StaticFiles(directory="webapp"), name="webapp")
 async def read_root():
     return FileResponse('webapp/index.html')
 
-# Для всех остальных путей тоже отдаем index.html (SPA)
-@app.get("/{full_path:path}")
-async def catch_all(full_path: str):
-    # Если это API запрос, пропускаем
-    if full_path.startswith('api/'):
-        raise HTTPException(status_code=404, detail="Not Found")
-    
-    # Проверяем, есть ли файл
-    file_path = Path("webapp") / full_path
-    if file_path.exists() and file_path.is_file():
-        return FileResponse(file_path)
-    
-    # Иначе отдаем index.html (для SPA роутинга)
-    return FileResponse('webapp/index.html')
-
 # API эндпоинты
 @app.get("/api/v1/health", response_model=HealthResponse)
 async def health_check():

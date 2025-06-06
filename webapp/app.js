@@ -317,7 +317,7 @@ class MishuraApp {
         container.innerHTML = `
             <header class="header">
                 <h1>✨ МИШУРА</h1>
-                <p>Luxury ИИ-стилист премиум класса</p>
+                <p>Твой личный стилист в кармане</p>
             </header>
 
             <div class="action-buttons">

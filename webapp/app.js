@@ -1,12 +1,12 @@
 // 🎭 МИШУРА - Твой Стилист
-// Главный файл приложения - app.js (ПРОДАКШН ВЕРСИЯ С ПАТЧАМИ V2)
-// Версия: 2.1.0 - Все критические исправления + улучшения из тестирования
+// Главный файл приложения - app.js (ПРОДАКШН ВЕРСИЯ С ПАТЧАМИ V2 + STcoin)
+// Версия: 2.2.0 - Все критические исправления + STcoin система
 
-console.log('🎭 МИШУРА App загружается с патчами V2 (продакшн)...');
+console.log('🎭 МИШУРА App загружается с патчами V2 + STcoin...');
 
 class MishuraApp {
     constructor() {
-        console.log('🚀 Инициализация MishuraApp с патчами V2...');
+        console.log('🚀 Инициализация MishuraApp с патчами V2 + STcoin...');
         
         // Состояние приложения
         this.currentMode = null; // 'single' или 'compare'
@@ -23,8 +23,8 @@ class MishuraApp {
         this.eventListenersAttached = false;
         this.initializationComplete = false;
         
-        // Пользовательские данные
-        this.userBalance = 100;
+        // Пользовательские данные - STcoin система
+        this.userBalance = 200; // STcoin баланс
         this.consultationsHistory = [];
         this.consultationsUsed = 0;
         
@@ -207,7 +207,7 @@ class MishuraApp {
             this.setupTelegramIntegration();
             
             this.initializationComplete = true;
-            console.log('✅ MishuraApp инициализирован с патчами V2');
+            console.log('✅ MishuraApp инициализирован с патчами V2 + STcoin');
         } catch (error) {
             console.error('❌ Ошибка инициализации:', error);
         }
@@ -332,19 +332,20 @@ class MishuraApp {
             </div>
         `;
         
-        // ПАТЧ V2: Переинициализируем обработчики с задержкой и защитой
+        // ИСПРАВЛЕНИЕ: Сбрасываем флаг и переинициализируем обработчики
         setTimeout(() => {
-            if (!this.modeButtonsSetup) {
-                this.setupModeButtons();
-            }
+            this.modeButtonsSetup = false;
+            this.setupModeButtons();
         }, 100);
     }
 
+    // STcoin: Обновленная секция истории (2 строчки)
     showHistorySection() {
         const container = document.querySelector('.container');
         if (!container) return;
         
         const history = this.consultationsHistory.slice(-10).reverse();
+        const consultationsRemaining = Math.floor(this.userBalance / 10); // STcoin: расчет из STcoin
         
         let historyHTML = `
             <header class="header">
@@ -360,11 +361,11 @@ class MishuraApp {
                 margin-bottom: 20px;
                 text-align: center;
             ">
-                <div style="color: var(--text-gold); font-size: 1.2rem; font-weight: 600;">
-                    Всего консультаций: ${this.consultationsHistory.length}
+                <div style="color: var(--text-gold); font-size: 1.2rem; font-weight: 700; margin-bottom: 6px;">
+                    Осталось консультаций: ${consultationsRemaining}
                 </div>
-                <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">
-                    Осталось: ${this.userBalance} бесплатных
+                <div style="color: var(--text-muted); font-size: 0.9rem;">
+                    ${this.userBalance} STcoin
                 </div>
             </div>
         `;
@@ -441,14 +442,17 @@ class MishuraApp {
         container.innerHTML = historyHTML;
     }
 
+    // STcoin: Обновленная секция баланса
     showBalanceSection() {
         const container = document.querySelector('.container');
         if (!container) return;
         
+        const consultationsRemaining = Math.floor(this.userBalance / 10); // STcoin: расчет консультаций из STcoin
+        
         container.innerHTML = `
             <header class="header">
                 <h1>💰 Баланс</h1>
-                <p>Управление консультациями</p>
+                <p>Управление STcoin</p>
             </header>
             
             <div class="balance-card" style="
@@ -464,7 +468,10 @@ class MishuraApp {
                     ${this.userBalance}
                 </div>
                 <div style="font-size: 1.1rem; font-weight: 600; text-transform: uppercase;">
-                    Бесплатных консультаций
+                    STcoin
+                </div>
+                <div style="font-size: 0.9rem; margin-top: 8px; opacity: 0.8;">
+                    Доступно консультаций: ${consultationsRemaining}
                 </div>
             </div>
             
@@ -489,12 +496,12 @@ class MishuraApp {
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="color: var(--text-muted);">Использовано:</span>
+                    <span style="color: var(--text-muted);">Потрачено STcoin:</span>
                     <span style="color: var(--text-light); font-weight: 600;">${this.consultationsUsed}</span>
                 </div>
                 
                 <div style="display: flex; justify-content: space-between;">
-                    <span style="color: var(--text-muted);">Осталось:</span>
+                    <span style="color: var(--text-muted);">Остаток STcoin:</span>
                     <span style="color: var(--text-gold); font-weight: 600;">${this.userBalance}</span>
                 </div>
             </div>
@@ -508,7 +515,7 @@ class MishuraApp {
                     color: var(--text-gold);
                 ">
                     <span class="icon">➕</span>
-                    Добавить консультации
+                    Пополнить STcoin
                 </button>
                 
                 <div style="
@@ -531,9 +538,9 @@ class MishuraApp {
                         font-size: 0.9rem;
                         line-height: 1.4;
                     ">
-                        Каждый новый пользователь получает 100 бесплатных консультаций. 
-                        После их использования можно приобрести дополнительные пакеты 
-                        или поддержать проект добровольным пожертвованием.
+                        Каждый новый пользователь получает 200 STcoin. 
+                        Одна консультация стоит 10 STcoin.
+                        После использования можно приобрести дополнительные STcoin.
                     </div>
                 </div>
             </div>
@@ -548,17 +555,17 @@ class MishuraApp {
         }
     }
 
-    // 💰 Модальное окно пополнения баланса
+    // STcoin: Обновленное модальное окно пополнения баланса
     showAddBalanceModal() {
         this.showNotification('🚧 Функция в разработке. Скоро будет доступна оплата!', 'info', 4000);
         this.triggerHapticFeedback('warning');
         
-        // Пока что добавляем 10 консультаций бесплатно для тестирования
+        // Пока что добавляем 100 STcoin бесплатно для тестирования
         setTimeout(() => {
-            this.userBalance += 10;
+            this.userBalance += 100; // STcoin: добавляем 100 STcoin (10 консультаций)
             this.saveUserData();
             this.showBalanceSection();
-            this.showNotification('🎁 Добавлено 10 бесплатных консультаций!', 'success');
+            this.showNotification('🎁 Добавлено 100 STcoin (10 консультаций)!', 'success');
             this.triggerHapticFeedback('success');
         }, 1000);
     }
@@ -613,7 +620,7 @@ class MishuraApp {
     loadUserData() {
         try {
             const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
-            this.userBalance = data.balance || 100;
+            this.userBalance = data.balance || 200; // STcoin: стартовый баланс 200
             this.consultationsHistory = data.history || [];
             this.consultationsUsed = data.used || 0;
             
@@ -644,14 +651,15 @@ class MishuraApp {
         }
     }
 
+    // STcoin: Обновленная инициализация данных пользователя
     initializeUserData() {
-        this.userBalance = 100;
+        this.userBalance = 200; // STcoin: 200 STcoin вместо 100
         this.consultationsHistory = [];
         this.consultationsUsed = 0;
         this.saveUserData();
         
         console.log('🆕 Инициализированы данные нового пользователя');
-        this.showNotification('🎉 Добро пожаловать! У вас 100 бесплатных консультаций!', 'success', 5000);
+        this.showNotification('🎉 Добро пожаловать! У вас 200 STcoin!', 'success', 5000); // STcoin: текст уведомления
     }
 
     // 🔧 ПАТЧ V2: Исправленная настройка обработчиков без циклов
@@ -1164,7 +1172,7 @@ class MishuraApp {
         if (result) result.classList.remove('active');
     }
 
-    // ПАТЧ V2: Улучшенное отображение результатов с нормализацией ответа + навигацией
+    // ПАТЧ V2: Улучшенное отображение результатов с нормализацией ответа + навигацией + STcoin
     showResult(result) {
         this.isLoading = false;
         
@@ -1233,16 +1241,17 @@ class MishuraApp {
             metadata: normalizedResult.metadata || {}
         };
         
-        // Списываем консультацию
-        this.userBalance--;
-        this.consultationsUsed++;
+        // STcoin: Списываем консультацию (10 STcoin)
+        this.userBalance -= 10; // STcoin: списываем 10 STcoin вместо 1
+        this.consultationsUsed += 10; // STcoin: увеличиваем счетчик на 10
         this.consultationsHistory.push(consultation);
         this.saveUserData();
         
-        // Показываем обновленный баланс
-        if (this.userBalance <= 10) {
+        // STcoin: Показываем обновленный баланс
+        if (this.userBalance <= 50) { // STcoin: предупреждение при 50 STcoin (5 консультаций)
             setTimeout(() => {
-                this.showNotification(`⚠️ Осталось ${this.userBalance} консультаций`, 'warning', 4000);
+                const consultationsRemaining = Math.floor(this.userBalance / 10);
+                this.showNotification(`⚠️ Осталось ${consultationsRemaining} консультаций`, 'warning', 4000);
             }, 2000);
         }
     }
@@ -1439,7 +1448,7 @@ class MishuraApp {
         return formattedText;
     }
 
-    // 📤 ПАТЧ V2: Исправленная отправка форм с правильным timeout
+    // 📤 ПАТЧ V2: Исправленная отправка форм с правильным timeout + STcoin
     async submit() {
         if (this.isLoading) {
             console.log('⏳ Запрос уже выполняется');
@@ -1455,9 +1464,9 @@ class MishuraApp {
             return;
         }
         
-        // Проверяем баланс
-        if (this.userBalance <= 0) {
-            this.showNotification('❌ Консультации закончились! Пополните баланс', 'error');
+        // STcoin: Проверяем баланс (нужно минимум 10 STcoin)
+        if (this.userBalance < 10) { // STcoin: проверяем что хватает на 1 консультацию (10 STcoin)
+            this.showNotification('❌ Недостаточно STcoin! Пополните баланс', 'error');
             this.triggerHapticFeedback('error');
             return;
         }
@@ -1894,7 +1903,7 @@ class MishuraApp {
     diagnose() {
         const diagnosis = {
             timestamp: new Date().toISOString(),
-            version: '2.1.0',
+            version: '2.2.0',
             initialization: this.initializationComplete,
             api: {
                 connected: !!this.api,
@@ -1991,9 +2000,9 @@ function initializeMishuraApp() {
 • mishuraUtils.testCompare() - тест compare режима
 
 🎯 ТЕКУЩЕЕ СОСТОЯНИЕ:
-• Версия: 2.1.0 с патчами V2
+• Версия: 2.2.0 с патчами V2 + STcoin
 • API: ${window.mishuraApp.api ? (window.mishuraApp.api.isMock ? 'Mock (демо)' : 'Реальный') : 'Не подключен'}
-• Баланс: ${window.mishuraApp.userBalance} консультаций
+• Баланс: ${window.mishuraApp.userBalance} STcoin (${Math.floor(window.mishuraApp.userBalance / 10)} консультаций)
 • Timeout: ${window.mishuraApp.requestTimeout / 1000} секунд
 
 ✨ Приложение полностью загружено и готово к использованию!
@@ -2048,4 +2057,4 @@ function initializeMishuraApp() {
     }
 }
 
-console.log('📦 МИШУРА App модуль загружен успешно!');
+console.log('📦 МИШУРА App модуль загружен успешно с STcoin системой!');

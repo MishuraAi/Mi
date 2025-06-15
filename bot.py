@@ -32,11 +32,6 @@ try:
     import database as db
     from database import save_wardrobe_item, get_user_wardrobe, get_wardrobe_item, update_wardrobe_item, delete_wardrobe_item
     from gemini_ai import analyze_clothing_file, analyze_clothing_image
-    from wardrobe_handlers import handle_name_command, handle_tag_command, handle_wardrobe_command
-    from wardrobe_callbacks import (
-        handle_view_item, handle_edit_item, handle_delete_item, 
-        handle_confirm_delete, handle_refresh_wardrobe, handle_wardrobe_stats
-    )
 except ImportError as e:
     logging.critical(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось импортировать модули database или gemini_ai для бота. {e}")
     # Для целей отладки, бот может попытаться запуститься, но функционал будет ограничен.
@@ -48,24 +43,6 @@ except ImportError as e:
     async def analyze_clothing_image(*args, **kwargs):
         logging.error("Функция analyze_clothing_image не доступна из-за ошибки импорта gemini_ai.")
         return "Ошибка сервера: ИИ-модуль не инициализирован."
-    async def handle_name_command(*args, **kwargs):
-        pass
-    async def handle_tag_command(*args, **kwargs):
-        pass  
-    async def handle_wardrobe_command(*args, **kwargs):
-        pass
-    async def handle_view_item(*args, **kwargs):
-        pass
-    async def handle_edit_item(*args, **kwargs):
-        pass
-    async def handle_delete_item(*args, **kwargs):
-        pass
-    async def handle_confirm_delete(*args, **kwargs):
-        pass
-    async def handle_refresh_wardrobe(*args, **kwargs):
-        pass
-    async def handle_wardrobe_stats(*args, **kwargs):
-        pass
 
 
 # Настройка логирования для этого модуля
@@ -75,13 +52,6 @@ if not logger.handlers: # Предотвращение многократног�
         format="%(asctime)s - [%(levelname)s] - %(name)s - (%(filename)s).%(funcName)s(%(lineno)d): %(message)s",
         level=logging.INFO
     )
-    # Можно добавить специфичный обработчик для логгера бота, если нужно
-    # handler = logging.StreamHandler()
-    # formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
-    # handler.setFormatter(formatter)
-    # logger.addHandler(handler)
-    # logger.setLevel(logging.INFO)
-    # logger.propagate = False # Чтобы не дублировать логи в root logger, если он тоже настроен
 
 logger.info("Инициализация Telegram бота МИШУРА...")
 
@@ -97,9 +67,6 @@ WEBAPP_URL_BASE = os.getenv("WEBAPP_URL", DEFAULT_WEBAPP_URL).rstrip('/')
 
 if not TOKEN:
     logger.critical("КРИТИЧЕСКАЯ ОШИБКА: TELEGRAM_TOKEN не найден. Бот не сможет запуститься.")
-    # В production здесь стоило бы завершить выполнение скрипта:
-    # import sys
-    # sys.exit("Ошибка: TELEGRAM_TOKEN не установлен.")
 
 # Добавляем кэш-бастинг параметр к URL веб-приложения
 WEBAPP_URL_WITH_CACHEBUST = f"{WEBAPP_URL_BASE}?v={random.randint(10000, 99999)}"
@@ -156,9 +123,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
-        [KeyboardButton("💎 Гардероб"), KeyboardButton("Мои консультации")],
-        [KeyboardButton("Пополнить баланс"), KeyboardButton("О сервисе МИШУРА")],
-        [KeyboardButton("Поддержка")]
+        [KeyboardButton("Мои консультации"), KeyboardButton("О сервисе МИШУРА")],
+        [KeyboardButton("Пополнить баланс"), KeyboardButton("Поддержка")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -234,54 +200,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         except Exception as e_db_consult:
             logger.error(f"Ошибка БД при получении консультаций для пользователя {user_id}: {e_db_consult}", exc_info=True)
             await update.message.reply_text("Не удалось загрузить ваши консультации. Попробуйте позже.")
-
-    elif text == "💎 Гардероб":
-        if not db:
-            await update.message.reply_text("Сервис гардероба временно недоступен.")
-            return
-        try:
-            wardrobe_items = get_user_wardrobe(user_id, limit=10)  # Получаем последние 10 предметов
-            if not wardrobe_items:
-                await update.message.reply_html(
-                    "💎 <b>Ваш Гардероб пуст</b>\n\n"
-                    "Сохраните предметы одежды в Гардероб после получения консультации, "
-                    "чтобы быстро использовать их в будущих анализах!\n\n"
-                    "Отправьте фото одежды для анализа и увидите кнопку \"Сохранить в Гардероб\"."
-                )
-                return
-            
-            message = "💎 <b>Ваш Гардероб:</b>\n\n"
-            keyboard = []
-            for item in wardrobe_items:
-                item_name = item.get('item_name') or "Без названия"
-                item_tag = item.get('item_tag') or ""
-                created_date = item.get('created_at', '')[:10]  # Только дата
-                
-                display_name = f"{item_name}"
-                if item_tag:
-                    display_name += f" #{item_tag}"
-                    
-                message += f"🔸 {display_name} (добавлено: {created_date})\n"
-                
-                # Добавляем кнопки для каждого предмета
-                keyboard.append([
-                    InlineKeyboardButton(f"👁️ {item_name[:15]}...", callback_data=f"view_item_{item['id']}"),
-                    InlineKeyboardButton("📝", callback_data=f"edit_item_{item['id']}"),
-                    InlineKeyboardButton("🗑️", callback_data=f"delete_item_{item['id']}")
-                ])
-            
-            # Добавляем кнопки управления
-            keyboard.append([
-                InlineKeyboardButton("📊 Статистика гардероба", callback_data="wardrobe_stats"),
-                InlineKeyboardButton("🔄 Обновить", callback_data="refresh_wardrobe")
-            ])
-            
-            message += f"\n<i>Показано последних {len(wardrobe_items)} предметов</i>"
-            await update.message.reply_html(message, reply_markup=InlineKeyboardMarkup(keyboard))
-            
-        except Exception as e_wardrobe:
-            logger.error(f"Ошибка при получении гардероба для пользователя {user_id}: {e_wardrobe}", exc_info=True)
-            await update.message.reply_text("Не удалось загрузить ваш гардероб. Попробуйте позже.")
 
     elif text == "Пополнить баланс":
         keyboard = [
@@ -363,9 +281,8 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         new_balance = db.get_user_balance(user_id)
         
-        # Добавляем кнопку "Сохранить в Гардероб" для новой функциональности
+        # Добавляем кнопку просмотра полной консультации
         keyboard = [
-            [InlineKeyboardButton("💎 Сохранить в Гардероб", callback_data=f"save_to_wardrobe_{consultation_id}")],
             [InlineKeyboardButton("📄 Полная консультация", callback_data=f"full_consultation_{consultation_id}")]
         ]
         
@@ -439,34 +356,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "Выберите пакет консультаций от МИШУРЫ:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
-            
-        # Обработка сохранения в гардероб
-        elif query.data.startswith("save_to_wardrobe_"):
-            consultation_id = int(query.data.split("_")[-1])
-            consultation = db.get_consultation(consultation_id, user_id)
-            
-            if not consultation:
-                await query.edit_message_text("Консультация не найдена.")
-                return
-            
-            # Сохраняем в гардероб, используя telegram_file_id из консультации
-            telegram_file_id = consultation.get('image_path')  # Теперь это file_id
-            if telegram_file_id:
-                wardrobe_id = save_wardrobe_item(user_id, telegram_file_id, "Предмет одежды", "новый")
-                if wardrobe_id:
-                    keyboard = [
-                        [InlineKeyboardButton("📝 Задать название", callback_data=f"name_item_{wardrobe_id}")],
-                        [InlineKeyboardButton("💎 Мой гардероб", callback_data="refresh_wardrobe")]
-                    ]
-                    await query.edit_message_text(
-                        f"✅ Предмет сохранен в ваш Гардероб (ID: {wardrobe_id})!\n\n"
-                        "Вы можете задать название или посмотреть весь гардероб.",
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-                else:
-                    await query.edit_message_text("Не удалось сохранить предмет в гардероб. Попробуйте позже.")
-            else:
-                await query.edit_message_text("Изображение для этой консультации недоступно.")
                 
         # Обработка просмотра полной консультации
         elif query.data.startswith("full_consultation_"):
@@ -499,29 +388,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             else:
                 await query.edit_message_text(response_message, parse_mode='HTML')
                 
-        # Обработка callback'ов гардероба
-        elif query.data.startswith("view_item_"):
-            item_id = int(query.data.split("_")[-1])
-            await handle_view_item(query, user_id, item_id, context)
-            
-        elif query.data.startswith("edit_item_") or query.data.startswith("name_item_"):
-            item_id = int(query.data.split("_")[-1])
-            await handle_edit_item(query, user_id, item_id)
-            
-        elif query.data.startswith("delete_item_"):
-            item_id = int(query.data.split("_")[-1])
-            await handle_delete_item(query, user_id, item_id)
-            
-        elif query.data.startswith("confirm_delete_"):
-            item_id = int(query.data.split("_")[-1])
-            await handle_confirm_delete(query, user_id, item_id)
-            
-        elif query.data == "refresh_wardrobe":
-            await handle_refresh_wardrobe(query, user_id)
-            
-        elif query.data == "wardrobe_stats":
-            await handle_wardrobe_stats(query, user_id)
-            
         else:
             logger.warning(f"Неизвестный callback_data: {query.data}")
             await query.edit_message_text("Произошла ошибка при обработке вашего выбора.")
@@ -611,21 +477,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "    * Также можно просто отправить мне фото в чат (в этом случае анализ будет по стандартным параметрам).\n\n"
         "2.  **Просмотр консультаций:**\n"
         "    * Используйте кнопку «Мои консультации» в меню или команду <code>/consultation ID</code> для просмотра полной версии ранее полученного совета.\n\n"
-        "3.  **Гардероб (НОВИНКА!):**\n"
-        "    * Используйте кнопку «💎 Гардероб» или команду <code>/wardrobe</code> для управления сохраненными предметами одежды.\n"
-        "    * Сохраняйте фото одежды после консультаций кнопкой «Сохранить в Гардероб».\n"
-        "    * Быстро используйте сохраненные предметы в новых консультациях без повторной загрузки.\n\n"
-        "4.  **Баланс:**\n"
+        "3.  **Баланс:**\n"
         "    * Каждая консультация списывает одну единицу с вашего баланса.\n"
         "    * Пополнить баланс можно через соответствующую кнопку в меню.\n\n"
         "📋 <b>Доступные команды:</b>\n"
         "•  /start - Начать работу с МИШУРОЙ / обновить меню\n"
         "•  /help - Эта справка\n"
         "•  /webapp - Открыть веб-приложение для консультации\n"
-        "•  /wardrobe - Быстрый доступ к гардеробу\n"
-        "•  <code>/consultation &lt;ID&gt;</code> - Получить полный текст консультации по её номеру\n"
-        "•  <code>/name_&lt;ID&gt; новое название</code> - Изменить название предмета в гардеробе\n"
-        "•  <code>/tag_&lt;ID&gt; новый_тег</code> - Изменить тег предмета в гардеробе\n\n"
+        "•  <code>/consultation &lt;ID&gt;</code> - Получить полный текст консультации по её номеру\n\n"
         f"{balance_text}\n\n"
         "Если возникнут вопросы, используйте кнопку «Поддержка» в меню."
     )
@@ -648,20 +507,7 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("webapp", webapp_command))
-    application.add_handler(CommandHandler("consultation", get_consultation_command)) # Обновленное имя функции
-    application.add_handler(CommandHandler("wardrobe", handle_wardrobe_command))  # Команда гардероба
-    
-    # Динамические команды гардероба (для редактирования предметов)
-    # Эти обработчики должны быть добавлены до общего текстового обработчика
-    from telegram.ext import MessageHandler, filters
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r'^/name_\d+'), 
-        handle_name_command
-    ))
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r'^/tag_\d+'), 
-        handle_tag_command
-    ))
+    application.add_handler(CommandHandler("consultation", get_consultation_command))
     
     # Текстовые сообщения (должен идти после CommandHandlers, чтобы не перехватывать команды)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))

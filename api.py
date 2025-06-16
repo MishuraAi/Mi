@@ -3,23 +3,18 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Production API сервер с интеграцией ЮKassa (api.py)
-ВЕРСИЯ: 1.3.0
-ДАТА ОБНОВЛЕНИЯ: 2025-06-15
+ВЕРСИЯ: 1.3.1 - ИСПРАВЛЕНЫ ПРОБЛЕМЫ RENDER.COM
+ДАТА ОБНОВЛЕНИЯ: 2025-06-16
 
 НАЗНАЧЕНИЕ:
 FastAPI сервер для обработки запросов анализа изображений через Gemini AI
 + интеграция платежной системы ЮKassa
 
-НОВЫЕ ЭНДПОИНТЫ:
-- GET /api/v1/payments/packages - получение пакетов пополнения
-- POST /api/v1/payments/create - создание платежа
-- POST /api/v1/payments/webhook - webhook от ЮKassa
-
-СУЩЕСТВУЮЩИЕ ЭНДПОИНТЫ:
-- GET /api/v1/health - проверка состояния сервера
-- POST /api/v1/analyze - анализ одного изображения
-- POST /api/v1/compare - сравнение нескольких изображений
-- GET /api/v1/status - статус Gemini AI
+ИСПРАВЛЕНИЯ v1.3.1:
+- Исправлены CORS настройки для Render.com
+- Убрана блокирующая проверка payment_service.configured
+- Добавлено детальное логирование ошибок
+- Исправлена обработка тестовых ключей ЮKassa
 ==========================================================================================
 """
 
@@ -31,6 +26,7 @@ from pathlib import Path
 import logging
 import base64
 import json
+import traceback
 from typing import Optional, List, Dict, Any
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Header
@@ -86,16 +82,17 @@ PORT = int(os.getenv('BACKEND_PORT', 8000))
 app = FastAPI(
     title="МИШУРА ИИ-Стилист API с ЮKassa",
     description="API для анализа стиля одежды с помощью Google Gemini AI + платежная система",
-    version="1.3.0",
+    version="1.3.1",
     docs_url="/api/v1/docs" if DEBUG else None,
     redoc_url="/api/v1/redoc" if DEBUG else None
 )
 
-# Настройка CORS
+# ИСПРАВЛЕННАЯ НАСТРОЙКА CORS ДЛЯ RENDER.COM
 if ENVIRONMENT == 'production':
     origins = [
         "https://style-ai-bot.onrender.com",
-        "http://localhost:8000",
+        "https://style-ai-bot.onrender.com/webapp",
+        "http://localhost:8000",  # Для локального тестирования
         "http://127.0.0.1:8000"
     ]
 else:
@@ -110,7 +107,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Добавлен OPTIONS
     allow_headers=["*"],
 )
 
@@ -344,7 +341,7 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         service="МИШУРА ИИ-Стилист API с ЮKassa",
-        version="1.3.0",
+        version="1.3.1",
         gemini_configured=gemini_configured,
         gemini_working=gemini_working,
         environment=ENVIRONMENT,
@@ -522,40 +519,86 @@ async def get_payment_packages():
 
 @app.post("/api/v1/payments/create")
 async def create_payment(request: CreatePaymentRequest):
-    """Создать платеж для пополнения баланса"""
+    """Создать платеж для пополнения баланса - ИСПРАВЛЕННАЯ ВЕРСИЯ ДЛЯ RENDER.COM"""
     logger.info(f"💳 Создание платежа для user_id={request.user_id}, package={request.package_id}")
     
     try:
-        # ВРЕМЕННО ЗАКОММЕНТИРОВАНО для тестирования
-        # # Проверяем что сервис платежей настроен
-        # if not payment_service.payment_service.configured:
-        #     raise HTTPException(
-        #         status_code=503, 
-        #         detail="Платежная система временно недоступна"
-        #     )
+        # Логируем входящие данные
+        logger.info(f"📥 Request data: user_id={request.user_id}, package_id={request.package_id}, return_url={request.return_url}")
         
-        # Создаем платеж
-        result = payment_service.payment_service.create_payment(
-            user_id=request.user_id,
-            package_id=request.package_id,
-            return_url=request.return_url
-        )
+        # Проверяем что payment_service инициализирован
+        if not hasattr(payment_service, 'payment_service'):
+            logger.error("❌ payment_service не инициализирован")
+            raise HTTPException(status_code=503, detail="Платежная система не инициализирована")
         
-        if result['status'] == 'success':
-            logger.info(f"✅ Платеж создан: {result['payment_id']}")
-            return JSONResponse(content=result)
-        else:
-            logger.error(f"❌ Ошибка создания платежа: {result}")
-            raise HTTPException(
-                status_code=400, 
-                detail=result.get('message', 'Не удалось создать платеж')
+        # ИСПРАВЛЕНИЕ: В продакшне НЕ проверяем configured (тестовые ключи могут не проходить проверку)
+        logger.info(f"🔧 Payment service status: configured={payment_service.payment_service.configured}")
+        logger.info(f"🔧 Environment: {ENVIRONMENT}")
+        logger.info(f"🔧 YuKassa keys present: shop_id={bool(os.getenv('YUKASSA_SHOP_ID'))}, secret_key={bool(os.getenv('YUKASSA_SECRET_KEY'))}")
+        
+        # Создаем платеж даже если configured=False (для тестовых ключей)
+        try:
+            result = payment_service.payment_service.create_payment(
+                user_id=request.user_id,
+                package_id=request.package_id,
+                return_url=request.return_url
             )
+            
+            logger.info(f"🔧 Payment service result status: {result.get('status', 'unknown')}")
+            
+            if result.get('status') == 'success':
+                logger.info(f"✅ Платеж создан: {result.get('payment_id', 'unknown')}")
+                return JSONResponse(content=result)
+            else:
+                logger.error(f"❌ Ошибка создания платежа: {result}")
+                
+                # Детальное логирование ошибки
+                error_detail = result.get('message', 'Не удалось создать платеж')
+                error_type = result.get('error', 'unknown')
+                
+                logger.error(f"❌ Error type: {error_type}")
+                logger.error(f"❌ Error detail: {error_detail}")
+                
+                # Возвращаем более информативную ошибку
+                raise HTTPException(
+                    status_code=400, 
+                    detail={
+                        "error": error_type,
+                        "message": error_detail,
+                        "debug_info": {
+                            "environment": ENVIRONMENT,
+                            "payment_service_configured": payment_service.payment_service.configured,
+                            "yukassa_keys_present": bool(os.getenv('YUKASSA_SHOP_ID') and os.getenv('YUKASSA_SECRET_KEY'))
+                        }
+                    }
+                )
+                
+        except Exception as payment_error:
+            logger.error(f"❌ Exception при создании платежа: {payment_error}")
+            logger.error(f"❌ Exception type: {type(payment_error)}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            
+            # Если это ошибка ЮKassa API
+            if "yookassa" in str(payment_error).lower() or "unauthorized" in str(payment_error).lower():
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Ошибка платежной системы ЮKassa: {str(payment_error)}"
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Внутренняя ошибка: {str(payment_error)}"
+                )
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Ошибка создания платежа: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка создания платежа")
+        logger.error(f"❌ Неожиданная ошибка создания платежа: {e}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
 
 @app.post("/api/v1/payments/webhook")
 async def payment_webhook(
@@ -654,6 +697,7 @@ async def startup_event():
     logger.info("🚀 Запуск МИШУРА API сервера с ЮKassa...")
     logger.info(f"📋 Среда: {ENVIRONMENT}")
     logger.info(f"🌐 Хост: {HOST}:{PORT}")
+    logger.info(f"🔧 Debug режим: {DEBUG}")
     
     # Инициализируем базу данных
     try:
@@ -672,10 +716,13 @@ async def startup_event():
     
     # Проверяем статус платежной системы
     payment_status = payment_service.payment_service.get_service_status()
+    logger.info(f"🔧 Payment service status: {payment_status}")
+    
     if payment_status['status'] == 'online':
         logger.info("✅ ЮKassa платежная система настроена и готова")
     else:
-        logger.warning("⚠️ ЮKassa недоступна, платежи отключены")
+        logger.warning(f"⚠️ ЮKassa статус: {payment_status['status']}")
+        logger.warning("ℹ️ Платежи могут работать в тестовом режиме")
     
     logger.info("🎭 МИШУРА API сервер с ЮKassa полностью готов!")
 

@@ -27,6 +27,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from decimal import Decimal
 import uuid
+import traceback
 
 # Добавляем путь для импорта database.py
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -484,13 +485,23 @@ class PaymentService:
             if not payment:
                 raise Exception(f"Платеж {payment_id} не найден в ЮKassa")
             
+            # ИСПРАВЛЕНИЕ: правильная обработка дат
+            created_at_iso = None
+            if hasattr(payment, 'created_at') and payment.created_at:
+                if hasattr(payment.created_at, 'isoformat'):
+                    # Это datetime объект
+                    created_at_iso = payment.created_at.isoformat()
+                else:
+                    # Это уже строка
+                    created_at_iso = str(payment.created_at)
+            
             result = {
                 'status': 'success',
                 'payment_id': payment.id,
                 'payment_status': payment.status,
                 'amount': float(payment.amount.value),
                 'currency': payment.amount.currency,
-                'created_at': payment.created_at.isoformat() if payment.created_at else None,
+                'created_at': created_at_iso,
                 'description': payment.description,
                 'metadata': payment.metadata or {},
                 'test_mode': self.test_mode,
@@ -498,14 +509,16 @@ class PaymentService:
             }
             
             # Добавляем URL для оплаты если платеж в ожидании
-            if payment.status == 'pending' and payment.confirmation:
-                result['confirmation_url'] = payment.confirmation.confirmation_url
+            if payment.status == 'pending' and hasattr(payment, 'confirmation') and payment.confirmation:
+                if hasattr(payment.confirmation, 'confirmation_url'):
+                    result['confirmation_url'] = payment.confirmation.confirmation_url
             
             logger.info(f"✅ Статус платежа {payment_id}: {payment.status}")
             return result
             
         except Exception as e:
             logger.error(f"❌ Ошибка получения статуса платежа: {e}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return {
                 'status': 'error',
                 'error': 'payment_status_error',

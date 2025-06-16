@@ -2346,57 +2346,197 @@ class MishuraApp {
 
     // НОВОЕ: Получение реального user_id из Telegram
     getCurrentUserId() {
-        // Попытка получить реальный user_id из Telegram WebApp
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-            const user = window.Telegram.WebApp.initDataUnsafe.user;
-            if (user && user.id) {
-                console.log('🔍 Получен real user_id из Telegram:', user.id);
-                return user.id;
+        console.log('🔍 Получение user_id - СТРОГАЯ ПРИВЯЗКА К TELEGRAM...');
+        
+        // 1. ТОЛЬКО Telegram WebApp - остальное БЛОКИРУЕМ
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user?.id) {
+            const telegramUserId = window.Telegram.WebApp.initDataUnsafe.user.id;
+            console.log('✅ РЕАЛЬНЫЙ Telegram user_id:', telegramUserId);
+            
+            // Принудительно сохраняем в localStorage для синхронизации
+            try {
+                localStorage.setItem('telegram_user_id', telegramUserId.toString());
+                localStorage.setItem('user_source', 'telegram_webapp');
+                localStorage.setItem('last_sync', Date.now().toString());
+            } catch (e) {
+                console.warn('⚠️ Не удалось сохранить в localStorage:', e);
             }
+            
+            return telegramUserId;
         }
         
-        // Fallback: генерируем стабильный ID на основе браузера
-        let deviceId = localStorage.getItem('mishura_device_id');
-        if (!deviceId) {
-            deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('mishura_device_id', deviceId);
-            console.log('🔧 Создан device_id:', deviceId);
-        }
-        
-        // Преобразуем device_id в числовой формат для совместимости
-        const numericId = parseInt(deviceId.replace(/\D/g, '').substr(0, 9)) || 12345;
-        console.log('🔧 Используем device-based user_id:', numericId);
-        return numericId;
-    }
-
-    // НОВОЕ: Получение данных пользователя из Telegram
-    getCurrentUserData() {
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-            const user = window.Telegram.WebApp.initDataUnsafe.user;
-            if (user) {
-                return {
-                    id: user.id,
-                    username: user.username || null,
-                    first_name: user.first_name || null,
-                    last_name: user.last_name || null,
-                    language_code: user.language_code || 'ru'
-                };
-            }
-        }
-        
-        return {
-            id: this.getCurrentUserId(),
-            username: null,
-            first_name: null,
-            last_name: null,
-            language_code: 'ru'
-        };
-    }
-
-    // ОБНОВЛЕННОЕ: Инициализация пользователя через API
-    async initializeUser() {
+        // 2. Проверяем сохраненный Telegram ID (если есть)
         try {
-            const userData = this.getCurrentUserData();
+            const savedTelegramId = localStorage.getItem('telegram_user_id');
+            if (savedTelegramId) {
+                console.log('💾 Используем сохраненный Telegram user_id:', savedTelegramId);
+                return parseInt(savedTelegramId);
+            }
+        } catch (e) {
+            console.warn('⚠️ localStorage недоступен:', e);
+        }
+        
+        // 3. URL параметр user_id (для прямых ссылок из Telegram)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlUserId = urlParams.get('user_id');
+        if (urlUserId) {
+            console.log('🔗 User ID из URL (Telegram ссылка):', urlUserId);
+            try {
+                localStorage.setItem('telegram_user_id', urlUserId);
+                localStorage.setItem('user_source', 'telegram_url');
+            } catch (e) {
+                console.warn('⚠️ Не удалось сохранить URL user_id');
+            }
+            return parseInt(urlUserId);
+        }
+        
+        // 4. БЛОКИРУЕМ обычный браузер (НЕ ДАЕМ ДЕМО ID)
+        console.error('❌ ДОСТУП ЗАБЛОКИРОВАН: Используйте только через Telegram бота!');
+        
+        // Показываем ошибку пользователю
+        this.showTelegramOnlyError();
+        
+        return null; // Возвращаем null вместо демо ID
+    }
+
+    showTelegramOnlyError() {
+        // Очищаем весь контент и показываем сообщение об ошибке
+        const container = document.querySelector('.container') || document.body;
+        
+        container.innerHTML = `
+            <div style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                color: #ffffff;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                text-align: center;
+                padding: 20px;
+            ">
+                <div style="
+                    background: rgba(239, 68, 68, 0.1);
+                    border: 2px solid #ef4444;
+                    border-radius: 20px;
+                    padding: 40px;
+                    max-width: 500px;
+                    margin: 20px;
+                ">
+                    <div style="font-size: 4rem; margin-bottom: 20px;">🚫</div>
+                    
+                    <h1 style="
+                        color: #ef4444; 
+                        margin-bottom: 16px;
+                        font-size: 1.5rem;
+                    ">Доступ заблокирован</h1>
+                    
+                    <p style="
+                        color: #a1a1aa; 
+                        margin-bottom: 24px; 
+                        line-height: 1.6;
+                        font-size: 1.1rem;
+                    ">
+                        Это приложение работает <strong>только через Telegram бота</strong>.<br>
+                        Доступ через обычный браузер запрещен для обеспечения безопасности.
+                    </p>
+                    
+                    <div style="
+                        background: rgba(212, 175, 55, 0.1);
+                        border: 1px solid rgba(212, 175, 55, 0.3);
+                        border-radius: 12px;
+                        padding: 20px;
+                        margin-bottom: 24px;
+                        text-align: left;
+                    ">
+                        <h3 style="color: #d4af37; margin-bottom: 12px; font-size: 1.1rem;">
+                            📱 Как получить доступ:
+                        </h3>
+                        <ol style="color: #e5e5e5; margin: 0; padding-left: 20px; line-height: 1.8;">
+                            <li>Откройте Telegram</li>
+                            <li>Найдите бота <strong>@your_bot_name</strong></li>
+                            <li>Нажмите <strong>"🌐 Веб-приложение"</strong></li>
+                            <li>Или отправьте команду <code>/webapp</code></li>
+                        </ol>
+                    </div>
+                    
+                    <div style="
+                        color: #71717a;
+                        font-size: 0.9rem;
+                        margin-top: 20px;
+                    ">
+                        💡 Все ваши консультации и баланс привязаны к вашему Telegram аккаунту
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Блокируем все остальные функции приложения
+        this.isBlocked = true;
+    }
+
+    async loadUserData() {
+        // Проверяем что пользователь не заблокирован
+        const userId = this.getCurrentUserId();
+        if (!userId || this.isBlocked) {
+            console.log('🚫 Пользователь заблокирован - пропускаем загрузку данных');
+            return;
+        }
+        
+        try {
+            // Остальной код метода loadUserData() остается без изменений...
+            const serverData = await this.initializeUser();
+            
+            if (serverData) {
+                console.log('✅ Данные пользователя загружены с сервера');
+            } else {
+                console.log('⚠️ Используем локальные данные пользователя');
+                const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
+                this.userBalance = data.balance || 200;
+                this.consultationsHistory = data.history || [];
+                this.consultationsUsed = data.used || 0;
+                this.userId = userId;
+            }
+            
+            console.log('📊 Итоговые данные пользователя:', {
+                userId: this.userId,
+                balance: this.userBalance,
+                history: this.consultationsHistory.length,
+                used: this.consultationsUsed
+            });
+        } catch (error) {
+            console.error('❌ Ошибка загрузки данных пользователя:', error);
+            this.initializeUserData();
+        }
+    }
+
+    getCurrentUserData() {
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
+            const user = window.Telegram.WebApp.initDataUnsafe.user;
+            console.log('👤 Данные пользователя из Telegram:', user);
+            return {
+                id: user.id,
+                username: user.username || null,
+                first_name: user.first_name || null,
+                last_name: user.last_name || null,
+                language_code: user.language_code || 'ru'
+            };
+        }
+        
+        // Если Telegram данных нет - возвращаем null
+        console.warn('⚠️ Telegram данные недоступны');
+        return null;
+    }
+
+    async initializeUser() {
+        const userData = this.getCurrentUserData();
+        if (!userData) {
+            console.error('❌ Нет данных пользователя - инициализация невозможна');
+            return null;
+        }
+        
+        try {
             console.log('👤 Инициализация пользователя:', userData);
 
             // Отправляем данные пользователя на сервер
@@ -2417,7 +2557,6 @@ class MishuraApp {
                 const serverData = await response.json();
                 console.log('✅ Пользователь инициализирован на сервере:', serverData);
                 
-                // Обновляем локальный баланс данными с сервера
                 this.userBalance = serverData.balance;
                 this.userId = serverData.user_id;
                 
@@ -2425,17 +2564,13 @@ class MishuraApp {
                     this.showNotification('🎉 Добро пожаловать! У вас 200 STcoin!', 'success', 5000);
                 }
                 
-                // Синхронизируем историю консультаций
                 await this.syncUserHistory();
-                
                 return serverData;
             } else {
                 throw new Error('Ошибка инициализации пользователя на сервере');
             }
         } catch (error) {
             console.error('❌ Ошибка инициализации пользователя:', error);
-            // Fallback на локальные данные
-            this.loadUserData();
             return null;
         }
     }

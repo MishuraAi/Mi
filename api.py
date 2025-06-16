@@ -2,19 +2,19 @@
 """
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Production API сервер с интеграцией ЮKassa (api.py)
-ВЕРСИЯ: 1.3.1 - ИСПРАВЛЕНЫ ПРОБЛЕМЫ RENDER.COM
+КОМПОНЕНТ: Production API сервер с интеграцией ЮKassa + синхронизация (api.py)
+ВЕРСИЯ: 1.3.2 - ДОБАВЛЕНА СИНХРОНИЗАЦИЯ USER_ID
 ДАТА ОБНОВЛЕНИЯ: 2025-06-16
 
 НАЗНАЧЕНИЕ:
 FastAPI сервер для обработки запросов анализа изображений через Gemini AI
 + интеграция платежной системы ЮKassa
++ синхронизация пользователей между устройствами
 
-ИСПРАВЛЕНИЯ v1.3.1:
-- Исправлены CORS настройки для Render.com
-- Убрана блокирующая проверка payment_service.configured
-- Добавлено детальное логирование ошибок
-- Исправлена обработка тестовых ключей ЮKassa
+НОВОЕ В v1.3.2:
+- Добавлены endpoints для синхронизации user_id между устройствами
+- Исправлена проблема разных балансов в Telegram и браузере
+- Добавлена принудительная синхронизация баланса
 ==========================================================================================
 """
 
@@ -80,9 +80,9 @@ PORT = int(os.getenv('BACKEND_PORT', 8000))
 
 # Создание FastAPI приложения
 app = FastAPI(
-    title="МИШУРА ИИ-Стилист API с ЮKassa",
-    description="API для анализа стиля одежды с помощью Google Gemini AI + платежная система",
-    version="1.3.1",
+    title="МИШУРА ИИ-Стилист API с ЮKassa + Синхронизация",
+    description="API для анализа стиля одежды с помощью Google Gemini AI + платежная система + синхронизация",
+    version="1.3.2",
     docs_url="/api/v1/docs" if DEBUG else None,
     redoc_url="/api/v1/redoc" if DEBUG else None
 )
@@ -185,6 +185,13 @@ class UserInitRequest(BaseModel):
     username: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+
+# НОВЫЕ МОДЕЛИ ДЛЯ СИНХРОНИЗАЦИИ
+class UserSyncRequest(BaseModel):
+    user_id: int
+    telegram_data: Optional[Dict[str, Any]] = None
+    sync_timestamp: int
+    client_info: Optional[Dict[str, str]] = None
 
 # Утилиты для работы с изображениями
 def process_image(image_data: bytes) -> Image.Image:
@@ -358,7 +365,7 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         service="МИШУРА ИИ-Стилист API с ЮKassa",
-        version="1.3.1",
+        version="1.3.2",
         gemini_configured=gemini_configured,
         gemini_working=gemini_working,
         environment=ENVIRONMENT,
@@ -688,73 +695,12 @@ async def get_payment_status(payment_id: str):
         raise HTTPException(status_code=500, detail="Ошибка получения статуса")
 
 # ===========================================================================
-# СТАТИЧЕСКИЕ ФАЙЛЫ И МАРШРУТИЗАЦИЯ
-# ===========================================================================
-
-# Главная страница
-@app.get("/")
-async def read_root():
-    return FileResponse('webapp/index.html')
-
-# Catch-all (ПОСЛЕДНИМ!)
-@app.get("/{full_path:path}")
-async def catch_all(full_path: str):
-    file_path = Path("webapp") / full_path
-    if file_path.exists() and file_path.is_file():
-        return FileResponse(file_path)
-    return FileResponse('webapp/index.html')
-
-# ===========================================================================
-# СОБЫТИЯ ЖИЗНЕННОГО ЦИКЛА
-# ===========================================================================
-
-@app.on_event("startup")
-async def startup_event():
-    """Инициализация при запуске сервера"""
-    logger.info("🚀 Запуск МИШУРА API сервера с ЮKassa...")
-    logger.info(f"📋 Среда: {ENVIRONMENT}")
-    logger.info(f"🌐 Хост: {HOST}:{PORT}")
-    logger.info(f"🔧 Debug режим: {DEBUG}")
-    
-    # Инициализируем базу данных
-    try:
-        if database.init_db():
-            logger.info("✅ База данных инициализирована")
-        else:
-            logger.error("❌ Ошибка инициализации базы данных")
-    except Exception as e:
-        logger.error(f"❌ Ошибка подключения к БД: {e}")
-    
-    # Инициализируем Gemini AI
-    if init_gemini():
-        logger.info("✅ Gemini AI готов к работе")
-    else:
-        logger.warning("⚠️ Gemini AI недоступен, работаем в режиме fallback")
-    
-    # Проверяем статус платежной системы
-    payment_status = payment_service.payment_service.get_service_status()
-    logger.info(f"🔧 Payment service status: {payment_status}")
-    
-    if payment_status['status'] == 'online':
-        logger.info("✅ ЮKassa платежная система настроена и готова")
-    else:
-        logger.warning(f"⚠️ ЮKassa статус: {payment_status['status']}")
-        logger.warning("ℹ️ Платежи могут работать в тестовом режиме")
-    
-    logger.info("🎭 МИШУРА API сервер с ЮKassa полностью готов!")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Очистка ресурсов при остановке"""
-    logger.info("🛑 Остановка МИШУРА API сервера...")
-
-# ===========================================================================
-# API РОУТЫ ДЛЯ СИНХРОНИЗАЦИИ БАЛАНСА ПОЛЬЗОВАТЕЛЯ
+# API РОУТЫ ДЛЯ СИНХРОНИЗАЦИИ БАЛАНСА ПОЛЬЗОВАТЕЛЯ (старые)
 # ===========================================================================
 
 @app.get("/api/v1/user/{user_id}/balance", response_model=UserBalanceResponse)
 async def get_user_balance(user_id: int):
-    """Получить актуальный баланс пользователя"""
+    """Получить актуальный баланс пользователя (старый endpoint)"""
     logger.info(f"👤 Запрос баланса для user_id={user_id}")
     
     try:
@@ -901,6 +847,226 @@ async def sync_user_balance(user_id: int):
     except Exception as e:
         logger.error(f"❌ Ошибка синхронизации баланса для user_id={user_id}: {e}")
         raise HTTPException(status_code=500, detail="Ошибка синхронизации баланса")
+
+# ===========================================================================
+# НОВЫЕ API РОУТЫ ДЛЯ СИНХРОНИЗАЦИИ USER_ID
+# ===========================================================================
+
+@app.get("/api/v1/users/{user_id}/balance")
+async def get_user_balance_sync(user_id: int):
+    """Получение актуального баланса пользователя (новый endpoint для синхронизации)"""
+    try:
+        logger.info(f"💰 Запрос баланса для user_id: {user_id}")
+        
+        # Проверяем существование пользователя
+        user_data = database.get_user(user_id)
+        if not user_data:
+            logger.info(f"👤 Создаем нового пользователя {user_id}")
+            # Создаем пользователя если не существует
+            database.save_user(
+                telegram_id=user_id,
+                username=f"user_{user_id}",
+                first_name="Пользователь",
+                last_name=""
+            )
+            # Устанавливаем начальный баланс
+            database.update_user_balance(user_id, 200)
+            balance = 200  # Стартовый баланс
+        else:
+            balance = database.get_user_balance(user_id)
+        
+        response_data = {
+            "user_id": user_id,
+            "balance": balance,
+            "timestamp": datetime.now().isoformat(),
+            "consultations_available": balance // 10,
+            "status": "success"
+        }
+        
+        logger.info(f"✅ Баланс user_id {user_id}: {balance} STcoin")
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения баланса для user_id {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/users/sync")
+async def sync_user_endpoint(request: Request):
+    """Синхронизация пользователя между устройствами"""
+    try:
+        # Получаем JSON данные напрямую
+        data = await request.json()
+        
+        user_id = data.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id required")
+        
+        telegram_data = data.get("telegram_data", {})
+        sync_timestamp = data.get("sync_timestamp", 0)
+        
+        logger.info(f"🔄 Синхронизация пользователя {user_id}")
+        
+        # Проверяем существование пользователя
+        user_data = database.get_user(user_id)
+        
+        if not user_data:
+            # Создаем нового пользователя
+            logger.info(f"👤 Создание нового пользователя {user_id}")
+            
+            username = None
+            first_name = "Пользователь"
+            last_name = ""
+            
+            if telegram_data:
+                username = telegram_data.get("username")
+                first_name = telegram_data.get("first_name", "Пользователь")
+                last_name = telegram_data.get("last_name", "")
+            
+            database.save_user(
+                telegram_id=user_id,
+                username=username or f"user_{user_id}",
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+            # Устанавливаем начальный баланс
+            database.update_user_balance(user_id, 200)
+            new_balance = 200  # Стартовый баланс
+            is_new_user = True
+        else:
+            new_balance = database.get_user_balance(user_id)
+            is_new_user = False
+        
+        # Получаем консультации
+        try:
+            recent_consultations = database.get_user_consultations(user_id, limit=5)
+            consultations_count = len(recent_consultations) if recent_consultations else 0
+        except:
+            consultations_count = 0
+        
+        sync_result = {
+            "user_id": user_id,
+            "balance": new_balance,
+            "is_new_user": is_new_user,
+            "sync_timestamp": sync_timestamp,
+            "server_timestamp": datetime.now().isoformat(),
+            "consultations_count": consultations_count,
+            "status": "success"
+        }
+        
+        if telegram_data:
+            sync_result["telegram_synced"] = True
+            sync_result["username"] = telegram_data.get("username")
+            sync_result["first_name"] = telegram_data.get("first_name")
+        
+        logger.info(f"✅ Пользователь {user_id} синхронизирован: balance={new_balance}")
+        
+        return sync_result
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка синхронизации пользователя: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/users/{user_id}/balance/add")
+async def add_user_balance_endpoint(user_id: int, amount: int):
+    """Добавление STcoin к балансу пользователя (для тестирования)"""
+    try:
+        logger.info(f"💰 Добавление {amount} STcoin пользователю {user_id}")
+        
+        # Проверяем существование пользователя
+        user_data = database.get_user(user_id)
+        if not user_data:
+            logger.info(f"👤 Создаем пользователя {user_id}")
+            database.save_user(
+                telegram_id=user_id,
+                username=f"user_{user_id}",
+                first_name="Пользователь",
+                last_name=""
+            )
+            # Устанавливаем начальный баланс
+            database.update_user_balance(user_id, 200)
+        
+        # Обновляем баланс
+        database.update_user_balance(user_id, amount)
+        new_balance = database.get_user_balance(user_id)
+        
+        response_data = {
+            "user_id": user_id,
+            "amount_added": amount,
+            "new_balance": new_balance,
+            "consultations_available": new_balance // 10,
+            "timestamp": datetime.now().isoformat(),
+            "status": "success"
+        }
+        
+        logger.info(f"✅ Баланс пользователя {user_id} обновлен: +{amount} = {new_balance}")
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка обновления баланса: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================================================================
+# СТАТИЧЕСКИЕ ФАЙЛЫ И МАРШРУТИЗАЦИЯ
+# ===========================================================================
+
+# Главная страница
+@app.get("/")
+async def read_root():
+    return FileResponse('webapp/index.html')
+
+# Catch-all (ПОСЛЕДНИМ!)
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    file_path = Path("webapp") / full_path
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(file_path)
+    return FileResponse('webapp/index.html')
+
+# ===========================================================================
+# СОБЫТИЯ ЖИЗНЕННОГО ЦИКЛА
+# ===========================================================================
+
+@app.on_event("startup")
+async def startup_event():
+    """Инициализация при запуске сервера"""
+    logger.info("🚀 Запуск МИШУРА API сервера с ЮKassa...")
+    logger.info(f"📋 Среда: {ENVIRONMENT}")
+    logger.info(f"🌐 Хост: {HOST}:{PORT}")
+    logger.info(f"🔧 Debug режим: {DEBUG}")
+    
+    # Инициализируем базу данных
+    try:
+        if database.init_db():
+            logger.info("✅ База данных инициализирована")
+        else:
+            logger.error("❌ Ошибка инициализации базы данных")
+    except Exception as e:
+        logger.error(f"❌ Ошибка подключения к БД: {e}")
+    
+    # Инициализируем Gemini AI
+    if init_gemini():
+        logger.info("✅ Gemini AI готов к работе")
+    else:
+        logger.warning("⚠️ Gemini AI недоступен, работаем в режиме fallback")
+    
+    # Проверяем статус платежной системы
+    payment_status = payment_service.payment_service.get_service_status()
+    logger.info(f"🔧 Payment service status: {payment_status}")
+    
+    if payment_status['status'] == 'online':
+        logger.info("✅ ЮKassa платежная система настроена и готова")
+    else:
+        logger.warning(f"⚠️ ЮKassa статус: {payment_status['status']}")
+        logger.warning("ℹ️ Платежи могут работать в тестовом режиме")
+    
+    logger.info("🎭 МИШУРА API сервер с ЮKassa полностью готов!")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Очистка ресурсов при остановке"""
+    logger.info("🛑 Остановка МИШУРА API сервера...")
 
 # Запуск сервера
 if __name__ == "__main__":

@@ -2,15 +2,20 @@
 """
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Production API сервер (api.py)
-ВЕРСИЯ: 1.2.0
-ДАТА СОЗДАНИЯ: 2025-06-05
+КОМПОНЕНТ: Production API сервер с интеграцией ЮKassa (api.py)
+ВЕРСИЯ: 1.3.0
+ДАТА ОБНОВЛЕНИЯ: 2025-06-15
 
 НАЗНАЧЕНИЕ:
 FastAPI сервер для обработки запросов анализа изображений через Gemini AI
-Предоставляет REST API для веб-приложения МИШУРЫ
++ интеграция платежной системы ЮKassa
 
-ЭНДПОИНТЫ:
+НОВЫЕ ЭНДПОИНТЫ:
+- GET /api/v1/payments/packages - получение пакетов пополнения
+- POST /api/v1/payments/create - создание платежа
+- POST /api/v1/payments/webhook - webhook от ЮKassa
+
+СУЩЕСТВУЮЩИЕ ЭНДПОИНТЫ:
 - GET /api/v1/health - проверка состояния сервера
 - POST /api/v1/analyze - анализ одного изображения
 - POST /api/v1/compare - сравнение нескольких изображений
@@ -28,7 +33,7 @@ import base64
 import json
 from typing import Optional, List, Dict, Any
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
@@ -37,7 +42,7 @@ from PIL import Image
 import io
 from fastapi.staticfiles import StaticFiles
 
-# Добавляем текущую директорию в путь для импорта database.py
+# Добавляем текущую директорию в путь для импорта database.py и payment_service.py
 sys.path.append(str(Path(__file__).parent))
 
 try:
@@ -45,6 +50,13 @@ try:
 except ImportError:
     print("❌ ОШИБКА: Не удалось импортировать database.py")
     print("💡 Убедитесь, что файл database.py находится в той же папке")
+    sys.exit(1)
+
+try:
+    import payment_service
+except ImportError:
+    print("❌ ОШИБКА: Не удалось импортировать payment_service.py")
+    print("💡 Убедитесь, что файл payment_service.py находится в той же папке")
     sys.exit(1)
 
 # Настройка логирования
@@ -72,9 +84,9 @@ PORT = int(os.getenv('BACKEND_PORT', 8000))
 
 # Создание FastAPI приложения
 app = FastAPI(
-    title="МИШУРА ИИ-Стилист API",
-    description="API для анализа стиля одежды с помощью Google Gemini AI",
-    version="1.2.0",
+    title="МИШУРА ИИ-Стилист API с ЮKassa",
+    description="API для анализа стиля одежды с помощью Google Gemini AI + платежная система",
+    version="1.3.0",
     docs_url="/api/v1/docs" if DEBUG else None,
     redoc_url="/api/v1/redoc" if DEBUG else None
 )
@@ -130,7 +142,7 @@ def init_gemini():
         gemini_configured = False
         return False
 
-# Модели данных
+# Модели данных для существующих эндпоинтов
 class AnalyzeRequest(BaseModel):
     occasion: str = "повседневный"
     preferences: Optional[str] = None
@@ -149,6 +161,16 @@ class HealthResponse(BaseModel):
     gemini_working: bool
     environment: str
     timestamp: str
+
+# НОВЫЕ МОДЕЛИ ДАННЫХ ДЛЯ ПЛАТЕЖЕЙ
+class CreatePaymentRequest(BaseModel):
+    user_id: int
+    package_id: str
+    return_url: Optional[str] = None
+
+class WebhookRequest(BaseModel):
+    event: str
+    object: Dict[str, Any]
 
 # Утилиты для работы с изображениями
 def process_image(image_data: bytes) -> Image.Image:
@@ -299,7 +321,10 @@ async def compare_with_gemini(images: List[Image.Image], occasion: str, preferen
 # Подключаем статические файлы веб-приложения  
 app.mount("/webapp", StaticFiles(directory="webapp"), name="webapp")
 
-# 2. ВСЕ API роуты
+# ===========================================================================
+# СУЩЕСТВУЮЩИЕ API РОУТЫ (без изменений)
+# ===========================================================================
+
 @app.get("/api/v1/health", response_model=HealthResponse)
 async def health_check():
     """Проверка состояния сервера"""
@@ -318,8 +343,8 @@ async def health_check():
     
     return HealthResponse(
         status="healthy",
-        service="МИШУРА ИИ-Стилист API",
-        version="1.2.0",
+        service="МИШУРА ИИ-Стилист API с ЮKassa",
+        version="1.3.0",
         gemini_configured=gemini_configured,
         gemini_working=gemini_working,
         environment=ENVIRONMENT,
@@ -363,8 +388,8 @@ async def analyze_clothing(
                 )
                 
                 # Списываем баланс
-                database.update_user_balance(user_id, -1)
-                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на 1")
+                database.update_user_balance(user_id, -10)  # STcoin: списываем 10 STcoin
+                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на 10 STcoin")
                 
             except Exception as e:
                 logger.warning(f"⚠️ Ошибка сохранения в БД: {e}")
@@ -437,9 +462,9 @@ async def compare_clothing(
                 )
                 
                 # Списываем баланс (сравнение стоит больше)
-                cost = len(files)  # 1 консультация за каждое изображение
+                cost = len(files) * 10  # STcoin: 10 STcoin за каждое изображение
                 database.update_user_balance(user_id, -cost)
-                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на {cost}")
+                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на {cost} STcoin")
                 
             except Exception as e:
                 logger.warning(f"⚠️ Ошибка сохранения в БД: {e}")
@@ -478,12 +503,140 @@ async def get_status():
         "timestamp": datetime.now().isoformat()
     }
 
-# 3. Главная страница
+# ===========================================================================
+# НОВЫЕ API РОУТЫ ДЛЯ ПЛАТЕЖЕЙ ЮKassa
+# ===========================================================================
+
+@app.get("/api/v1/payments/packages")
+async def get_payment_packages():
+    """Получить доступные пакеты пополнения STcoin"""
+    logger.info("📦 Запрос пакетов пополнения")
+    
+    try:
+        packages = payment_service.payment_service.get_packages()
+        return JSONResponse(content=packages)
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения пакетов: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения пакетов")
+
+@app.post("/api/v1/payments/create")
+async def create_payment(request: CreatePaymentRequest):
+    """Создать платеж для пополнения баланса"""
+    logger.info(f"💳 Создание платежа для user_id={request.user_id}, package={request.package_id}")
+    
+    try:
+        # ВРЕМЕННО ЗАКОММЕНТИРОВАНО для тестирования
+        # # Проверяем что сервис платежей настроен
+        # if not payment_service.payment_service.configured:
+        #     raise HTTPException(
+        #         status_code=503, 
+        #         detail="Платежная система временно недоступна"
+        #     )
+        
+        # Создаем платеж
+        result = payment_service.payment_service.create_payment(
+            user_id=request.user_id,
+            package_id=request.package_id,
+            return_url=request.return_url
+        )
+        
+        if result['status'] == 'success':
+            logger.info(f"✅ Платеж создан: {result['payment_id']}")
+            return JSONResponse(content=result)
+        else:
+            logger.error(f"❌ Ошибка создания платежа: {result}")
+            raise HTTPException(
+                status_code=400, 
+                detail=result.get('message', 'Не удалось создать платеж')
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка создания платежа: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка создания платежа")
+
+@app.post("/api/v1/payments/webhook")
+async def payment_webhook(
+    request: Request,
+    signature: Optional[str] = Header(None, alias="X-Signature")
+):
+    """Webhook для обработки уведомлений от ЮKassa"""
+    logger.info("🔔 Получен webhook от ЮKassa")
+    
+    try:
+        # Читаем тело запроса
+        body = await request.body()
+        webhook_data = json.loads(body.decode('utf-8'))
+        
+        logger.debug(f"📨 Webhook данные: {json.dumps(webhook_data, ensure_ascii=False, indent=2)}")
+        
+        # Проверяем подпись (в продакшне)
+        if signature and ENVIRONMENT == 'production':
+            is_valid = payment_service.payment_service.validate_webhook_signature(
+                body.decode('utf-8'), 
+                signature
+            )
+            if not is_valid:
+                logger.warning("⚠️ Неверная подпись webhook")
+                raise HTTPException(status_code=401, detail="Неверная подпись")
+        
+        # Обрабатываем webhook
+        result = payment_service.payment_service.process_webhook(webhook_data)
+        
+        if result['status'] == 'success':
+            logger.info(f"✅ Webhook обработан успешно: {result}")
+            return JSONResponse(content={"status": "ok"})
+        elif result['status'] == 'ignored':
+            logger.info(f"ℹ️ Webhook проигнорирован: {result}")
+            return JSONResponse(content={"status": "ok"})
+        else:
+            logger.error(f"❌ Ошибка обработки webhook: {result}")
+            return JSONResponse(
+                content={"status": "error", "message": result.get('message')},
+                status_code=400
+            )
+            
+    except json.JSONDecodeError:
+        logger.error("❌ Некорректный JSON в webhook")
+        raise HTTPException(status_code=400, detail="Некорректный JSON")
+    except Exception as e:
+        logger.error(f"❌ Ошибка обработки webhook: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка обработки webhook")
+
+@app.get("/api/v1/payments/status/{payment_id}")
+async def get_payment_status(payment_id: str):
+    """Получить статус платежа"""
+    logger.info(f"🔍 Запрос статуса платежа: {payment_id}")
+    
+    try:
+        result = payment_service.payment_service.get_payment_status(payment_id)
+        
+        if result['status'] == 'success':
+            return JSONResponse(content=result)
+        else:
+            raise HTTPException(
+                status_code=404, 
+                detail=result.get('message', 'Платеж не найден')
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения статуса платежа: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения статуса")
+
+# ===========================================================================
+# СТАТИЧЕСКИЕ ФАЙЛЫ И МАРШРУТИЗАЦИЯ
+# ===========================================================================
+
+# Главная страница
 @app.get("/")
 async def read_root():
     return FileResponse('webapp/index.html')
 
-# 4. Catch-all (ПОСЛЕДНИМ!)
+# Catch-all (ПОСЛЕДНИМ!)
 @app.get("/{full_path:path}")
 async def catch_all(full_path: str):
     file_path = Path("webapp") / full_path
@@ -491,11 +644,14 @@ async def catch_all(full_path: str):
         return FileResponse(file_path)
     return FileResponse('webapp/index.html')
 
-# События жизненного цикла
+# ===========================================================================
+# СОБЫТИЯ ЖИЗНЕННОГО ЦИКЛА
+# ===========================================================================
+
 @app.on_event("startup")
 async def startup_event():
     """Инициализация при запуске сервера"""
-    logger.info("🚀 Запуск МИШУРА API сервера...")
+    logger.info("🚀 Запуск МИШУРА API сервера с ЮKassa...")
     logger.info(f"📋 Среда: {ENVIRONMENT}")
     logger.info(f"🌐 Хост: {HOST}:{PORT}")
     
@@ -514,7 +670,14 @@ async def startup_event():
     else:
         logger.warning("⚠️ Gemini AI недоступен, работаем в режиме fallback")
     
-    logger.info("🎭 МИШУРА API сервер полностью готов!")
+    # Проверяем статус платежной системы
+    payment_status = payment_service.payment_service.get_service_status()
+    if payment_status['status'] == 'online':
+        logger.info("✅ ЮKassa платежная система настроена и готова")
+    else:
+        logger.warning("⚠️ ЮKassa недоступна, платежи отключены")
+    
+    logger.info("🎭 МИШУРА API сервер с ЮKassa полностью готов!")
 
 @app.on_event("shutdown")
 async def shutdown_event():

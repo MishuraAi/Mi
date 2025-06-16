@@ -1,12 +1,12 @@
 // 🎭 МИШУРА - Твой Стилист
-// Главный файл приложения - app.js (ПРОДАКШН ВЕРСИЯ С ПАТЧАМИ V2 + STcoin)
-// Версия: 2.2.0 - Все критические исправления + STcoin система
+// Главный файл приложения - app.js (ПРОДАКШН ВЕРСИЯ С ПАТЧАМИ V2 + STcoin + ЮKassa)
+// Версия: 2.3.0 - Все критические исправления + STcoin система + ЮKassa интеграция
 
-console.log('🎭 МИШУРА App загружается с патчами V2 + STcoin...');
+console.log('🎭 МИШУРА App загружается с патчами V2 + STcoin + ЮKassa...');
 
 class MishuraApp {
     constructor() {
-        console.log('🚀 Инициализация MishuraApp с патчами V2 + STcoin...');
+        console.log('🚀 Инициализация MishuraApp с патчами V2 + STcoin + ЮKassa...');
         
         // Состояние приложения
         this.currentMode = null; // 'single' или 'compare'
@@ -27,6 +27,11 @@ class MishuraApp {
         this.userBalance = 200; // STcoin баланс
         this.consultationsHistory = [];
         this.consultationsUsed = 0;
+        
+        // НОВОЕ: Состояние платежей ЮKassa
+        this.paymentPackages = null;
+        this.currentPayment = null;
+        this.paymentCheckInterval = null;
         
         // ПАТЧ V2: Исправленная инициализация API с правильным контекстом
         this.api = null;
@@ -134,6 +139,9 @@ class MishuraApp {
                     const status = await this.api.getStatus();
                     if (status && status.api_status === 'online') {
                         console.log('🎯 API полностью работоспособен');
+                        
+                        // НОВОЕ: Загружаем пакеты платежей
+                        await this.loadPaymentPackages();
                     } else {
                         throw new Error('API не прошел проверку статуса');
                     }
@@ -155,6 +163,26 @@ class MishuraApp {
             this.api = new window.MockMishuraAPIService();
             console.log('🎭 Mock API активирован из-за ошибки:', error);
             this.updateAPIStatus();
+        }
+    }
+
+    // НОВОЕ: Загрузка пакетов платежей с API
+    async loadPaymentPackages() {
+        try {
+            console.log('💳 Загрузка пакетов платежей...');
+            
+            const response = await fetch('/api/v1/payments/packages');
+            if (response.ok) {
+                const data = await response.json();
+                this.paymentPackages = data.packages;
+                console.log('✅ Пакеты платежей загружены:', Object.keys(this.paymentPackages).length);
+            } else {
+                console.warn('⚠️ Не удалось загрузить пакеты платежей');
+                this.paymentPackages = null;
+            }
+        } catch (error) {
+            console.warn('⚠️ Ошибка загрузки пакетов:', error);
+            this.paymentPackages = null;
         }
     }
 
@@ -207,7 +235,7 @@ class MishuraApp {
             this.setupTelegramIntegration();
             
             this.initializationComplete = true;
-            console.log('✅ MishuraApp инициализирован с патчами V2 + STcoin');
+            console.log('✅ MishuraApp инициализирован с патчами V2 + STcoin + ЮKassa');
         } catch (error) {
             console.error('❌ Ошибка инициализации:', error);
         }
@@ -442,7 +470,7 @@ class MishuraApp {
         container.innerHTML = historyHTML;
     }
 
-    // STcoin: Обновленная секция баланса
+    // STcoin + ЮKassa: Обновленная секция баланса с интеграцией платежей
     showBalanceSection() {
         const container = document.querySelector('.container');
         if (!container) return;
@@ -514,7 +542,7 @@ class MishuraApp {
                     border: 2px solid var(--border-gold);
                     color: var(--text-gold);
                 ">
-                    <span class="icon">➕</span>
+                    <span class="icon">💳</span>
                     Пополнить STcoin
                 </button>
                 
@@ -540,7 +568,7 @@ class MishuraApp {
                     ">
                         Каждый новый пользователь получает 200 STcoin. 
                         Одна консультация стоит 10 STcoin.
-                        После использования можно приобрести дополнительные STcoin.
+                        Пополнение через безопасную платежную систему ЮKassa.
                     </div>
                 </div>
             </div>
@@ -550,24 +578,387 @@ class MishuraApp {
         const addBalanceBtn = document.getElementById('add-balance-btn');
         if (addBalanceBtn) {
             addBalanceBtn.addEventListener('click', () => {
-                this.showAddBalanceModal();
+                this.showPaymentModal();
             });
         }
     }
 
-    // STcoin: Обновленное модальное окно пополнения баланса
-    showAddBalanceModal() {
-        this.showNotification('🚧 Функция в разработке. Скоро будет доступна оплата!', 'info', 4000);
-        this.triggerHapticFeedback('warning');
+    // НОВОЕ: Модальное окно пополнения через ЮKassa
+    showPaymentModal() {
+        // Проверяем доступность пакетов
+        if (!this.paymentPackages) {
+            this.showNotification('🔄 Загружаем пакеты пополнения...', 'info');
+            this.loadPaymentPackages().then(() => {
+                if (this.paymentPackages) {
+                    this.showPaymentModal();
+                } else {
+                    this.showNotification('❌ Пакеты пополнения недоступны', 'error');
+                }
+            });
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.id = 'payment-modal';
         
-        // Пока что добавляем 100 STcoin бесплатно для тестирования
+        let packagesHTML = '';
+        Object.entries(this.paymentPackages).forEach(([packageId, packageData]) => {
+            const isPopular = packageData.popular;
+            packagesHTML += `
+                <div class="payment-package ${isPopular ? 'popular' : ''}" 
+                     data-package-id="${packageId}"
+                     style="
+                        background: ${isPopular ? 'linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.1))' : 'rgba(26, 26, 26, 0.8)'};
+                        border: 2px solid ${isPopular ? 'var(--border-gold)' : 'var(--border-light)'};
+                        border-radius: 16px;
+                        padding: 20px;
+                        margin-bottom: 16px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        position: relative;
+                     ">
+                    ${isPopular ? '<div style="position: absolute; top: -8px; right: 16px; background: var(--accent-gold); color: var(--bg-primary); padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">🔥 ПОПУЛЯРНЫЙ</div>' : ''}
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 style="color: var(--text-gold); margin: 0; font-size: 1.2rem;">${packageData.name}</h3>
+                        <div style="color: var(--text-light); font-size: 1.5rem; font-weight: 700;">${packageData.price_rub}₽</div>
+                    </div>
+                    
+                    <div style="color: var(--text-muted); margin-bottom: 12px; font-size: 0.9rem;">
+                        ${packageData.description}
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="color: var(--text-light);">
+                            <span style="font-size: 1.1rem; font-weight: 600;">${packageData.stcoin}</span>
+                            <span style="color: var(--text-muted); margin-left: 4px;">STcoin</span>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 0.9rem;">
+                            ${packageData.consultations} консультаций
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2 class="modal-title">💳 Пополнение STcoin</h2>
+                    <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="
+                        background: rgba(212, 175, 55, 0.1);
+                        border: 1px solid var(--border-gold);
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 20px;
+                        text-align: center;
+                    ">
+                        <div style="color: var(--text-gold); font-weight: 600; margin-bottom: 8px;">
+                            🔒 Безопасная оплата через ЮKassa
+                        </div>
+                        <div style="color: var(--text-light); font-size: 0.9rem;">
+                            Принимаем карты Visa, MasterCard, МИР, СБП и другие способы оплаты
+                        </div>
+                    </div>
+                    
+                    <div class="payment-packages">
+                        ${packagesHTML}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Добавляем обработчики клика на пакеты
+        modal.querySelectorAll('.payment-package').forEach(packageElement => {
+            packageElement.addEventListener('click', () => {
+                const packageId = packageElement.dataset.packageId;
+                this.initiatePayment(packageId);
+            });
+            
+            // Hover эффекты
+            packageElement.addEventListener('mouseenter', () => {
+                packageElement.style.transform = 'translateY(-2px)';
+                packageElement.style.boxShadow = '0 8px 24px rgba(212, 175, 55, 0.3)';
+            });
+            
+            packageElement.addEventListener('mouseleave', () => {
+                packageElement.style.transform = 'translateY(0)';
+                packageElement.style.boxShadow = 'none';
+            });
+        });
+        
+        this.triggerHapticFeedback('light');
+    }
+
+    // НОВОЕ: Инициация платежа через ЮKassa
+    async initiatePayment(packageId) {
+        const packageData = this.paymentPackages[packageId];
+        if (!packageData) {
+            this.showNotification('❌ Пакет не найден', 'error');
+            return;
+        }
+
+        try {
+            this.showNotification('💳 Создаем платеж...', 'info');
+
+            // Создаем платеж через API
+            const response = await fetch('/api/v1/payments/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: 12345, // TODO: Получать реальный user_id
+                    package_id: packageId,
+                    return_url: window.location.origin + '/webapp'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const paymentData = await response.json();
+
+            if (paymentData.status === 'success') {
+                // Сохраняем информацию о платеже
+                this.currentPayment = {
+                    id: paymentData.payment_id,
+                    packageId: packageId,
+                    amount: paymentData.amount,
+                    stcoinAmount: paymentData.stcoin_amount,
+                    confirmationUrl: paymentData.confirmation_url
+                };
+
+                // Закрываем модальное окно пакетов
+                const paymentModal = document.getElementById('payment-modal');
+                if (paymentModal) {
+                    paymentModal.remove();
+                }
+
+                // Показываем модальное окно подтверждения
+                this.showPaymentConfirmation();
+
+            } else {
+                throw new Error(paymentData.message || 'Не удалось создать платеж');
+            }
+
+        } catch (error) {
+            console.error('❌ Ошибка создания платежа:', error);
+            this.showNotification('❌ Ошибка создания платежа. Попробуйте позже.', 'error');
+        }
+    }
+
+    // НОВОЕ: Модальное окно подтверждения платежа
+    showPaymentConfirmation() {
+        if (!this.currentPayment) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.id = 'payment-confirmation-modal';
+
+        const packageData = this.paymentPackages[this.currentPayment.packageId];
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header">
+                    <h2 class="modal-title">💳 Подтверждение платежа</h2>
+                    <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="
+                        background: var(--gold-gradient);
+                        color: var(--text-dark);
+                        border-radius: 16px;
+                        padding: 20px;
+                        margin-bottom: 20px;
+                        text-align: center;
+                    ">
+                        <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px;">
+                            ${packageData.name}
+                        </div>
+                        <div style="font-size: 2rem; font-weight: 900; margin-bottom: 8px;">
+                            ${this.currentPayment.amount}₽
+                        </div>
+                        <div style="font-size: 1rem; opacity: 0.8;">
+                            ${this.currentPayment.stcoinAmount} STcoin
+                        </div>
+                    </div>
+                    
+                    <div style="
+                        background: rgba(26, 26, 26, 0.8);
+                        border: 1px solid var(--border-light);
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 20px;
+                    ">
+                        <div style="color: var(--text-light); margin-bottom: 12px;">
+                            <strong>Что получите:</strong>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.4;">
+                            • ${this.currentPayment.stcoinAmount} STcoin на ваш баланс<br>
+                            • ${packageData.consultations} консультаций стилиста<br>
+                            • Моментальное зачисление после оплаты
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <button id="cancel-payment-btn" style="
+                            flex: 1;
+                            background: transparent;
+                            border: 1px solid var(--border-light);
+                            color: var(--text-light);
+                            padding: 12px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                        ">Отмена</button>
+                        
+                        <button id="proceed-payment-btn" style="
+                            flex: 2;
+                            background: var(--accent-gold);
+                            border: none;
+                            color: var(--bg-primary);
+                            padding: 12px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: 600;
+                        ">Перейти к оплате</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Обработчики кнопок
+        modal.querySelector('#cancel-payment-btn').addEventListener('click', () => {
+            modal.remove();
+            this.currentPayment = null;
+        });
+
+        modal.querySelector('#proceed-payment-btn').addEventListener('click', () => {
+            this.proceedToPayment();
+        });
+
+        this.triggerHapticFeedback('light');
+    }
+
+    // НОВОЕ: Переход к оплате через ЮKassa
+    proceedToPayment() {
+        if (!this.currentPayment || !this.currentPayment.confirmationUrl) {
+            this.showNotification('❌ Ошибка платежа', 'error');
+            return;
+        }
+
+        // Закрываем модальное окно
+        const confirmationModal = document.getElementById('payment-confirmation-modal');
+        if (confirmationModal) {
+            confirmationModal.remove();
+        }
+
+        // Показываем уведомление
+        this.showNotification('🔄 Переходим к оплате...', 'info');
+
+        // Запускаем проверку статуса платежа
+        this.startPaymentStatusCheck();
+
+        // Переходим на страницу оплаты ЮKassa
+        window.open(this.currentPayment.confirmationUrl, '_blank');
+
+        this.triggerHapticFeedback('medium');
+    }
+
+    // НОВОЕ: Проверка статуса платежа
+    startPaymentStatusCheck() {
+        if (this.paymentCheckInterval) {
+            clearInterval(this.paymentCheckInterval);
+        }
+
+        console.log('🔍 Начинаем проверку статуса платежа:', this.currentPayment.id);
+
+        this.paymentCheckInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/v1/payments/status/${this.currentPayment.id}`);
+                
+                if (response.ok) {
+                    const statusData = await response.json();
+                    console.log('💳 Статус платежа:', statusData.payment_status);
+
+                    if (statusData.payment_status === 'succeeded') {
+                        // Платеж успешен
+                        this.handleSuccessfulPayment();
+                    } else if (statusData.payment_status === 'canceled') {
+                        // Платеж отменен
+                        this.handleCanceledPayment();
+                    }
+                    // Если 'pending' - продолжаем проверку
+                } else {
+                    console.warn('⚠️ Ошибка проверки статуса платежа');
+                }
+            } catch (error) {
+                console.warn('⚠️ Ошибка при проверке платежа:', error);
+            }
+        }, 5000); // Проверяем каждые 5 секунд
+
+        // Останавливаем проверку через 10 минут
         setTimeout(() => {
-            this.userBalance += 100; // STcoin: добавляем 100 STcoin (10 консультаций)
-            this.saveUserData();
+            if (this.paymentCheckInterval) {
+                clearInterval(this.paymentCheckInterval);
+                this.paymentCheckInterval = null;
+                console.log('⏰ Время проверки платежа истекло');
+            }
+        }, 600000); // 10 минут
+    }
+
+    // НОВОЕ: Обработка успешного платежа
+    handleSuccessfulPayment() {
+        if (this.paymentCheckInterval) {
+            clearInterval(this.paymentCheckInterval);
+            this.paymentCheckInterval = null;
+        }
+
+        // Обновляем баланс
+        this.userBalance += this.currentPayment.stcoinAmount;
+        this.saveUserData();
+
+        // Показываем успешное уведомление
+        this.showNotification(
+            `🎉 Платеж успешен! Зачислено ${this.currentPayment.stcoinAmount} STcoin`, 
+            'success', 
+            8000
+        );
+
+        // Обновляем секцию баланса если мы на ней
+        if (this.currentSection === 'balance') {
             this.showBalanceSection();
-            this.showNotification('🎁 Добавлено 100 STcoin (10 консультаций)!', 'success');
-            this.triggerHapticFeedback('success');
-        }, 1000);
+        }
+
+        this.currentPayment = null;
+        this.triggerHapticFeedback('success');
+
+        console.log('✅ Платеж успешно обработан');
+    }
+
+    // НОВОЕ: Обработка отмененного платежа
+    handleCanceledPayment() {
+        if (this.paymentCheckInterval) {
+            clearInterval(this.paymentCheckInterval);
+            this.paymentCheckInterval = null;
+        }
+
+        this.showNotification('❌ Платеж отменен', 'warning');
+        this.currentPayment = null;
+        this.triggerHapticFeedback('error');
+
+        console.log('❌ Платеж отменен');
     }
 
     // 📄 Просмотр консультации
@@ -1879,7 +2270,9 @@ class MishuraApp {
             currentMode: this.currentMode,
             currentSection: this.currentSection,
             apiStatus: this.api ? 'connected' : 'disconnected',
-            isMockAPI: this.api && this.api.isMock || false
+            isMockAPI: this.api && this.api.isMock || false,
+            paymentPackages: this.paymentPackages ? Object.keys(this.paymentPackages).length : 0,
+            currentPayment: this.currentPayment ? this.currentPayment.id : null
         };
     }
 
@@ -1893,6 +2286,13 @@ class MishuraApp {
         this.isLoading = false;
         this.lastAnalysisResult = null;
         
+        // Очищаем платежные данные
+        this.currentPayment = null;
+        if (this.paymentCheckInterval) {
+            clearInterval(this.paymentCheckInterval);
+            this.paymentCheckInterval = null;
+        }
+        
         // Возвращаемся на главную
         this.navigateToSection('home');
         
@@ -1903,7 +2303,7 @@ class MishuraApp {
     diagnose() {
         const diagnosis = {
             timestamp: new Date().toISOString(),
-            version: '2.2.0',
+            version: '2.3.0',
             initialization: this.initializationComplete,
             api: {
                 connected: !!this.api,
@@ -1924,6 +2324,12 @@ class MishuraApp {
                 consultationsUsed: this.consultationsUsed,
                 historyCount: this.consultationsHistory.length
             },
+            payments: {
+                packagesLoaded: !!this.paymentPackages,
+                packagesCount: this.paymentPackages ? Object.keys(this.paymentPackages).length : 0,
+                currentPayment: this.currentPayment ? this.currentPayment.id : null,
+                checkingPayment: !!this.paymentCheckInterval
+            },
             analytics: this.getAnalytics(),
             domElements: {
                 overlay: !!document.getElementById('consultation-overlay'),
@@ -1934,7 +2340,7 @@ class MishuraApp {
             }
         };
         
-        console.log('🔧 Диагностика МИШУРЫ:', diagnosis);
+        console.log('🔧 Диагностика МИШУРЫ с ЮKassa:', diagnosis);
         return diagnosis;
     }
 }
@@ -1959,7 +2365,7 @@ function initializeMishuraApp() {
             return;
         }
         
-        console.log('🎬 Создание экземпляра MishuraApp...');
+        console.log('🎬 Создание экземпляра MishuraApp с ЮKassa...');
         window.mishuraApp = new MishuraApp();
         
         // Глобальные утилиты для отладки
@@ -1986,11 +2392,21 @@ function initializeMishuraApp() {
                     if (occasionInput) occasionInput.value = '🎉 Вечеринка';
                     window.mishuraApp.updateSubmitButton();
                 }, 100);
+            },
+            
+            // НОВЫЕ: Тесты платежей
+            testPaymentModal: () => {
+                window.mishuraApp.showPaymentModal();
+            },
+            
+            testPaymentPackages: async () => {
+                await window.mishuraApp.loadPaymentPackages();
+                console.log('Пакеты:', window.mishuraApp.paymentPackages);
             }
         };
         
         console.log(`
-🎉 === МИШУРА ГОТОВА К РАБОТЕ ===
+🎉 === МИШУРА С ЮKASSA ГОТОВА К РАБОТЕ ===
 
 📋 ДОСТУПНЫЕ КОМАНДЫ В КОНСОЛИ:
 • mishuraUtils.diagnose() - диагностика приложения
@@ -1998,14 +2414,17 @@ function initializeMishuraApp() {
 • mishuraUtils.reset() - сброс состояния
 • mishuraUtils.testSingle() - тест single режима
 • mishuraUtils.testCompare() - тест compare режима
+• mishuraUtils.testPaymentModal() - тест модального окна платежей
+• mishuraUtils.testPaymentPackages() - тест загрузки пакетов
 
 🎯 ТЕКУЩЕЕ СОСТОЯНИЕ:
-• Версия: 2.2.0 с патчами V2 + STcoin
+• Версия: 2.3.0 с патчами V2 + STcoin + ЮKassa
 • API: ${window.mishuraApp.api ? (window.mishuraApp.api.isMock ? 'Mock (демо)' : 'Реальный') : 'Не подключен'}
 • Баланс: ${window.mishuraApp.userBalance} STcoin (${Math.floor(window.mishuraApp.userBalance / 10)} консультаций)
+• Платежи: ${window.mishuraApp.paymentPackages ? 'Загружены' : 'В процессе загрузки'}
 • Timeout: ${window.mishuraApp.requestTimeout / 1000} секунд
 
-✨ Приложение полностью загружено и готово к использованию!
+✨ Приложение полностью загружено и готово к использованию с ЮKassa!
         `);
         
     } catch (error) {
@@ -2057,4 +2476,4 @@ function initializeMishuraApp() {
     }
 }
 
-console.log('📦 МИШУРА App модуль загружен успешно с STcoin системой!');
+console.log('📦 МИШУРА App модуль загружен успешно с STcoin системой и ЮKassa!');

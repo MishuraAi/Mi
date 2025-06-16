@@ -169,6 +169,23 @@ class WebhookRequest(BaseModel):
     event: str
     object: Dict[str, Any]
 
+# Модели данных для работы с пользователем
+class UserBalanceRequest(BaseModel):
+    user_id: int
+
+class UserBalanceResponse(BaseModel):
+    status: str
+    user_id: int
+    balance: int
+    consultations_available: int
+    timestamp: str
+
+class UserInitRequest(BaseModel):
+    user_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
 # Утилиты для работы с изображениями
 def process_image(image_data: bytes) -> Image.Image:
     """Обработка изображения"""
@@ -730,6 +747,160 @@ async def startup_event():
 async def shutdown_event():
     """Очистка ресурсов при остановке"""
     logger.info("🛑 Остановка МИШУРА API сервера...")
+
+# ===========================================================================
+# API РОУТЫ ДЛЯ СИНХРОНИЗАЦИИ БАЛАНСА ПОЛЬЗОВАТЕЛЯ
+# ===========================================================================
+
+@app.get("/api/v1/user/{user_id}/balance", response_model=UserBalanceResponse)
+async def get_user_balance(user_id: int):
+    """Получить актуальный баланс пользователя"""
+    logger.info(f"👤 Запрос баланса для user_id={user_id}")
+    
+    try:
+        # Проверяем существует ли пользователь
+        user = database.get_user(user_id)
+        if not user:
+            # Создаем нового пользователя с начальным балансом
+            logger.info(f"🆕 Создаем нового пользователя {user_id}")
+            database.save_user(user_id, None, None, None)
+            # Устанавливаем начальный баланс 200 STcoin
+            database.update_user_balance(user_id, 200)
+        
+        # Получаем текущий баланс
+        balance = database.get_user_balance(user_id)
+        consultations_available = balance // 10  # 1 консультация = 10 STcoin
+        
+        logger.info(f"💰 Баланс user_id={user_id}: {balance} STcoin ({consultations_available} консультаций)")
+        
+        return UserBalanceResponse(
+            status="success",
+            user_id=user_id,
+            balance=balance,
+            consultations_available=consultations_available,
+            timestamp=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения баланса для user_id={user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения баланса")
+
+@app.post("/api/v1/user/init")
+async def init_user(request: UserInitRequest):
+    """Инициализация пользователя (создание или обновление данных)"""
+    logger.info(f"🔄 Инициализация пользователя {request.user_id}")
+    
+    try:
+        # Проверяем существует ли пользователь
+        existing_user = database.get_user(request.user_id)
+        
+        if existing_user:
+            logger.info(f"✅ Пользователь {request.user_id} уже существует")
+            # Обновляем данные пользователя если они изменились
+            if request.username or request.first_name or request.last_name:
+                database.save_user(
+                    request.user_id, 
+                    request.username, 
+                    request.first_name, 
+                    request.last_name
+                )
+                logger.info(f"📝 Данные пользователя {request.user_id} обновлены")
+        else:
+            logger.info(f"🆕 Создаем нового пользователя {request.user_id}")
+            # Создаем нового пользователя
+            database.save_user(
+                request.user_id, 
+                request.username, 
+                request.first_name, 
+                request.last_name
+            )
+            
+            # Устанавливаем начальный баланс 200 STcoin
+            database.update_user_balance(request.user_id, 200)
+            logger.info(f"💰 Пользователю {request.user_id} начислен стартовый баланс 200 STcoin")
+        
+        # Получаем актуальный баланс
+        balance = database.get_user_balance(request.user_id)
+        consultations_available = balance // 10
+        
+        return {
+            "status": "success",
+            "user_id": request.user_id,
+            "balance": balance,
+            "consultations_available": consultations_available,
+            "is_new_user": not bool(existing_user),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка инициализации пользователя {request.user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка инициализации пользователя")
+
+@app.get("/api/v1/user/{user_id}/history")
+async def get_user_history(user_id: int, limit: int = 20):
+    """Получить историю консультаций пользователя"""
+    logger.info(f"📚 Запрос истории для user_id={user_id}, limit={limit}")
+    
+    try:
+        # Получаем историю консультаций
+        consultations = database.get_user_consultations(user_id, limit)
+        
+        # Форматируем данные
+        formatted_consultations = []
+        for consultation in consultations:
+            formatted_consultations.append({
+                "id": consultation[0],
+                "occasion": consultation[2],
+                "preferences": consultation[3],
+                "advice": consultation[5],
+                "created_at": consultation[6],
+                "image_path": consultation[4]
+            })
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "consultations": formatted_consultations,
+            "total_count": len(formatted_consultations),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения истории для user_id={user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка получения истории")
+
+@app.post("/api/v1/user/{user_id}/balance/sync")
+async def sync_user_balance(user_id: int):
+    """Принудительная синхронизация баланса (для отладки)"""
+    logger.info(f"🔄 Синхронизация баланса для user_id={user_id}")
+    
+    try:
+        # Получаем актуальный баланс из БД
+        balance = database.get_user_balance(user_id)
+        consultations_available = balance // 10
+        
+        # Получаем последние платежи пользователя
+        payments = database.get_connection()
+        cursor = payments.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'completed'",
+            (user_id,)
+        )
+        completed_payments = cursor.fetchone()[0]
+        payments.close()
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "balance": balance,
+            "consultations_available": consultations_available,
+            "completed_payments": completed_payments,
+            "synced_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка синхронизации баланса для user_id={user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка синхронизации баланса")
 
 # Запуск сервера
 if __name__ == "__main__":

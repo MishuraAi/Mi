@@ -379,44 +379,38 @@ def get_consultation(consultation_id: int, user_id: Optional[int] = None) -> Opt
         logger.error(f"Непредвиденная ошибка при получении консультации ID={consultation_id}: {e_gen}", exc_info=True)
     return None
 
-def get_user_consultations(user_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+def get_user_consultations(user_id: int, limit: int = 20):
     """
-    Получает последние N консультаций для указанного пользователя.
-
+    Получить консультации пользователя
+    
     Args:
-        user_id (int): Telegram ID пользователя.
-        limit (int): Максимальное количество консультаций для получения.
-
+        user_id: Telegram ID пользователя
+        limit: Максимальное количество консультаций
+    
     Returns:
-        List[Dict[str, Any]]: Список словарей с информацией о консультациях.
-
-    Raises:
-        sqlite3.Error: При ошибках выполнения SQL-запросов.
+        List консультаций пользователя
     """
-    logger.debug(f"Запрос последних {limit} консультаций для user_id={user_id}")
-    sql = '''
-    SELECT id, occasion, preferences, image_path, advice, created_at 
-    FROM consultations 
-    WHERE user_id = ? 
-    ORDER BY created_at DESC 
-    LIMIT ?
-    '''
-    consultations_list = []
     try:
-        with get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(sql, (user_id, limit))
-            rows = cursor.fetchall()
+        conn = get_connection()
+        cursor = conn.cursor()
         
-        for row in rows:
-            consultations_list.append(dict(row))
-        logger.info(f"Найдено {len(consultations_list)} консультаций для user_id={user_id}.")
-    except sqlite3.Error as e:
-        logger.error(f"Ошибка SQLite при получении консультаций для user_id={user_id}: {e}", exc_info=True)
-    except Exception as e_gen:
-        logger.error(f"Непредвиденная ошибка при получении консультаций для user_id={user_id}: {e_gen}", exc_info=True)
-    return consultations_list
+        cursor.execute("""
+            SELECT id, user_id, occasion, preferences, image_path, advice, created_at
+            FROM consultations 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        """, (user_id, limit))
+        
+        consultations = cursor.fetchall()
+        conn.close()
+        
+        logger.info(f"📚 Получено {len(consultations)} консультаций для пользователя {user_id}")
+        return consultations
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения консультаций для пользователя {user_id}: {e}")
+        return []
 
 # --- ФУНКЦИИ ДЛЯ РАБОТЫ С ПЛАТЕЖАМИ ---
 def record_payment(user_id: int, amount_rub: int, status: str = "pending", payment_provider_id: Optional[str] = None) -> Optional[int]:

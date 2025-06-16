@@ -2343,6 +2343,276 @@ class MishuraApp {
         console.log('🔧 Диагностика МИШУРЫ с ЮKassa:', diagnosis);
         return diagnosis;
     }
+
+    // НОВОЕ: Получение реального user_id из Telegram
+    getCurrentUserId() {
+        // Попытка получить реальный user_id из Telegram WebApp
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+            const user = window.Telegram.WebApp.initDataUnsafe.user;
+            if (user && user.id) {
+                console.log('🔍 Получен real user_id из Telegram:', user.id);
+                return user.id;
+            }
+        }
+        
+        // Fallback: генерируем стабильный ID на основе браузера
+        let deviceId = localStorage.getItem('mishura_device_id');
+        if (!deviceId) {
+            deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('mishura_device_id', deviceId);
+            console.log('🔧 Создан device_id:', deviceId);
+        }
+        
+        // Преобразуем device_id в числовой формат для совместимости
+        const numericId = parseInt(deviceId.replace(/\D/g, '').substr(0, 9)) || 12345;
+        console.log('🔧 Используем device-based user_id:', numericId);
+        return numericId;
+    }
+
+    // НОВОЕ: Получение данных пользователя из Telegram
+    getCurrentUserData() {
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+            const user = window.Telegram.WebApp.initDataUnsafe.user;
+            if (user) {
+                return {
+                    id: user.id,
+                    username: user.username || null,
+                    first_name: user.first_name || null,
+                    last_name: user.last_name || null,
+                    language_code: user.language_code || 'ru'
+                };
+            }
+        }
+        
+        return {
+            id: this.getCurrentUserId(),
+            username: null,
+            first_name: null,
+            last_name: null,
+            language_code: 'ru'
+        };
+    }
+
+    // ОБНОВЛЕННОЕ: Инициализация пользователя через API
+    async initializeUser() {
+        try {
+            const userData = this.getCurrentUserData();
+            console.log('👤 Инициализация пользователя:', userData);
+
+            // Отправляем данные пользователя на сервер
+            const response = await fetch('/api/v1/user/init', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: userData.id,
+                    username: userData.username,
+                    first_name: userData.first_name,
+                    last_name: userData.last_name
+                })
+            });
+
+            if (response.ok) {
+                const serverData = await response.json();
+                console.log('✅ Пользователь инициализирован на сервере:', serverData);
+                
+                // Обновляем локальный баланс данными с сервера
+                this.userBalance = serverData.balance;
+                this.userId = serverData.user_id;
+                
+                if (serverData.is_new_user) {
+                    this.showNotification('🎉 Добро пожаловать! У вас 200 STcoin!', 'success', 5000);
+                }
+                
+                // Синхронизируем историю консультаций
+                await this.syncUserHistory();
+                
+                return serverData;
+            } else {
+                throw new Error('Ошибка инициализации пользователя на сервере');
+            }
+        } catch (error) {
+            console.error('❌ Ошибка инициализации пользователя:', error);
+            // Fallback на локальные данные
+            this.loadUserData();
+            return null;
+        }
+    }
+
+    // НОВОЕ: Синхронизация баланса с сервером
+    async syncUserBalance() {
+        try {
+            const userId = this.getCurrentUserId();
+            console.log('💰 Синхронизация баланса для user_id:', userId);
+
+            const response = await fetch(`/api/v1/user/${userId}/balance`);
+            if (response.ok) {
+                const balanceData = await response.json();
+                console.log('📊 Баланс с сервера:', balanceData);
+                
+                // Обновляем локальный баланс
+                const oldBalance = this.userBalance;
+                this.userBalance = balanceData.balance;
+                
+                // Показываем уведомление если баланс изменился
+                if (oldBalance !== this.userBalance && oldBalance > 0) {
+                    const diff = this.userBalance - oldBalance;
+                    if (diff > 0) {
+                        this.showNotification(`💰 Баланс пополнен на ${diff} STcoin!`, 'success');
+                    } else if (diff < 0) {
+                        this.showNotification(`💸 Списано ${Math.abs(diff)} STcoin`, 'info');
+                    }
+                }
+                
+                // Обновляем UI если мы в разделе баланса
+                if (this.currentSection === 'balance') {
+                    this.showBalanceSection();
+                }
+                
+                return balanceData;
+            } else {
+                throw new Error('Ошибка получения баланса с сервера');
+            }
+        } catch (error) {
+            console.error('❌ Ошибка синхронизации баланса:', error);
+            return null;
+        }
+    }
+
+    // НОВОЕ: Синхронизация истории консультаций
+    async syncUserHistory() {
+        try {
+            const userId = this.getCurrentUserId();
+            console.log('📚 Синхронизация истории для user_id:', userId);
+
+            const response = await fetch(`/api/v1/user/${userId}/history?limit=50`);
+            if (response.ok) {
+                const historyData = await response.json();
+                console.log('📋 История с сервера:', historyData.consultations.length, 'консультаций');
+                
+                // Преобразуем серверный формат в локальный
+                this.consultationsHistory = historyData.consultations.map(consultation => ({
+                    id: consultation.id,
+                    type: 'single', // По умолчанию
+                    occasion: consultation.occasion,
+                    preferences: consultation.preferences,
+                    advice: consultation.advice,
+                    timestamp: consultation.created_at,
+                    imagesCount: 1,
+                    metadata: {}
+                }));
+                
+                // Пересчитываем использованные консультации
+                this.consultationsUsed = this.consultationsHistory.length * 10;
+                
+                return historyData;
+            } else {
+                throw new Error('Ошибка получения истории с сервера');
+            }
+        } catch (error) {
+            console.error('❌ Ошибка синхронизации истории:', error);
+            return null;
+        }
+    }
+
+    // ОБНОВЛЕННОЕ: Загрузка данных пользователя (теперь с синхронизацией)
+    async loadUserData() {
+        try {
+            // Сначала пытаемся инициализировать пользователя на сервере
+            const serverData = await this.initializeUser();
+            
+            if (serverData) {
+                console.log('✅ Данные пользователя загружены с сервера');
+            } else {
+                // Fallback на локальные данные
+                console.log('⚠️ Используем локальные данные пользователя');
+                const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
+                this.userBalance = data.balance || 200;
+                this.consultationsHistory = data.history || [];
+                this.consultationsUsed = data.used || 0;
+                this.userId = this.getCurrentUserId();
+            }
+            
+            console.log('📊 Итоговые данные пользователя:', {
+                userId: this.userId,
+                balance: this.userBalance,
+                history: this.consultationsHistory.length,
+                used: this.consultationsUsed
+            });
+        } catch (error) {
+            console.error('❌ Ошибка загрузки данных пользователя:', error);
+            this.initializeUserData();
+        }
+    }
+
+    // ОБНОВЛЕННОЕ: Сохранение данных (теперь без баланса - он хранится на сервере)
+    saveUserData() {
+        try {
+            const data = {
+                last_sync: Date.now(),
+                device_id: localStorage.getItem('mishura_device_id'),
+                user_id: this.userId
+            };
+            
+            localStorage.setItem('mishura_user_data', JSON.stringify(data));
+            console.log('💾 Локальные данные сохранены (без баланса)');
+        } catch (error) {
+            console.error('❌ Ошибка сохранения данных пользователя:', error);
+        }
+    }
+
+    // НОВОЕ: Периодическая синхронизация
+    startPeriodicSync() {
+        // Синхронизируем баланс каждые 30 секунд
+        setInterval(async () => {
+            if (this.currentSection === 'balance') {
+                await this.syncUserBalance();
+            }
+        }, 30000);
+        
+        console.log('🔄 Периодическая синхронизация баланса запущена (каждые 30 сек)');
+    }
+
+    // ОБНОВЛЕННОЕ: Инициализация приложения
+    async init() {
+        if (this.initializationComplete) {
+            console.log('⚠️ Инициализация уже завершена, пропускаем');
+            return;
+        }
+
+        try {
+            console.log('🎯 Начало безопасной инициализации...');
+            
+            // Основные обработчики с защитой от дублирования
+            this.setupModeButtons();
+            this.setupCloseButtons();
+            this.setupSubmitButton();
+            this.initUploaders();
+            this.setupNavigation();
+            
+            // Дополнительные функции
+            this.setupKeyboardShortcuts();
+            this.setupDragAndDrop();
+            this.setupContextMenu();
+            this.setupOccasionDropdown();
+            this.setupResultNavigation();
+            
+            // НОВОЕ: Загружаем данные пользователя с синхронизацией
+            await this.loadUserData();
+            
+            // НОВОЕ: Запускаем периодическую синхронизацию
+            this.startPeriodicSync();
+            
+            // Telegram интеграция
+            this.setupTelegramIntegration();
+            
+            this.initializationComplete = true;
+            console.log('✅ MishuraApp инициализирован с синхронизацией пользователя');
+        } catch (error) {
+            console.error('❌ Ошибка инициализации:', error);
+        }
+    }
 }
 
 // === ИНИЦИАЛИЗАЦИЯ И ЭКСПОРТ ===

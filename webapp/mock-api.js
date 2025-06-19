@@ -2,8 +2,6 @@
 // mock-api.js - Полная имитация API для демо-режима в продакшне
 // Версия: 1.1.0 - Улучшенные ответы из тестирования
 
-console.log('🎭 Резервный Mock API для МИШУРЫ загружается...');
-
 /**
  * Класс Mock API Service для демо-режима
  * Используется когда реальный API недоступен
@@ -34,20 +32,10 @@ class MockMishuraAPIService {
             failureRate: 0.02, // 2% шанс ошибки для реалистичности
             customResponses: new Map()
         };
-        
-        this.log('✅ Mock API сервис инициализирован для демо-режима');
     }
 
     log(message, type = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
-        const prefix = {
-            'info': 'ℹ️',
-            'success': '✅', 
-            'error': '❌',
-            'warning': '⚠️'
-        }[type] || 'ℹ️';
-        
-        console.log(`[${timestamp}] [MOCK-API] ${prefix} ${message}`);
+        // Удалено для оптимизации
     }
 
     /**
@@ -57,8 +45,7 @@ class MockMishuraAPIService {
         if (!this.settings.simulateDelay) return;
         
         const delay = Math.random() * (this.settings.maxDelay - this.settings.minDelay) + this.settings.minDelay;
-        this.log(`Симуляция задержки сети: ${Math.round(delay)}мс`);
-        
+        // this.log(`Симуляция задержки сети: ${Math.round(delay)}мс`); // удалено для оптимизации
         return new Promise(resolve => setTimeout(resolve, delay));
     }
 
@@ -590,7 +577,7 @@ window.activateMockAPI = function() {
         window.originalMishuraAPIService = window.MishuraAPIService;
     }
     window.MishuraAPIService = MockMishuraAPIService;
-    console.log('🎭 Резервный Mock API активирован');
+    // this.log('🎭 Резервный Mock API активирован'); // удалено для оптимизации
     
     // Показываем уведомление пользователю
     if (typeof window.showNotification === 'function') {
@@ -602,7 +589,7 @@ window.activateMockAPI = function() {
 window.restoreOriginalAPI = function() {
     if (window.originalMishuraAPIService) {
         window.MishuraAPIService = window.originalMishuraAPIService;
-        console.log('✅ Оригинальный API восстановлен');
+        // this.log('✅ Оригинальный API восстановлен'); // удалено для оптимизации
         
         if (typeof window.showNotification === 'function') {
             window.showNotification('✅ Основной API восстановлен', 'success');
@@ -610,4 +597,4 @@ window.restoreOriginalAPI = function() {
     }
 };
 
-console.log('✅ Резервный Mock API для МИШУРЫ готов к использованию!');
+// this.log('✅ Резервный Mock API для МИШУРЫ готов к использованию!'); // удалено для оптимизации

@@ -2,16 +2,14 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: API клиент (api.js)
-ВЕРСИЯ: 1.3.0 (ВОССТАНОВЛЕНО)
-ДАТА ОБНОВЛЕНИЯ: 2025-06-05
+ВЕРСИЯ: 1.4.0 (ИСПРАВЛЕНЫ ENDPOINTS)
+ДАТА ОБНОВЛЕНИЯ: 2025-06-18
 
 НАЗНАЧЕНИЕ:
 JavaScript клиент для взаимодействия с API сервером МИШУРЫ
 Обеспечивает отправку изображений и получение анализов от Gemini AI
 ==========================================================================================
 */
-
-console.log('🔗 Премиум API клиент загружается...');
 
 class MishuraAPIService {
     constructor() {
@@ -27,8 +25,6 @@ class MishuraAPIService {
         this.detectBaseURL();
         
         console.log('✅ MishuraAPIService создан:', this.baseURL);
-        console.log('📱 Системная информация:', this.systemInfo);
-        console.log('📱 Совместимость с Telegram:', this.telegramCompat);
     }
 
     getSystemInfo() {
@@ -72,7 +68,6 @@ class MishuraAPIService {
             this.baseURL = `${currentProtocol}//${currentHost}/api/v1`;
             console.log('🌐 Production environment');
         }
-        
         console.log('🔍 Базовый URL API установлен:', this.baseURL);
     }
 
@@ -127,15 +122,12 @@ class MishuraAPIService {
     async healthCheck() {
         try {
             console.log('🏥 Проверка состояния API...');
-            
             const response = await this.makeRequest('/health', {
                 method: 'GET',
                 timeout: 5000 // Короткий timeout для health check
             });
-
             this.isHealthy = response.status === 'healthy';
             this.lastHealthCheck = new Date();
-
             if (this.isHealthy) {
                 console.log('🏥 Статус API:', response);
                 return response;
@@ -143,7 +135,6 @@ class MishuraAPIService {
                 console.warn('⚠️ API вернул не OK статус:', response.status);
                 return null;
             }
-
         } catch (error) {
             console.warn('⚠️ API недоступен:', error.message);
             this.isHealthy = false;
@@ -152,74 +143,130 @@ class MishuraAPIService {
         }
     }
 
+    // ИСПРАВЛЕНИЕ: Правильный endpoint для анализа одиночного изображения
     async analyzeSingle(imageFile, occasion = '💼 Деловая встреча', preferences = '', userId = null) {
         try {
-            console.log('📤 Отправка запроса на анализ:', {
-                filename: imageFile.name,
-                size: imageFile.size,
-                type: imageFile.type,
-                occasion: occasion
+            console.log('📤 Отправка запроса на анализ:', { 
+                filename: imageFile.name, 
+                size: imageFile.size, 
+                type: imageFile.type, 
+                occasion: occasion,
+                userId: userId 
             });
 
-            const formData = new FormData();
-            formData.append('file', imageFile);
-            formData.append('occasion', occasion);
-            if (preferences) formData.append('preferences', preferences);
-            if (userId) formData.append('user_id', userId);
+            // Получаем userId если не передан
+            if (!userId) {
+                userId = this.getCurrentUserId();
+            }
 
-            const response = await this.makeRequest('/analyze', {
+            // Конвертируем файл в base64
+            const imageData = await this.fileToBase64(imageFile);
+            
+            const requestData = {
+                user_id: userId,
+                occasion: occasion,
+                preferences: preferences,
+                image_data: imageData
+            };
+
+            // ИСПРАВЛЕНИЕ: Используем правильный endpoint
+            const response = await this.makeRequest('/consultations/analyze', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
             });
 
             console.log('✅ Анализ получен от API:', response);
             return response;
-
         } catch (error) {
             console.error('❌ Ошибка анализа:', error);
             throw new Error(`Ошибка анализа: ${error.message}`);
         }
     }
 
+    // ИСПРАВЛЕНИЕ: Правильный endpoint для сравнения изображений
     async analyzeCompare(imageFiles, occasion = '💼 Деловая встреча', preferences = '', userId = null) {
         try {
             if (!Array.isArray(imageFiles) || imageFiles.length < 2) {
                 throw new Error('Необходимо минимум 2 изображения для сравнения');
             }
-
             if (imageFiles.length > 4) {
                 throw new Error('Максимум 4 изображения для сравнения');
             }
 
-            console.log('📤 Отправка запроса на сравнение:', {
-                count: imageFiles.length,
-                files: imageFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
-                occasion: occasion
+            console.log('📤 Отправка запроса на сравнение:', { 
+                count: imageFiles.length, 
+                files: imageFiles.map(f => ({ name: f.name, size: f.size, type: f.type })), 
+                occasion: occasion,
+                userId: userId 
             });
 
-            const formData = new FormData();
-            
-            // Добавляем все файлы
-            imageFiles.forEach((file, index) => {
-                formData.append('files', file);
-            });
-            
-            formData.append('occasion', occasion);
-            if (preferences) formData.append('preferences', preferences);
-            if (userId) formData.append('user_id', userId);
+            // Получаем userId если не передан
+            if (!userId) {
+                userId = this.getCurrentUserId();
+            }
 
-            const response = await this.makeRequest('/compare', {
+            // Конвертируем все файлы в base64
+            const imagesData = await Promise.all(
+                imageFiles.map(file => this.fileToBase64(file))
+            );
+            
+            const requestData = {
+                user_id: userId,
+                occasion: occasion,
+                preferences: preferences,
+                images_data: imagesData
+            };
+
+            // ИСПРАВЛЕНИЕ: Используем правильный endpoint для сравнения
+            const response = await this.makeRequest('/consultations/compare', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
             });
 
             console.log('✅ Сравнение получено от API:', response);
             return response;
-
         } catch (error) {
             console.error('❌ Ошибка сравнения:', error);
             throw new Error(`Ошибка сравнения: ${error.message}`);
         }
+    }
+
+    // Вспомогательная функция для конвертации файла в base64
+    async fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Убираем префикс "data:image/jpeg;base64," и оставляем только base64 данные
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Получение текущего user_id
+    getCurrentUserId() {
+        // Пытаемся получить из URL параметров
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlUserId = urlParams.get('user_id');
+        if (urlUserId && !isNaN(urlUserId)) {
+            return parseInt(urlUserId);
+        }
+        
+        // Пытаемся получить из Telegram WebApp
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user?.id) {
+            return window.Telegram.WebApp.initDataUnsafe.user.id;
+        }
+        
+        // Fallback для тестирования
+        return 5930269100;
     }
 
     async getStatus() {
@@ -228,10 +275,8 @@ class MishuraAPIService {
                 method: 'GET',
                 timeout: 5000
             });
-
             console.log('📊 Статус сервера:', response);
             return response;
-
         } catch (error) {
             console.warn('⚠️ Не удалось получить статус:', error.message);
             return null;
@@ -298,4 +343,4 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = MishuraAPIService;
 }
 
-console.log('✅ Премиум MishuraAPIService доступен в window');
+console.log('✅ Исправленный MishuraAPIService доступен в window');

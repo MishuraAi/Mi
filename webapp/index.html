@@ -100,7 +100,7 @@
         .container {
             max-width: 420px;
             margin: 0 auto;
-            padding: 20px 16px 100px 16px; /* Добавили отступ снизу для навигации */
+            padding: 20px 16px 100px 16px;
             position: relative;
             z-index: 1;
             min-height: 100vh;
@@ -148,7 +148,7 @@
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
-        /* Luxury Action Buttons */
+        /* Action Buttons */
         .action-buttons {
             display: flex;
             flex-direction: column;
@@ -174,7 +174,6 @@
             letter-spacing: 1px;
         }
 
-        /* Luxury hover animation */
         .action-btn::before {
             content: '';
             position: absolute;
@@ -188,29 +187,8 @@
             opacity: 0.1;
         }
 
-        .action-btn::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border: 2px solid var(--gold-primary);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            transition: all 0.3s ease;
-            z-index: 2;
-        }
-
         .action-btn:hover::before {
             left: 100%;
-        }
-
-        .action-btn:hover::after {
-            width: 100%;
-            height: 100%;
-            border-radius: var(--border-radius-lg);
-            opacity: 0;
         }
 
         .action-btn:hover {
@@ -219,10 +197,6 @@
             border-color: var(--gold-secondary);
             color: var(--gold-secondary);
             text-shadow: var(--glow-gold);
-        }
-
-        .action-btn:active {
-            transform: translateY(-2px);
         }
 
         .action-btn .icon {
@@ -276,7 +250,6 @@
             color: var(--text-gold);
         }
 
-        /* Animated nav button effects */
         .nav-btn::before {
             content: '';
             position: absolute;
@@ -336,7 +309,112 @@
             z-index: 1;
         }
 
-        /* Luxury Modal */
+        /* НОВОЕ: Стили для тарифных планов */
+        .pricing-section {
+            margin-bottom: 24px;
+        }
+
+        .pricing-grid {
+            display: grid;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .pricing-card {
+            background: rgba(26, 26, 26, 0.8);
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            padding: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pricing-card.popular {
+            border-color: var(--border-gold);
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-gold);
+            border-color: var(--border-gold);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .plan-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-gold);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .plan-price {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--text-light);
+        }
+
+        .plan-features {
+            margin-bottom: 16px;
+        }
+
+        .feature-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+        }
+
+        .feature-value {
+            color: var(--text-light);
+            font-weight: 600;
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -8px;
+            right: 16px;
+            background: var(--gold-gradient);
+            color: var(--text-dark);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .buy-btn {
+            width: 100%;
+            background: var(--gold-gradient);
+            color: var(--text-dark);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .buy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--glow-gold);
+            filter: brightness(1.1);
+        }
+
+        /* Modal Styles */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -372,34 +450,6 @@
             color: var(--text-light);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(50px) scale(0.9);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        /* Modal Header */
         .modal-header {
             display: flex;
             justify-content: space-between;
@@ -436,545 +486,37 @@
             box-shadow: var(--glow-gold);
         }
 
-        /* Upload Modes */
-        .upload-mode {
-            display: none;
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
-        .upload-mode.active {
-            display: block;
-            animation: fadeInUp 0.5s ease-out;
-        }
-
-        /* Single Upload */
-        .single-upload {
-            margin-bottom: 24px;
-        }
-
-        .upload-area {
-            border: 2px dashed var(--border-light);
-            border-radius: var(--border-radius);
-            padding: 32px 16px;
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            background: rgba(212, 175, 55, 0.02);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .upload-area::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--gold-gradient);
-            opacity: 0;
-            transition: var(--transition);
-        }
-
-        .upload-area:hover::before {
-            opacity: 0.05;
-        }
-
-        .upload-area:hover {
-            border-color: var(--border-gold);
-            background: rgba(212, 175, 55, 0.05);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-gold);
-        }
-
-        .upload-area.has-image {
-            border-color: var(--gold-primary);
-            background: rgba(212, 175, 55, 0.08);
-            box-shadow: var(--glow-gold);
-        }
-
-        .upload-preview {
-            width: 120px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 12px;
-            margin: 0 auto 12px;
-            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
-            display: block;
-            border: 2px solid var(--gold-primary);
-        }
-
-        .upload-text {
-            color: var(--text-muted);
-            font-size: 1rem;
-            font-weight: 500;
-            position: relative;
-            z-index: 1;
-        }
-
-        .upload-area.has-image .upload-text {
-            color: var(--text-gold);
-        }
-
-        /* Compare Mode */
-        .compare-upload {
-            margin-bottom: 24px;
-        }
-
-        .compare-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-gold);
-            margin-bottom: 16px;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .compare-slots {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .compare-slot {
-            aspect-ratio: 1;
-            border: 2px dashed var(--border-light);
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-            background: rgba(212, 175, 55, 0.02);
-        }
-
-        .compare-slot:hover {
-            border-color: var(--border-gold);
-            background: rgba(212, 175, 55, 0.05);
-            transform: scale(1.02);
-            box-shadow: var(--shadow-gold);
-        }
-
-        .compare-slot.has-image {
-            border-color: var(--gold-primary);
-            border-style: solid;
-            background: rgba(212, 175, 55, 0.08);
-            box-shadow: var(--glow-gold);
-        }
-
-        .compare-slot img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: calc(var(--border-radius) - 2px);
-        }
-
-        .slot-number {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            background: var(--gold-gradient);
-            color: var(--text-dark);
-            padding: 4px 8px;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            z-index: 2;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        .add-icon {
-            font-size: 2rem;
-            color: var(--text-muted);
-            transition: var(--transition);
-        }
-
-        .compare-slot:hover .add-icon {
-            color: var(--text-gold);
-            transform: scale(1.1);
-        }
-
-        /* Form Styles */
-        .consultation-form {
-            display: none;
-        }
-
-        .consultation-form.active {
-            display: block;
-            animation: fadeInUp 0.5s ease-out;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--text-gold);
-            font-size: 0.95rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .form-input, .form-textarea {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid var(--border-light);
-            border-radius: 12px;
-            font-size: 1rem;
-            transition: var(--transition);
-            background: rgba(26, 26, 26, 0.8);
-            color: var(--text-light);
-            cursor: pointer;
-            position: relative;
-        }
-
-        .form-input:focus, .form-textarea:focus {
-            outline: none;
-            border-color: var(--border-gold);
-            background: rgba(26, 26, 26, 0.95);
-            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
-        }
-
-        /* Dropdown Styles */
-        .occasion-dropdown {
-            position: relative;
-        }
-
-        .occasion-options {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: var(--secondary-black);
-            border: 2px solid var(--border-gold);
-            border-radius: 12px;
-            box-shadow: var(--shadow-gold), var(--shadow-black);
-            z-index: 1000;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
-
-        .occasion-options.active {
-            display: block;
-            animation: fadeInUp 0.3s ease-out;
-        }
-
-        .occasion-option {
-            padding: 12px 16px;
-            cursor: pointer;
-            transition: var(--transition-fast);
-            border-bottom: 1px solid var(--border-light);
-            color: var(--text-light);
-        }
-
-        .occasion-option:last-child {
-            border-bottom: none;
-        }
-
-        .occasion-option:hover {
-            background: rgba(212, 175, 55, 0.1);
-            color: var(--text-gold);
-        }
-
-        .occasion-option.selected {
-            background: var(--gold-gradient);
-            color: var(--text-dark);
-        }
-
-        /* Button Styles */
-        .form-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
-
-        .btn {
-            flex: 1;
-            padding: 16px 20px;
-            border: 2px solid;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            background: rgba(212, 175, 55, 0.2);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            transition: width 0.3s, height 0.3s;
-        }
-
-        .btn:active::before {
-            width: 300px;
-            height: 300px;
-        }
-
-        .btn-cancel {
-            background: transparent;
-            color: var(--text-muted);
-            border-color: var(--text-muted);
-        }
-
-        .btn-cancel:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-light);
-            border-color: var(--text-light);
-        }
-
-        .btn-submit {
-            background: var(--gold-gradient);
-            color: var(--text-dark);
-            border-color: var(--gold-primary);
-            box-shadow: var(--shadow-gold);
-        }
-
-        .btn-submit:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: var(--glow-gold), var(--shadow-black);
-            filter: brightness(1.1);
-        }
-
-        .btn-submit:disabled {
-            background: var(--accent-black);
-            color: var(--text-muted);
-            border-color: var(--text-muted);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        /* Loading & Results */
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 32px 16px;
-        }
-
-        .loading.active {
-            display: block;
-            animation: fadeInUp 0.5s ease-out;
-        }
-
-        .spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(212, 175, 55, 0.2);
-            border-top: 4px solid var(--gold-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-            box-shadow: var(--glow-gold);
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            color: var(--text-gold);
-            font-size: 1.1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .result-section {
-            display: none;
-        }
-
-        .result-section.active {
-            display: block;
-            animation: fadeInUp 0.5s ease-out;
-        }
-
-        .result-title {
-            font-size: 1.4rem;
-            font-weight: 700;
-            margin-bottom: 16px;
-            color: var(--text-gold);
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .result-content {
-            background: rgba(212, 175, 55, 0.05);
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            padding: 20px;
-            line-height: 1.7;
-            color: var(--text-light);
-            border-left: 4px solid var(--gold-primary);
-            margin-bottom: 20px;
-        }
-
-        .result-content h4 {
-            color: var(--text-gold);
-            font-weight: 600;
-            margin: 20px 0 10px 0;
-            padding: 8px 12px;
-            background: rgba(212, 175, 55, 0.1);
-            border-radius: 8px;
-            border-left: 3px solid var(--gold-primary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .result-content h4:first-child {
-            margin-top: 0;
-        }
-
-        .result-content p {
-            margin: 12px 0;
-            text-align: justify;
-        }
-
-        .result-content strong {
-            color: var(--text-gold);
-            font-weight: 600;
-        }
-
-        .result-content .outfit-title {
-            display: inline-block;
-            background: var(--gold-gradient);
-            color: var(--text-dark);
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-right: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .error-message {
-            background: rgba(220, 53, 69, 0.1);
-            color: #dc3545;
-            padding: 16px;
-            border-radius: 12px;
-            border-left: 4px solid #dc3545;
-            font-weight: 500;
-        }
-
-        /* НОВОЕ: Кнопки навигации результатов (из тестирования) */
-        .result-navigation {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin-top: 20px;
-        }
-
-        .result-nav-btn {
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 0.9rem;
-            position: relative;
-            z-index: 10001;
-        }
-
-        .result-nav-btn.secondary {
-            background: var(--accent-black);
-            color: var(--text-light);
-            border: 1px solid var(--border-gold);
-        }
-
-        .result-nav-btn.secondary:hover {
-            background: var(--secondary-black);
-            border-color: var(--gold-secondary);
-            color: var(--gold-secondary);
-        }
-
-        .result-nav-btn.primary {
-            background: var(--gold-gradient);
-            color: var(--text-dark);
-            border: none;
-            box-shadow: var(--shadow-gold);
-        }
-
-        .result-nav-btn.primary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--glow-gold), var(--shadow-black);
-            filter: brightness(1.1);
-        }
-
-        /* Notifications */
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 16px 20px;
-            border-radius: 12px;
-            color: white;
-            font-weight: 600;
-            z-index: 10000;
-            animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: var(--shadow-black);
-            backdrop-filter: blur(10px);
-            max-width: 300px;
-            border: 1px solid;
-        }
-
-        @keyframes slideInRight {
+        @keyframes fadeInUp {
             from {
                 opacity: 0;
-                transform: translateX(100%);
+                transform: translateY(30px);
             }
             to {
                 opacity: 1;
-                transform: translateX(0);
+                transform: translateY(0);
             }
         }
 
-        .notification-error {
-            background: rgba(220, 53, 69, 0.9);
-            border-color: #dc3545;
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
 
-        .notification-warning {
-            background: rgba(255, 193, 7, 0.9);
-            border-color: #ffc107;
-            color: var(--text-dark);
-        }
-
-        .notification-info {
-            background: var(--gold-gradient);
-            border-color: var(--gold-primary);
-            color: var(--text-dark);
-        }
-
-        .notification-success {
-            background: rgba(40, 167, 69, 0.9);
-            border-color: #28a745;
-        }
-
-        /* Hidden Elements */
-        .hidden-input {
-            display: none;
+        @keyframes goldPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
         }
 
         /* Mobile Optimizations */
@@ -992,113 +534,676 @@
                 padding: 24px 20px;
                 width: calc(100% - 20px);
             }
+        }
 
-            .form-actions {
-                flex-direction: column;
+        .balance-section-divider {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .balance-section-divider h3 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .loading-placeholder {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .loading-placeholder .icon {
+            display: block;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .pricing-info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .pricing-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .pricing-card:hover {
+            border-color: #007bff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+        }
+
+        .pricing-card.premium {
+            border-color: #28a745;
+        }
+
+        .pricing-card.pro {
+            border-color: #dc3545;
+        }
+
+        .pricing-card h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .pricing-card .price {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+
+        .pricing-card.premium .price {
+            color: #28a745;
+        }
+
+        .pricing-card.pro .price {
+            color: #dc3545;
+        }
+
+        .pricing-card .stcoins {
+            font-size: 16px;
+            font-weight: 600;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+
+        .pricing-card p {
+            margin: 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .pricing-card .badge {
+            position: absolute;
+            top: -8px;
+            right: 10px;
+            background: #ff6b6b;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .pricing-card.premium .badge {
+            background: #28a745;
+        }
+
+        /* ========== ИСПРАВЛЕННЫЕ СТИЛИ МОДАЛЬНЫХ ОКОН ========== */
+        .upload-mode {
+            display: none;
+            margin-bottom: 24px;
+        }
+
+        .upload-mode.active {
+            display: block;
+        }
+
+        .upload-area {
+            background: rgba(42, 42, 42, 0.8);
+            border: 2px dashed var(--border-gold);
+            border-radius: 16px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            min-height: 200px;
+            max-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .upload-area:hover {
+            border-color: var(--gold-secondary);
+            background: rgba(212, 175, 55, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .upload-area.has-image {
+            padding: 0;
+            border-style: solid;
+            min-height: auto;
+            height: 250px;
+        }
+
+        .upload-area img {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+            border-radius: 14px !important;
+            z-index: 10 !important;
+            background: rgba(26, 26, 26, 0.9) !important;
+        }
+
+        .upload-area.has-image .upload-text {
+            display: none !important;
+            visibility: hidden !important;
+        }
+
+        .upload-text {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+            text-align: center;
+            z-index: 5;
+        }
+
+        .upload-area .delete-single-image {
+            position: absolute !important;
+            top: 8px !important;
+            right: 8px !important;
+            width: 32px !important;
+            height: 32px !important;
+            background: rgba(231, 76, 60, 0.9) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            display: none !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            z-index: 25 !important;
+            line-height: 1 !important;
+            pointer-events: auto !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .upload-area.has-image .delete-single-image {
+            display: flex !important;
+        }
+
+        .upload-area .delete-single-image:hover {
+            background: rgba(231, 76, 60, 1) !important;
+            transform: scale(1.1) !important;
+        }
+
+        @media (max-width: 480px) {
+            .upload-area {
+                min-height: 180px;
+                padding: 30px 15px;
             }
-
-            .result-navigation {
-                flex-direction: column;
+            
+            .upload-area.has-image {
+                height: 200px;
             }
-
-            .notification {
-                right: 12px;
-                left: 12px;
-                max-width: none;
-            }
-
-            .nav-btn .nav-text {
-                font-size: 0.7rem;
+            
+            .upload-text {
+                font-size: 1rem;
             }
         }
 
-        /* High-end animations for premium feel */
-        @media (prefers-reduced-motion: no-preference) {
-            .action-btn,
-            .nav-btn,
-            .btn,
-            .upload-area,
-            .compare-slot {
-                will-change: transform;
-            }
+        .compare-title {
+            color: var(--text-gold);
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+            margin-bottom: 20px;
         }
 
-        /* Mobile-first touch animations */
-        @media (hover: none) and (pointer: coarse) {
-            .action-btn:active,
-            .nav-btn:active,
-            .btn:active,
-            .result-nav-btn:active {
-                transform: scale(0.95);
-                transition: transform 0.1s ease;
-            }
-            
-            .upload-area:active,
-            .compare-slot:active {
-                transform: scale(0.98);
-                transition: transform 0.1s ease;
-            }
-            
-            /* Enhanced mobile animations */
-            .action-btn {
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            
-            .nav-btn {
-                transition: all 0.2s ease-out;
-            }
-            
-            /* Touch ripple effect */
-            .action-btn:active::after {
-                content: '';
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                width: 0;
-                height: 0;
-                border-radius: 50%;
-                background: rgba(212, 175, 55, 0.3);
-                transform: translate(-50%, -50%);
-                animation: ripple 0.6s ease-out;
-            }
-            
-            @keyframes ripple {
-                to {
-                    width: 200px;
-                    height: 200px;
-                    opacity: 0;
-                }
-            }
+        .compare-slots {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
         }
 
-        /* Elegant scrollbars */
-        ::-webkit-scrollbar {
-            width: 8px;
+        .compare-slot {
+            background: rgba(42, 42, 42, 0.8);
+            border: 2px dashed var(--border-light);
+            border-radius: 12px;
+            padding: 30px 15px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 150px;
+            max-height: 200px;
+            position: relative;
+            overflow: hidden;
         }
 
-        ::-webkit-scrollbar-track {
-            background: var(--secondary-black);
-            border-radius: 4px;
+        .compare-slot:hover {
+            border-color: var(--border-gold);
+            background: rgba(212, 175, 55, 0.05);
+            transform: translateY(-2px);
         }
 
-        ::-webkit-scrollbar-thumb {
+        .compare-slot.has-image {
+            padding: 0;
+            border-style: solid;
+            border-color: var(--border-gold);
+            height: 180px;
+            min-height: 180px;
+        }
+
+        .compare-slot img {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+            border-radius: 10px !important;
+            z-index: 10 !important;
+            background: rgba(26, 26, 26, 0.9) !important;
+        }
+
+        .compare-slot.has-image .slot-number,
+        .compare-slot.has-image .add-icon {
+            display: none !important;
+            visibility: hidden !important;
+        }
+
+        .slot-number {
             background: var(--gold-gradient);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--gold-secondary);
-        }
-
-        /* Luxury selection styles */
-        ::selection {
-            background: var(--gold-primary);
             color: var(--text-dark);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            z-index: 5;
         }
 
-        ::-moz-selection {
-            background: var(--gold-primary);
+        .add-icon {
+            color: var(--text-gold);
+            font-size: 2rem;
+            font-weight: 300;
+            z-index: 5;
+        }
+
+        .compare-slot .delete-image {
+            position: absolute !important;
+            top: 8px !important;
+            right: 8px !important;
+            width: 28px !important;
+            height: 28px !important;
+            background: rgba(231, 76, 60, 0.9) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            display: none !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            font-size: 16px !important;
+            font-weight: bold !important;
+            z-index: 25 !important;
+            line-height: 1 !important;
+            pointer-events: auto !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .compare-slot.has-image .delete-image {
+            display: flex !important;
+        }
+
+        .compare-slot .delete-image:hover {
+            background: rgba(231, 76, 60, 1) !important;
+            transform: scale(1.1) !important;
+        }
+
+        @media (max-width: 768px) {
+            .compare-slots {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            
+            .compare-slot {
+                min-height: 120px;
+                padding: 20px 10px;
+            }
+            
+            .compare-slot.has-image {
+                height: 140px;
+                min-height: 140px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .compare-slots {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .compare-slot {
+                min-height: 140px;
+                padding: 25px 15px;
+            }
+            
+            .compare-slot.has-image {
+                height: 160px;
+                min-height: 160px;
+            }
+        }
+
+        .compare-slot .slot-placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-align: center;
+            pointer-events: none;
+            z-index: 5;
+            font-weight: 500;
+        }
+
+        .compare-slot.has-image .slot-placeholder {
+            display: none !important;
+        }
+
+        /* ========== ИСПРАВЛЕНИЕ 5: ФОРМА КОНСУЛЬТАЦИИ ========== */
+        .consultation-form {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .consultation-form.active {
+            display: block;
+            animation: fadeInUp 0.4s ease-out;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            color: var(--text-gold);
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            background: rgba(42, 42, 42, 0.8);
+            border: 2px solid var(--border-light);
+            border-radius: 12px;
+            padding: 16px;
+            color: var(--text-light);
+            font-size: 1rem;
+            transition: var(--transition);
+            resize: vertical;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--border-gold);
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .form-textarea {
+            min-height: 80px;
+            font-family: inherit;
+        }
+
+        /* ========== ИСПРАВЛЕНИЕ 6: DROPDOWN ========== */
+        .occasion-dropdown {
+            position: relative;
+        }
+
+        .occasion-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--secondary-black);
+            border: 2px solid var(--border-gold);
+            border-radius: 12px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: var(--shadow-gold);
+        }
+
+        .occasion-options.active {
+            display: block;
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        .occasion-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: var(--transition-fast);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+        }
+
+        .occasion-option:hover {
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--text-gold);
+        }
+
+        /* ========== ИСПРАВЛЕНИЕ 7: КНОПКИ ДЕЙСТВИЙ ========== */
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 2px solid transparent;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            flex: 1;
+        }
+
+        .btn-cancel {
+            background: transparent;
+            border-color: var(--border-light);
+            color: var(--text-muted);
+        }
+
+        .btn-cancel:hover {
+            border-color: var(--border-gold);
+            color: var(--text-light);
+            transform: translateY(-2px);
+        }
+
+        .btn-submit {
+            background: var(--gold-gradient);
             color: var(--text-dark);
+            border-color: var(--border-gold);
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+            box-shadow: var(--glow-gold);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ========== ИСПРАВЛЕНИЕ 8: ЗАГРУЗКА ========== */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .loading.active {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(212, 175, 55, 0.2);
+            border-top: 4px solid var(--gold-primary);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-gold);
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ========== ИСПРАВЛЕНИЕ 9: РЕЗУЛЬТАТ ========== */
+        .result-section {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .result-section.active {
+            display: block;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .result-title {
+            color: var(--text-gold);
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .result-content {
+            background: rgba(42, 42, 42, 0.6);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            padding: 24px;
+            color: var(--text-light);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .result-navigation {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .result-nav-btn {
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 2px solid transparent;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .result-nav-btn.secondary {
+            background: transparent;
+            border-color: var(--border-light);
+            color: var(--text-light);
+        }
+
+        .result-nav-btn.primary {
+            background: var(--gold-gradient);
+            color: var(--text-dark);
+            border-color: var(--border-gold);
+        }
+
+        .result-nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--glow-gold);
+        }
+
+        /* ========== СКРЫТЫЕ ЭЛЕМЕНТЫ ========== */
+        .hidden-input {
+            position: absolute;
+            visibility: hidden;
+            width: 0;
+            height: 0;
+        }
+
+        /* ========== АНИМАЦИИ ========== */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
     </style>
 </head>
@@ -1138,19 +1243,6 @@
             </button>
         </div>
     </nav>
-
-    <!-- Main Content Sections -->
-    <div id="home-section" class="content-section active">
-        <!-- Главная страница уже отображена выше -->
-    </div>
-
-    <div id="history-section" class="content-section" style="display: none;">
-        <!-- История будет здесь -->
-    </div>
-
-    <div id="balance-section" class="content-section" style="display: none;">
-        <!-- Баланс будет здесь -->
-    </div>
 
     <!-- Модальное окно консультации -->
     <div id="consultation-overlay" class="modal-overlay">
@@ -1223,12 +1315,11 @@
                 <p class="loading-text">Анализируем ваш образ...</p>
             </div>
 
-            <!-- Результат с навигационными кнопками (НОВОЕ ИЗ ТЕСТИРОВАНИЯ) -->
+            <!-- Результат -->
             <div id="result" class="result-section">
                 <h3 class="result-title">💎 Совет стилиста</h3>
                 <div id="result-content" class="result-content"></div>
                 
-                <!-- Кнопки навигации после результата -->
                 <div class="result-navigation">
                     <button id="result-back" class="result-nav-btn secondary">
                         ← Назад к выбору
@@ -1241,6 +1332,42 @@
         </div>
     </div>
 
+    <!-- НОВОЕ: Модальное окно тарифов -->
+    <div id="pricing-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2 class="modal-title">💰 Тарифные планы</h2>
+                <button class="close-btn" onclick="closePricingModal()">&times;</button>
+            </div>
+            
+            <div class="pricing-section">
+                <div style="text-align: center; margin-bottom: 20px; color: var(--text-muted);">
+                    Выберите подходящий пакет консультаций
+                </div>
+                
+                <div id="pricing-container" class="pricing-grid">
+                    <!-- Тарифы будут загружены из config.js -->
+                </div>
+                
+                <div style="
+                    background: rgba(212, 175, 55, 0.1);
+                    border: 1px solid var(--border-gold);
+                    border-radius: 12px;
+                    padding: 16px;
+                    margin-top: 20px;
+                    text-align: center;
+                ">
+                    <div style="color: var(--text-gold); font-weight: 600; margin-bottom: 8px;">
+                        🔒 Безопасная оплата через ЮKassa
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">
+                        Принимаем карты, СБП и другие способы оплаты
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Скрытые file inputs -->
     <input type="file" id="single-file-input" class="hidden-input" accept="image/jpeg,image/png,image/webp">
     <input type="file" id="compare-file-input-0" class="hidden-input" accept="image/jpeg,image/png,image/webp">
@@ -1248,10 +1375,198 @@
     <input type="file" id="compare-file-input-2" class="hidden-input" accept="image/jpeg,image/png,image/webp">
     <input type="file" id="compare-file-input-3" class="hidden-input" accept="image/jpeg,image/png,image/webp">
 
-    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ -->
+    <!-- Обновленная секция баланса -->
+    <section id="balanceSection" class="section" style="display: none;">
+        <div class="section-header">
+            <h2>💰 Баланс</h2>
+            <p>Управляйте своими STcoin для консультаций</p>
+        </div>
+
+        <div class="balance-card">
+            <div class="balance-info">
+                <div class="balance-amount">
+                    <span id="balanceAmount">0</span>
+                    <span class="currency">STcoin</span>
+                </div>
+                <p class="balance-description">Ваш текущий баланс</p>
+            </div>
+            
+            <button class="btn btn-primary" onclick="showTopUpModal()">
+                <span class="icon">💳</span>
+                Пополнить баланс
+            </button>
+        </div>
+
+        <!-- Новый блок: История транзакций -->
+        <div class="balance-section-divider">
+            <h3>📋 История пополнений</h3>
+            <div class="transaction-history">
+                <!-- Здесь будет загружаться история транзакций -->
+                <div class="loading-placeholder">
+                    <span class="icon">⏳</span>
+                    Загрузка истории...
+                </div>
+            </div>
+        </div>
+
+        <!-- Информация о тарифах -->
+        <div class="pricing-info">
+            <h3>💎 Тарифные планы</h3>
+            <div class="pricing-grid">
+                <div class="pricing-card basic">
+                    <h4>Базовый</h4>
+                    <div class="price">150₽</div>
+                    <div class="stcoins">100 STcoin</div>
+                    <p>~10 консультаций</p>
+                </div>
+                <div class="pricing-card premium">
+                    <h4>Премиум</h4>
+                    <div class="price">1000₽</div>
+                    <div class="stcoins">1000 STcoin</div>
+                    <p>~100 консультаций</p>
+                    <span class="badge">Популярный</span>
+                </div>
+                <div class="pricing-card pro">
+                    <h4>Профессиональный</h4>
+                    <div class="price">2000₽</div>
+                    <div class="stcoins">2500 STcoin</div>
+                    <p>~250 консультаций</p>
+                    <span class="badge">Выгодно</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ В ПРАВИЛЬНОМ ПОРЯДКЕ -->
     <script src="logger.js"></script>
     <script src="mock-api.js"></script>
     <script src="api.js"></script>
+    <script src="js/config.js"></script>
+
+    <!-- СНАЧАЛА ЗАГРУЖАЕМ ВСЕ МОДУЛИ: -->
+    <script src="js/utils/logger.js"></script>
+    <script src="js/utils/ui-helpers.js"></script>
+    <script src="js/components/navigation.js"></script>
+    <script src="js/components/modals.js"></script>
+    <script src="js/components/image-upload.js"></script>
+    <script src="js/features/consultation.js"></script>
+    <script src="js/features/comparison.js"></script>
+
+    <!-- ТОЛЬКО ПОТОМ ЗАГРУЖАЕМ ОСНОВНОЕ ПРИЛОЖЕНИЕ: -->
     <script src="app.js"></script>
+
+    <!-- Остальные скрипты... -->
+    <script>
+        // ОБНОВЛЕННЫЙ код для секции баланса в app.js
+        document.addEventListener('DOMContentLoaded', function() {
+            // Переопределяем showBalanceSection в app.js
+            if (window.mishuraApp) {
+                const originalShowBalanceSection = window.mishuraApp.showBalanceSection.bind(window.mishuraApp);
+                
+                window.mishuraApp.showBalanceSection = function() {
+                    const container = document.querySelector('.container');
+                    if (!container) return;
+                    
+                    const consultationsRemaining = Math.floor(this.userBalance / 10);
+                    
+                    container.innerHTML = `
+                        <header class="header">
+                            <h1>💰 Баланс</h1>
+                            <p>Управление STcoin</p>
+                        </header>
+                        
+                        <div class="balance-card" style="
+                            background: var(--gold-gradient);
+                            color: var(--text-dark);
+                            border-radius: 20px;
+                            padding: 24px;
+                            margin-bottom: 24px;
+                            text-align: center;
+                            box-shadow: var(--shadow-gold);
+                        ">
+                            <div style="font-size: 2.5rem; font-weight: 900; margin-bottom: 8px;" data-balance-display>
+                                ${this.userBalance}
+                            </div>
+                            <div style="font-size: 1.1rem; font-weight: 600; text-transform: uppercase;">
+                                STcoin
+                            </div>
+                            <div style="font-size: 0.9rem; margin-top: 8px; opacity: 0.8;">
+                                Доступно консультаций: <span data-consultations-display>${consultationsRemaining}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="usage-stats" style="
+                            background: rgba(26, 26, 26, 0.8);
+                            border: 1px solid var(--border-light);
+                            border-radius: 16px;
+                            padding: 20px;
+                            margin-bottom: 24px;
+                        ">
+                            <h3 style="
+                                color: var(--text-gold);
+                                margin-bottom: 16px;
+                                text-transform: uppercase;
+                                letter-spacing: 1px;
+                                font-size: 1rem;
+                            ">📊 Статистика использования</h3>
+                            
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                                <span style="color: var(--text-muted);">Всего получено:</span>
+                                <span style="color: var(--text-light); font-weight: 600;">${this.consultationsHistory.length}</span>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                                <span style="color: var(--text-muted);">Потрачено STcoin:</span>
+                                <span style="color: var(--text-light); font-weight: 600;">${this.consultationsUsed}</span>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-muted);">Остаток STcoin:</span>
+                                <span style="color: var(--text-gold); font-weight: 600;" data-balance-display>${this.userBalance}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="add-balance-section">
+                            <button id="add-balance-btn" class="action-btn" style="
+                                width: 100%;
+                                margin-bottom: 16px;
+                                background: rgba(26, 26, 26, 0.8);
+                                border: 2px solid var(--border-gold);
+                                color: var(--text-gold);
+                            " onclick="showPricingModal()">
+                                <span class="icon">💳</span>
+                                Пополнить STcoin
+                            </button>
+                            
+                            <div style="
+                                background: rgba(212, 175, 55, 0.1);
+                                border: 1px solid var(--border-gold);
+                                border-radius: 12px;
+                                padding: 16px;
+                                text-align: center;
+                            ">
+                                <div style="
+                                    color: var(--text-gold);
+                                    font-weight: 600;
+                                    margin-bottom: 8px;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    font-size: 0.9rem;
+                                ">💡 Информация</div>
+                                <div style="
+                                    color: var(--text-light);
+                                    font-size: 0.9rem;
+                                    line-height: 1.4;
+                                ">
+                                    Одна консультация стоит 10 STcoin.
+                                    Пополнение через безопасную платежную систему ЮKassa.
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                };
+            }
+        });
+    </script>
 </body>
 </html>

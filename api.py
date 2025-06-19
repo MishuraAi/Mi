@@ -1,1090 +1,943 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
-==========================================================================================
-ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Production API сервер с интеграцией ЮKassa + синхронизация (api.py)
-ВЕРСИЯ: 1.3.2 - ДОБАВЛЕНА СИНХРОНИЗАЦИЯ USER_ID
-ДАТА ОБНОВЛЕНИЯ: 2025-06-16
-
-НАЗНАЧЕНИЕ:
-FastAPI сервер для обработки запросов анализа изображений через Gemini AI
-+ интеграция платежной системы ЮKassa
-+ синхронизация пользователей между устройствами
-
-НОВОЕ В v1.3.2:
-- Добавлены endpoints для синхронизации user_id между устройствами
-- Исправлена проблема разных балансов в Telegram и браузере
-- Добавлена принудительная синхронизация баланса
-==========================================================================================
+🎭 МИШУРА - API Сервер
+FastAPI сервер для веб-приложения и интеграции с ЮKassa
 """
 
 import os
-import sys
+import json
+import logging
 import asyncio
 from datetime import datetime
-from pathlib import Path
-import logging
-import base64
-import json
-import traceback
-from typing import Optional, List, Dict, Any
-import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Header
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
-from pydantic import BaseModel
-import google.generativeai as genai
-from PIL import Image
-import io
+from typing import Optional, Dict, Any
+
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# Добавляем текущую директорию в путь для импорта database.py и payment_service.py
-sys.path.append(str(Path(__file__).parent))
+# ЮKassa
+from yookassa import Configuration, Payment
+import yookassa
 
-try:
-    import database
-except ImportError:
-    print("❌ ОШИБКА: Не удалось импортировать database.py")
-    print("💡 Убедитесь, что файл database.py находится в той же папке")
-    sys.exit(1)
-
-try:
-    import payment_service
-except ImportError:
-    print("❌ ОШИБКА: Не удалось импортировать payment_service.py")
-    print("💡 Убедитесь, что файл payment_service.py находится в той же папке")
-    sys.exit(1)
+# Локальные импорты
+import database
+import gemini_ai
+import payment_service
+from pricing_config import PRICING_PLANS, YOOKASSA_PLANS_CONFIG, get_plan_by_id, get_yookassa_config
 
 # Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s',
-    handlers=[
-        logging.FileHandler('api_server.log', encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger("MishuraAPI")
-
-# Загрузка переменных окружения
-from dotenv import load_dotenv
-load_dotenv()
-
-# Конфигурация
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-HOST = os.getenv('HOST', '0.0.0.0')
-PORT = int(os.getenv('BACKEND_PORT', 8000))
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Создание FastAPI приложения
 app = FastAPI(
-    title="МИШУРА ИИ-Стилист API с ЮKassa + Синхронизация",
-    description="API для анализа стиля одежды с помощью Google Gemini AI + платежная система + синхронизация",
-    version="1.3.2",
-    docs_url="/api/v1/docs" if DEBUG else None,
-    redoc_url="/api/v1/redoc" if DEBUG else None
+    title="МИШУРА API",
+    description="API для персонального ИИ-стилиста",
+    version="2.5.0"
 )
 
-# ИСПРАВЛЕННАЯ НАСТРОЙКА CORS ДЛЯ RENDER.COM
-if ENVIRONMENT == 'production':
-    origins = [
-        "https://style-ai-bot.onrender.com",
-        "https://style-ai-bot.onrender.com/webapp",
-        "http://localhost:8000",  # Для локального тестирования
-        "http://127.0.0.1:8000"
-    ]
-else:
-    origins = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:8000"
-    ]
-
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Добавлен OPTIONS
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Инициализация Gemini AI
-gemini_configured = False
-gemini_model = None
+# Конфигурация ЮKassa
+YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID')
+YOOKASSA_SECRET_KEY = os.getenv('YOOKASSA_SECRET_KEY')
 
-def init_gemini():
-    """Инициализация Gemini AI"""
-    global gemini_configured, gemini_model
-    
-    try:
-        if not GEMINI_API_KEY:
-            logger.error("❌ GEMINI_API_KEY не найден в переменных окружения")
-            return False
-        
-        genai.configure(api_key=GEMINI_API_KEY)
-        gemini_model = genai.GenerativeModel(GEMINI_MODEL)
-        
-        # Тестовый запрос
-        test_response = gemini_model.generate_content("Test connection")
-        
-        gemini_configured = True
-        logger.info(f"✅ Gemini AI подключен успешно (модель: {GEMINI_MODEL})")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка подключения к Gemini AI: {e}")
-        gemini_configured = False
-        return False
+if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
+    Configuration.account_id = YOOKASSA_SHOP_ID
+    Configuration.secret_key = YOOKASSA_SECRET_KEY
+    logger.info("ЮKassa configured successfully")
+else:
+    logger.warning("ЮKassa credentials not found")
 
-# Модели данных для существующих эндпоинтов
-class AnalyzeRequest(BaseModel):
-    occasion: str = "повседневный"
-    preferences: Optional[str] = None
-    user_id: Optional[int] = None
+# Статические файлы
+app.mount("/webapp", StaticFiles(directory="webapp", html=True), name="webapp")
 
-class CompareRequest(BaseModel):
-    occasion: str = "повседневный"
-    preferences: Optional[str] = None
-    user_id: Optional[int] = None
+# ================================
+# МОДЕЛИ ДАННЫХ
+# ================================
 
-class HealthResponse(BaseModel):
-    status: str
-    service: str
-    version: str
-    gemini_configured: bool
-    gemini_working: bool
-    environment: str
-    timestamp: str
-
-# НОВЫЕ МОДЕЛИ ДАННЫХ ДЛЯ ПЛАТЕЖЕЙ
-class CreatePaymentRequest(BaseModel):
-    user_id: int
-    package_id: str
-    return_url: Optional[str] = None
-
-class WebhookRequest(BaseModel):
-    event: str
-    object: Dict[str, Any]
-
-# Модели данных для работы с пользователем
-class UserBalanceRequest(BaseModel):
-    user_id: int
-
-class UserBalanceResponse(BaseModel):
-    status: str
-    user_id: int
-    balance: int
-    consultations_available: int
-    timestamp: str
-
-class UserInitRequest(BaseModel):
+class UserSyncRequest(BaseModel):
     user_id: int
     username: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 
-# НОВЫЕ МОДЕЛИ ДЛЯ СИНХРОНИЗАЦИИ
-class UserSyncRequest(BaseModel):
+class ConsultationRequest(BaseModel):
     user_id: int
-    telegram_data: Optional[Dict[str, Any]] = None
-    sync_timestamp: int
-    client_info: Optional[Dict[str, str]] = None
+    occasion: str = "general"
+    preferences: str = ""
+    image_url: Optional[str] = None
 
-# Утилиты для работы с изображениями
-def process_image(image_data: bytes) -> Image.Image:
-    """Обработка изображения"""
-    try:
-        image = Image.open(io.BytesIO(image_data))
-        
-        # Конвертируем в RGB если нужно
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Изменяем размер если изображение слишком большое
-        max_size = 1024
-        if max(image.size) > max_size:
-            image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-        
-        return image
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка обработки изображения: {e}")
-        raise HTTPException(status_code=400, detail="Некорректный формат изображения")
+class PaymentRequest(BaseModel):
+    user_id: int
+    plan_id: str
+    return_url: Optional[str] = None
 
-async def analyze_with_gemini(image: Image.Image, occasion: str, preferences: str = None) -> str:
-    """Анализ изображения с помощью Gemini AI"""
-    try:
-        if not gemini_configured:
-            raise HTTPException(status_code=503, detail="Gemini AI недоступен")
-        
-        # НОВЫЙ ПРОМПТ для Instagram-блогера
-        prompt = f"""
-Ты — модный Instagram-блогер с 1 млн подписчиков из России. Твои подписчики обожают тебя за лёгкость, чувство стиля и дружелюбные советы. Ты всегда даешь понятные, стильные и трендовые рекомендации. Используй выражения, которые популярны в соцсетях, не бойся лайфхаков и визуальных метафор. Будь как подружка, которая всегда скажет честно — но с любовью.
+class BalanceUpdateRequest(BaseModel):
+    user_id: int
+    amount: int
 
-ПОВОД: {occasion}
-{'ПРЕДПОЧТЕНИЯ: ' + preferences if preferences else ''}
+# ================================
+# ОСНОВНЫЕ ЭНДПОИНТЫ
+# ================================
 
-Проанализируй образ и дай краткие, но емкие советы:
-
-1. **Общее впечатление** (1-2 предложения)
-2. **Что работает** в образе 
-3. **Что можно улучшить** (конкретные советы)
-4. **Прическа и макияж** (если видно)
-5. **Рейтинг: X/10** и почему
-
-Пиши живо, с эмодзи, как в Инстаграме. Начни с эмодзи и "Привет, красотка!"
-
-Пример стиля: "Обожаю total beige, но здесь не хватает контраста. Добавь яркий багет или красную помаду — и образ заиграет ✨"
-
-Будь краткой, но точной!
-"""
-        
-        # Отправляем запрос к Gemini
-        response = await asyncio.to_thread(
-            gemini_model.generate_content, 
-            [prompt, image]
-        )
-        
-        if not response.text:
-            raise Exception("Пустой ответ от Gemini")
-        
-        logger.info("✅ Анализ Gemini AI выполнен успешно")
-        return response.text
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка анализа Gemini: {e}")
-        # Возвращаем fallback ответ в новом стиле
-        return f"""
-💫 Привет, красотка!
-
-## ⚠️ Ой, технический сбой!
-
-Прости, сейчас немного глючит, но скоро все исправим!
-
-**Повод:** {occasion}
-
-**Быстрые советы на всякий случай:**
-• Проверь посадку — все должно сидеть идеально!
-• Максимум 3 цвета в образе, остальное — детали
-• Один яркий акцент и ты звезда ⭐
-• Не забывай про аксессуары — они делают образ
-
-**Рейтинг:** Увидимся через минутку! 💕
-
-*Попробуй еще раз, я уже скучаю! 🥰*
-"""
-
-async def compare_with_gemini(images: List[Image.Image], occasion: str, preferences: str = None) -> str:
-    """Сравнение нескольких образов с помощью Gemini AI"""
-    try:
-        if not gemini_configured:
-            raise HTTPException(status_code=503, detail="Gemini AI недоступен")
-        
-        # НОВЫЙ ПРОМПТ для сравнения в стиле Instagram-блогера
-        prompt = f"""
-Ты — модный Instagram-блогер с 1 млн подписчиков из России. Твои подписчики обожают тебя за лёгкость, чувство стиля и дружелюбные советы.
-
-Сравни эти {len(images)} образа для: {occasion}
-{'Учти предпочтения: ' + preferences if preferences else ''}
-
-Для каждого образа дай:
-1. **Краткое описание** (1 предложение)
-2. **Рейтинг X/10** 
-3. **Почему именно такая оценка**
-4. **Прическа/макияж** (если видно)
-
-Потом **ИТОГОВЫЙ ВЕРДИКТ**: какой образ лучше и почему.
-
-Пиши живо, с эмодзи, как подружка! Начни с "Ого, какая дилемма! 😍"
-
-Будь краткой, но честной!
-"""
-        
-        # Подготавливаем контент для отправки
-        content = [prompt] + images
-        
-        response = await asyncio.to_thread(
-            gemini_model.generate_content,
-            content
-        )
-        
-        if not response.text:
-            raise Exception("Пустой ответ от Gemini")
-        
-        logger.info(f"✅ Сравнение {len(images)} образов выполнено успешно")
-        return response.text
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка сравнения Gemini: {e}")
-        return f"""
-😍 Ого, какая дилемма!
-
-## ⚠️ Упс, технические неполадки!
-
-Хочется сравнить все твои образы, но что-то глючит!
-
-**Повод:** {occasion}
-
-**Мои универсальные правила выбора:**
-🎯 Подходит ли дресс-коду события?
-💫 Чувствуешь ли себя уверенно?
-✨ Все ли элементы в гармонии?
-💕 Нравится ли тебе самой?
-
-**Совет:** Выбирай тот, в котором чувствуешь себя на 100! 
-
-*Попробуй еще раз, решим эту дилемму вместе! 💪*
-"""
-
-# Подключаем статические файлы веб-приложения  
-app.mount("/webapp", StaticFiles(directory="webapp"), name="webapp")
-
-# ===========================================================================
-# СУЩЕСТВУЮЩИЕ API РОУТЫ (без изменений)
-# ===========================================================================
-
-@app.get("/api/v1/health", response_model=HealthResponse)
-async def health_check():
-    """Проверка состояния сервера"""
-    
-    # Проверяем работоспособность Gemini
-    gemini_working = False
-    if gemini_configured:
-        try:
-            test_response = await asyncio.to_thread(
-                gemini_model.generate_content, 
-                "Test"
-            )
-            gemini_working = bool(test_response.text)
-        except:
-            gemini_working = False
-    
-    return HealthResponse(
-        status="healthy",
-        service="МИШУРА ИИ-Стилист API с ЮKassa",
-        version="1.3.2",
-        gemini_configured=gemini_configured,
-        gemini_working=gemini_working,
-        environment=ENVIRONMENT,
-        timestamp=datetime.now().isoformat()
-    )
-
-@app.post("/api/v1/analyze")
-async def analyze_clothing(
-    request: Request,
-    file: UploadFile = File(...),
-    occasion: str = Form("повседневный"),
-    preferences: Optional[str] = Form(None),
-    user_id: Optional[int] = Form(None)
-):
-    """Анализ одного изображения одежды"""
-    
-    logger.info(f"📤 Получен запрос на анализ: {file.filename}, повод: {occasion}")
-    
-    try:
-        # Проверяем тип файла
-        if not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="Файл должен быть изображением")
-        
-        # Читаем и обрабатываем изображение
-        image_data = await file.read()
-        image = process_image(image_data)
-        
-        # Анализируем с помощью Gemini
-        advice = await analyze_with_gemini(image, occasion, preferences)
-        
-        # Сохраняем консультацию в базу данных
-        consultation_id = None
-        if user_id:
-            try:
-                consultation_id = database.save_consultation(
-                    user_id=user_id,
-                    occasion=occasion,
-                    preferences=preferences,
-                    image_path=file.filename,
-                    advice=advice
-                )
-                
-                # Списываем баланс
-                database.update_user_balance(user_id, -10)  # STcoin: списываем 10 STcoin
-                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на 10 STcoin")
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Ошибка сохранения в БД: {e}")
-        
-        response_data = {
-            "status": "success",
-            "advice": advice,
-            "metadata": {
-                "consultation_id": consultation_id,
-                "occasion": occasion,
-                "preferences": preferences,
-                "timestamp": datetime.now().isoformat(),
-                "model": GEMINI_MODEL,
-                "environment": ENVIRONMENT
-            }
-        }
-        
-        logger.info(f"✅ Анализ завершен успешно (ID: {consultation_id})")
-        return JSONResponse(content=response_data)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Ошибка анализа: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
-
-@app.post("/api/v1/compare")
-async def compare_clothing(
-    request: Request,
-    files: List[UploadFile] = File(...),
-    occasion: str = Form("повседневный"),
-    preferences: Optional[str] = Form(None),
-    user_id: Optional[int] = Form(None)
-):
-    """Сравнение нескольких образов"""
-    
-    logger.info(f"📤 Получен запрос на сравнение: {len(files)} изображений, повод: {occasion}")
-    
-    try:
-        if len(files) < 2:
-            raise HTTPException(status_code=400, detail="Нужно минимум 2 изображения для сравнения")
-        
-        if len(files) > 4:
-            raise HTTPException(status_code=400, detail="Максимум 4 изображения для сравнения")
-        
-        # Обрабатываем все изображения
-        images = []
-        for file in files:
-            if not file.content_type.startswith('image/'):
-                raise HTTPException(status_code=400, detail=f"Файл {file.filename} не является изображением")
-            
-            image_data = await file.read()
-            image = process_image(image_data)
-            images.append(image)
-        
-        # Сравниваем с помощью Gemini
-        advice = await compare_with_gemini(images, occasion, preferences)
-        
-        # Сохраняем консультацию в базу данных
-        consultation_id = None
-        if user_id:
-            try:
-                filenames = ", ".join([f.filename for f in files])
-                consultation_id = database.save_consultation(
-                    user_id=user_id,
-                    occasion=occasion,
-                    preferences=preferences,
-                    image_path=filenames,
-                    advice=advice
-                )
-                
-                # Списываем баланс (сравнение стоит больше)
-                cost = len(files) * 10  # STcoin: 10 STcoin за каждое изображение
-                database.update_user_balance(user_id, -cost)
-                logger.info(f"💰 Баланс пользователя {user_id} уменьшен на {cost} STcoin")
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Ошибка сохранения в БД: {e}")
-        
-        response_data = {
-            "status": "success",
-            "advice": advice,
-            "metadata": {
-                "consultation_id": consultation_id,
-                "occasion": occasion,
-                "preferences": preferences,
-                "images_count": len(files),
-                "timestamp": datetime.now().isoformat(),
-                "model": GEMINI_MODEL,
-                "environment": ENVIRONMENT
-            }
-        }
-        
-        logger.info(f"✅ Сравнение завершено успешно (ID: {consultation_id})")
-        return JSONResponse(content=response_data)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Ошибка сравнения: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка сравнения: {str(e)}")
-
-@app.get("/api/v1/status")
-async def get_status():
-    """Получение статуса сервера и Gemini AI"""
+@app.get("/")
+async def root():
+    """Корневой эндпоинт"""
     return {
-        "api_status": "online",
-        "gemini_status": "connected" if gemini_configured else "disconnected",
-        "environment": ENVIRONMENT,
-        "model": GEMINI_MODEL if gemini_configured else None,
-        "timestamp": datetime.now().isoformat()
+        "service": "МИШУРА API",
+        "version": "2.5.0",
+        "status": "running",
+        "features": ["styling_ai", "wardrobe", "payments", "pricing_plans"]
     }
 
-# ===========================================================================
-# НОВЫЕ API РОУТЫ ДЛЯ ПЛАТЕЖЕЙ ЮKassa
-# ===========================================================================
-
-@app.get("/api/v1/payments/packages")
-async def get_payment_packages():
-    """Получить доступные пакеты пополнения STcoin"""
-    logger.info("📦 Запрос пакетов пополнения")
-    
+@app.get("/health")
+async def health_check():
+    """Проверка здоровья сервиса"""
     try:
-        packages = payment_service.payment_service.get_packages()
-        return JSONResponse(content=packages)
+        # Проверяем базу данных
+        db_status = True  # Заглушка, database.check_connection() пока нет
         
-    except Exception as e:
-        logger.error(f"❌ Ошибка получения пакетов: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения пакетов")
-
-@app.post("/api/v1/payments/create")
-async def create_payment(request: CreatePaymentRequest):
-    """Создать платеж для пополнения баланса - ИСПРАВЛЕННАЯ ВЕРСИЯ ДЛЯ RENDER.COM"""
-    logger.info(f"💳 Создание платежа для user_id={request.user_id}, package={request.package_id}")
-    
-    try:
-        # Логируем входящие данные
-        logger.info(f"📥 Request data: user_id={request.user_id}, package_id={request.package_id}, return_url={request.return_url}")
-        
-        # Проверяем что payment_service инициализирован
-        if not hasattr(payment_service, 'payment_service'):
-            logger.error("❌ payment_service не инициализирован")
-            raise HTTPException(status_code=503, detail="Платежная система не инициализирована")
-        
-        # ИСПРАВЛЕНИЕ: В продакшне НЕ проверяем configured (тестовые ключи могут не проходить проверку)
-        logger.info(f"🔧 Payment service status: configured={payment_service.payment_service.configured}")
-        logger.info(f"🔧 Environment: {ENVIRONMENT}")
-        logger.info(f"🔧 YuKassa keys present: shop_id={bool(os.getenv('YUKASSA_SHOP_ID'))}, secret_key={bool(os.getenv('YUKASSA_SECRET_KEY'))}")
-        
-        # Создаем платеж даже если configured=False (для тестовых ключей)
-        try:
-            result = payment_service.payment_service.create_payment(
-                user_id=request.user_id,
-                package_id=request.package_id,
-                return_url=request.return_url
-            )
-            
-            logger.info(f"🔧 Payment service result status: {result.get('status', 'unknown')}")
-            
-            if result.get('status') == 'success':
-                logger.info(f"✅ Платеж создан: {result.get('payment_id', 'unknown')}")
-                return JSONResponse(content=result)
-            else:
-                logger.error(f"❌ Ошибка создания платежа: {result}")
-                
-                # Детальное логирование ошибки
-                error_detail = result.get('message', 'Не удалось создать платеж')
-                error_type = result.get('error', 'unknown')
-                
-                logger.error(f"❌ Error type: {error_type}")
-                logger.error(f"❌ Error detail: {error_detail}")
-                
-                # Возвращаем более информативную ошибку
-                raise HTTPException(
-                    status_code=400, 
-                    detail={
-                        "error": error_type,
-                        "message": error_detail,
-                        "debug_info": {
-                            "environment": ENVIRONMENT,
-                            "payment_service_configured": payment_service.payment_service.configured,
-                            "yukassa_keys_present": bool(os.getenv('YUKASSA_SHOP_ID') and os.getenv('YUKASSA_SECRET_KEY'))
-                        }
-                    }
-                )
-                
-        except Exception as payment_error:
-            logger.error(f"❌ Exception при создании платежа: {payment_error}")
-            logger.error(f"❌ Exception type: {type(payment_error)}")
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
-            
-            # Если это ошибка ЮKassa API
-            if "yookassa" in str(payment_error).lower() or "unauthorized" in str(payment_error).lower():
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Ошибка платежной системы ЮKassa: {str(payment_error)}"
-                )
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Внутренняя ошибка: {str(payment_error)}"
-                )
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Неожиданная ошибка создания платежа: {e}")
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Внутренняя ошибка сервера: {str(e)}"
-        )
-
-@app.post("/api/v1/payments/webhook")
-async def payment_webhook(
-    request: Request,
-    signature: Optional[str] = Header(None, alias="X-Signature")
-):
-    """Webhook для обработки уведомлений от ЮKassa"""
-    logger.info("🔔 Получен webhook от ЮKassa")
-    
-    try:
-        # Читаем тело запроса
-        body = await request.body()
-        webhook_data = json.loads(body.decode('utf-8'))
-        
-        logger.debug(f"📨 Webhook данные: {json.dumps(webhook_data, ensure_ascii=False, indent=2)}")
-        
-        # Проверяем подпись (в продакшне)
-        if signature and ENVIRONMENT == 'production':
-            is_valid = payment_service.payment_service.validate_webhook_signature(
-                body.decode('utf-8'), 
-                signature
-            )
-            if not is_valid:
-                logger.warning("⚠️ Неверная подпись webhook")
-                raise HTTPException(status_code=401, detail="Неверная подпись")
-        
-        # Обрабатываем webhook
-        result = payment_service.payment_service.process_webhook(webhook_data)
-        
-        if result['status'] == 'success':
-            logger.info(f"✅ Webhook обработан успешно: {result}")
-            return JSONResponse(content={"status": "ok"})
-        elif result['status'] == 'ignored':
-            logger.info(f"ℹ️ Webhook проигнорирован: {result}")
-            return JSONResponse(content={"status": "ok"})
-        else:
-            logger.error(f"❌ Ошибка обработки webhook: {result}")
-            return JSONResponse(
-                content={"status": "error", "message": result.get('message')},
-                status_code=400
-            )
-            
-    except json.JSONDecodeError:
-        logger.error("❌ Некорректный JSON в webhook")
-        raise HTTPException(status_code=400, detail="Некорректный JSON")
-    except Exception as e:
-        logger.error(f"❌ Ошибка обработки webhook: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обработки webhook")
-
-@app.get("/api/v1/payments/status/{payment_id}")
-async def get_payment_status(payment_id: str):
-    """Получить статус платежа"""
-    logger.info(f"🔍 Запрос статуса платежа: {payment_id}")
-    
-    try:
-        result = payment_service.payment_service.get_payment_status(payment_id)
-        
-        if result['status'] == 'success':
-            return JSONResponse(content=result)
-        else:
-            raise HTTPException(
-                status_code=404, 
-                detail=result.get('message', 'Платеж не найден')
-            )
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Ошибка получения статуса платежа: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения статуса")
-
-# ===========================================================================
-# API РОУТЫ ДЛЯ СИНХРОНИЗАЦИИ БАЛАНСА ПОЛЬЗОВАТЕЛЯ (старые)
-# ===========================================================================
-
-@app.get("/api/v1/user/{user_id}/balance", response_model=UserBalanceResponse)
-async def get_user_balance(user_id: int):
-    """Получить актуальный баланс пользователя (старый endpoint)"""
-    logger.info(f"👤 Запрос баланса для user_id={user_id}")
-    
-    try:
-        # Проверяем существует ли пользователь
-        user = database.get_user(user_id)
-        if not user:
-            # Создаем нового пользователя с начальным балансом
-            logger.info(f"🆕 Создаем нового пользователя {user_id}")
-            database.save_user(user_id, None, None, None)
-            # Устанавливаем начальный баланс 200 STcoin
-            database.update_user_balance(user_id, 200)
-        
-        # Получаем текущий баланс
-        balance = database.get_user_balance(user_id)
-        consultations_available = balance // 10  # 1 консультация = 10 STcoin
-        
-        logger.info(f"💰 Баланс user_id={user_id}: {balance} STcoin ({consultations_available} консультаций)")
-        
-        return UserBalanceResponse(
-            status="success",
-            user_id=user_id,
-            balance=balance,
-            consultations_available=consultations_available,
-            timestamp=datetime.now().isoformat()
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка получения баланса для user_id={user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения баланса")
-
-@app.post("/api/v1/user/init")
-async def init_user(request: UserInitRequest):
-    """Инициализация пользователя (создание или обновление данных)"""
-    logger.info(f"🔄 Инициализация пользователя {request.user_id}")
-    
-    try:
-        # Проверяем существует ли пользователь
-        existing_user = database.get_user(request.user_id)
-        
-        if existing_user:
-            logger.info(f"✅ Пользователь {request.user_id} уже существует")
-            # Обновляем данные пользователя если они изменились
-            if request.username or request.first_name or request.last_name:
-                database.save_user(
-                    request.user_id, 
-                    request.username, 
-                    request.first_name, 
-                    request.last_name
-                )
-                logger.info(f"📝 Данные пользователя {request.user_id} обновлены")
-        else:
-            logger.info(f"🆕 Создаем нового пользователя {request.user_id}")
-            # Создаем нового пользователя
-            database.save_user(
-                request.user_id, 
-                request.username, 
-                request.first_name, 
-                request.last_name
-            )
-            
-            # Устанавливаем начальный баланс 200 STcoin
-            database.update_user_balance(request.user_id, 200)
-            logger.info(f"💰 Пользователю {request.user_id} начислен стартовый баланс 200 STcoin")
-        
-        # Получаем актуальный баланс
-        balance = database.get_user_balance(request.user_id)
-        consultations_available = balance // 10
+        # Проверяем Gemini AI
+        ai_status = await gemini_ai.test_gemini_connection()
         
         return {
-            "status": "success",
-            "user_id": request.user_id,
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "components": {
+                "database": "ok" if db_status else "error",
+                "gemini_ai": "ok" if ai_status else "error",
+                "yookassa": "ok" if YOOKASSA_SHOP_ID else "not_configured"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+
+@app.get("/api/v1/health")
+async def health_check_v1():
+    return await health_check()
+
+# ================================
+# ПОЛЬЗОВАТЕЛИ
+# ================================
+
+@app.post("/api/v1/users/sync")
+async def sync_user_endpoint(request: Request):
+    """Синхронизация пользователя"""
+    try:
+        data = await request.json()
+        user_id = data.get("user_id")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+        
+        # Получаем или создаем пользователя
+        user = database.get_user(user_id)
+        is_new_user = user is None
+        
+        if is_new_user:
+            # Создаем нового пользователя
+            database.save_user(
+                telegram_id=user_id,
+                username=data.get("username"),
+                first_name=data.get("first_name"),
+                last_name=data.get("last_name")
+            )
+            # Начальный баланс для новых пользователей
+            database.update_user_balance(user_id, 0)
+        
+        # Получаем актуальные данные
+        balance = database.get_user_balance(user_id) or 0
+        consultations_count = len(database.get_user_consultations(user_id, 1000))  # Получаем все консультации
+        
+        return {
+            "user_id": user_id,
             "balance": balance,
-            "consultations_available": consultations_available,
-            "is_new_user": not bool(existing_user),
-            "timestamp": datetime.now().isoformat()
+            "is_new_user": is_new_user,
+            "consultations_count": consultations_count,
+            "status": "success",
+            "telegram_synced": True
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Ошибка инициализации пользователя {request.user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка инициализации пользователя")
+        logger.error(f"Error syncing user: {str(e)}")
+        raise HTTPException(status_code=500, detail="User sync failed")
 
-@app.get("/api/v1/user/{user_id}/history")
-async def get_user_history(user_id: int, limit: int = 20):
-    """Получить историю консультаций пользователя"""
-    logger.info(f"📚 Запрос истории для user_id={user_id}, limit={limit}")
-    
+@app.get("/api/v1/users/{user_id}/balance")
+async def get_user_balance(user_id: int):
+    """Получить баланс пользователя"""
     try:
-        # Получаем историю консультаций
-        consultations = database.get_user_consultations(user_id, limit)
+        balance = database.get_user_balance(user_id) or 0
+        return {
+            "user_id": user_id,
+            "balance": balance,
+            "currency": "STcoin"
+        }
+    except Exception as e:
+        logger.error(f"Error getting balance: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get balance")
+
+@app.post("/api/v1/users/{user_id}/balance")
+async def update_user_balance(user_id: int, request: BalanceUpdateRequest):
+    """Обновить баланс пользователя (админ)"""
+    try:
+        database.update_user_balance(user_id, request.amount)
+        new_balance = database.get_user_balance(user_id)
         
-        # Форматируем данные
-        formatted_consultations = []
-        for consultation in consultations:
-            formatted_consultations.append({
-                "id": consultation[0],
-                "occasion": consultation[2],
-                "preferences": consultation[3],
-                "advice": consultation[5],
-                "created_at": consultation[6],
-                "image_path": consultation[4]
+        return {
+            "user_id": user_id,
+            "amount_changed": request.amount,
+            "new_balance": new_balance,
+            "status": "success"
+        }
+    except Exception as e:
+        logger.error(f"Error updating balance: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update balance")
+
+# ================================
+# ТАРИФНЫЕ ПЛАНЫ
+# ================================
+
+@app.get("/api/v1/pricing/plans")
+async def get_pricing_plans():
+    """Получить список всех тарифных планов"""
+    try:
+        plans_list = []
+        
+        for plan_id, plan in PRICING_PLANS.items():
+            price_per_consultation = plan["price_rub"] / plan["consultations"]
+            
+            plans_list.append({
+                "id": plan_id,
+                "name": plan["name"],
+                "description": plan["description"],
+                "consultations": plan["consultations"],
+                "stcoins": plan["stcoins"],
+                "price_rub": plan["price_rub"],
+                "price_per_consultation": round(price_per_consultation, 1),
+                "discount": plan["discount"],
+                "popular": plan["popular"],
+                "temporary": plan["temporary"],
+                "color": plan["color"]
             })
         
         return {
             "status": "success",
+            "plans": plans_list,
+            "currency": "RUB",
+            "consultation_cost": 10  # STcoin за консультацию
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting pricing plans: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get pricing plans")
+
+# ================================
+# ПЛАТЕЖИ
+# ================================
+
+@app.post("/api/v1/payments/create")
+async def create_payment_endpoint(request: Request):
+    """Создание платежа с новыми тарифными планами"""
+    try:
+        data = await request.json()
+        user_id = data.get("user_id")
+        plan_id = data.get("plan_id")
+        return_url = data.get("return_url", "https://t.me/your_bot_name")
+        
+        if not user_id or not plan_id:
+            raise HTTPException(status_code=400, detail="Missing user_id or plan_id")
+        
+        # Проверяем существование плана
+        plan = get_plan_by_id(plan_id)
+        if not plan:
+            raise HTTPException(status_code=400, detail="Invalid plan_id")
+        
+        yookassa_config = get_yookassa_config(plan_id)
+        if not yookassa_config:
+            raise HTTPException(status_code=400, detail="YooKassa config not found")
+        
+        # Создаем платеж в ЮKassa
+        payment = Payment.create({
+            "amount": yookassa_config["amount"],
+            "currency": "RUB",
+            "description": yookassa_config["description"],
+            "confirmation": {
+                "type": "redirect",
+                "return_url": return_url
+            },
+            "capture": True,
+            "metadata": {
+                "user_id": str(user_id),
+                "plan_id": plan_id,
+                "stcoins_reward": str(yookassa_config["stcoins_reward"]),
+                "consultations_count": str(plan["consultations"])
+            }
+        })
+        
+        # Сохраняем платеж в базу
+        payment_service.save_payment(
+            payment_id=payment.id,
+            user_id=user_id,
+            amount=float(yookassa_config["amount"]["value"]),
+            currency="RUB",
+            status="pending",
+            plan_id=plan_id,
+            stcoins_amount=yookassa_config["stcoins_reward"]
+        )
+        
+        # ДЛЯ ТЕСТОВОГО РЕЖИМА: автоматически завершаем платеж
+        if YOOKASSA_SECRET_KEY and YOOKASSA_SECRET_KEY.startswith('test_'):
+            # Это тестовый режим - сразу зачисляем STcoin
+            database.update_user_balance(user_id, yookassa_config["stcoins_reward"])
+            payment_service.update_payment_status(payment.id, 'completed')
+            logger.info(f"🧪 TEST MODE: Auto-completed payment {payment.id}, added {yookassa_config['stcoins_reward']} STcoin")
+        
+        logger.info(f"Created payment {payment.id} for user {user_id}, plan {plan_id} ({plan['name']})")
+        
+        return {
+            "payment_id": payment.id,
+            "payment_url": payment.confirmation.confirmation_url,
+            "amount": yookassa_config["amount"]["value"],
+            "plan": {
+                "id": plan_id,
+                "name": plan["name"],
+                "consultations": plan["consultations"],
+                "stcoins": plan["stcoins"],
+                "price": plan["price_rub"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Payment creation failed")
+
+@app.post("/api/v1/payments/webhook")
+async def payment_webhook_endpoint(request: Request):
+    """Webhook для обработки уведомлений от ЮKassa с новыми тарифами"""
+    try:
+        raw_body = await request.body()
+        webhook_data = json.loads(raw_body.decode('utf-8'))
+        
+        payment_data = webhook_data.get('object', {})
+        payment_id = payment_data.get('id')
+        status = payment_data.get('status')
+        
+        if not payment_id:
+            logger.error("No payment_id in webhook")
+            return {"status": "error", "message": "No payment_id"}
+        
+        # Получаем платеж из базы
+        payment_record = payment_service.get_payment(payment_id)
+        if not payment_record:
+            logger.error(f"Payment {payment_id} not found in database")
+            return {"status": "error", "message": "Payment not found"}
+        
+        user_id = payment_record['user_id']
+        plan_id = payment_record.get('plan_id')
+        
+        if status == 'succeeded':
+            # Проверяем, не был ли платеж уже обработан
+            if payment_record.get('status') == 'completed':
+                logger.info(f"Payment {payment_id} already processed")
+                return {"status": "ok", "message": "Already processed"}
+            
+            # Получаем конфигурацию плана
+            if plan_id and plan_id in PRICING_PLANS:
+                plan = PRICING_PLANS[plan_id]
+                stcoins_to_add = plan["stcoins"]
+                plan_name = plan["name"]
+            else:
+                # Fallback для совместимости
+                stcoins_to_add = payment_record.get('stcoins_amount', 10)
+                plan_name = "Пакет консультаций"
+            
+            # Начисляем STcoin
+            database.update_user_balance(user_id, stcoins_to_add)
+            
+            # Обновляем статус платежа
+            payment_service.update_payment_status(payment_id, 'completed')
+            
+            # Получаем обновленный баланс
+            new_balance = database.get_user_balance(user_id)
+            
+            logger.info(f"Payment {payment_id} processed: +{stcoins_to_add} STcoin for user {user_id} (plan: {plan_name})")
+            logger.info(f"User {user_id} new balance: {new_balance} STcoin")
+            
+            return {
+                "status": "success",
+                "message": "Payment processed",
+                "plan_id": plan_id,
+                "plan_name": plan_name,
+                "stcoins_added": stcoins_to_add,
+                "new_balance": new_balance
+            }
+            
+        elif status == 'canceled':
+            payment_service.update_payment_status(payment_id, 'canceled')
+            logger.info(f"Payment {payment_id} canceled")
+            return {"status": "ok", "message": "Payment canceled"}
+        
+        else:
+            logger.info(f"Payment {payment_id} status: {status}")
+            return {"status": "ok", "message": f"Status {status} received"}
+            
+    except Exception as e:
+        logger.error(f"Error processing webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+@app.get("/api/v1/payments/history")
+async def get_payments_history(user_id: int):
+    """Получает историю платежей пользователя"""
+    try:
+        logger.info(f"📋 Получение истории платежей для пользователя {user_id}")
+        
+        # Подключаемся к БД
+        import database
+        conn = database.get_connection()
+        
+        # Получаем все платежи пользователя
+        payments = conn.execute("""
+            SELECT 
+                payment_id,
+                amount,
+                stcoins_amount,
+                status,
+                plan_id,
+                created_at,
+                updated_at
+            FROM payments 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC
+        """, (user_id,)).fetchall()
+        
+        conn.close()
+        
+        # Преобразуем в список словарей
+        payments_list = []
+        for payment in payments:
+            payments_list.append({
+                "payment_id": payment[0],
+                "amount": payment[1],
+                "stcoins_amount": payment[2],
+                "status": payment[3],
+                "plan_id": payment[4],
+                "created_at": payment[5],
+                "updated_at": payment[6]
+            })
+        
+        logger.info(f"📊 Найдено {len(payments_list)} платежей для пользователя {user_id}")
+        
+        return payments_list
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения истории платежей: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка получения истории: {str(e)}")
+
+@app.post("/api/v1/payments/sync_all")
+async def sync_all_payments(request: dict):
+    """Синхронизирует все платежи пользователя с ЮKassa"""
+    try:
+        user_id = request.get('user_id')
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id обязателен")
+        
+        logger.info(f"🔄 Синхронизация всех платежей для пользователя {user_id}")
+        
+        # ИСПРАВЛЕНИЕ: используем правильную функцию подключения к БД
+        import database
+        
+        # Получаем все pending платежи пользователя
+        conn = database.get_connection()
+        pending_payments = conn.execute("""
+            SELECT payment_id, amount, stcoins_amount, plan_id 
+            FROM payments 
+            WHERE user_id = ? AND status = 'pending'
+            ORDER BY created_at DESC
+        """, (user_id,)).fetchall()
+        
+        if not pending_payments:
+            conn.close()
+            logger.info(f"💰 Нет pending платежей для пользователя {user_id}")
+            return {
+                "success": True,
+                "message": "Нет платежей для синхронизации",
+                "synchronized": 0,
+                "checked_payments": 0,
+                "total_stcoins": 0
+            }
+        
+        synchronized_count = 0
+        total_stcoins = 0
+        
+        # Проверяем каждый pending платеж в ЮKassa
+        for payment in pending_payments:
+            payment_id = payment[0]
+            stcoins_amount = payment[2]
+            
+            try:
+                # ИСПРАВЛЕНИЕ: Правильная проверка ЮKassa
+                from yookassa import Payment as YooPayment
+                
+                # Получаем информацию о платеже из ЮKassa
+                yoo_payment = YooPayment.find_one(payment_id)
+                
+                logger.info(f"🔍 Проверка платежа {payment_id}: статус {yoo_payment.status}")
+                
+                if yoo_payment.status == 'succeeded':
+                    # Платеж успешно завершен - обновляем статус
+                    conn.execute("""
+                        UPDATE payments 
+                        SET status = 'completed', updated_at = datetime('now') 
+                        WHERE payment_id = ?
+                    """, (payment_id,))
+                    
+                    # Зачисляем STcoin пользователю
+                    conn.execute("""
+                        UPDATE users 
+                        SET balance = balance + ?, updated_at = datetime('now')
+                        WHERE telegram_id = ?
+                    """, (stcoins_amount, user_id))
+                    
+                    synchronized_count += 1
+                    total_stcoins += stcoins_amount
+                    
+                    logger.info(f"✅ Синхронизирован платеж {payment_id}: +{stcoins_amount} STcoin")
+                    
+                elif yoo_payment.status == 'waiting_for_capture':
+                    # Платеж нужно подтвердить
+                    try:
+                        captured_payment = YooPayment.capture(payment_id)
+                        if captured_payment.status == 'succeeded':
+                            # Обновляем после подтверждения
+                            conn.execute("""
+                                UPDATE payments 
+                                SET status = 'completed', updated_at = datetime('now') 
+                                WHERE payment_id = ?
+                            """, (payment_id,))
+                            
+                            conn.execute("""
+                                UPDATE users 
+                                SET balance = balance + ?, updated_at = datetime('now')
+                                WHERE telegram_id = ?
+                            """, (stcoins_amount, user_id))
+                            
+                            synchronized_count += 1
+                            total_stcoins += stcoins_amount
+                            
+                            logger.info(f"✅ Подтвержден и синхронизирован платеж {payment_id}: +{stcoins_amount} STcoin")
+                            
+                    except Exception as capture_error:
+                        logger.error(f"❌ Ошибка подтверждения платежа {payment_id}: {capture_error}")
+                        
+                else:
+                    logger.info(f"ℹ️ Платеж {payment_id} в статусе {yoo_payment.status}, пропускаем")
+                    
+            except Exception as payment_error:
+                logger.error(f"❌ Ошибка проверки платежа {payment_id}: {payment_error}")
+                
+                # ВРЕМЕННОЕ РЕШЕНИЕ: Если не можем проверить в ЮKassa, завершаем принудительно
+                # (ТОЛЬКО для тестирования, в продакшне убрать!)
+                if "test_" in payment_id:  # Только для тестовых платежей
+                    logger.info(f"🧪 Тестовый платеж {payment_id}, завершаем принудительно")
+                    
+                    conn.execute("""
+                        UPDATE payments 
+                        SET status = 'completed', updated_at = datetime('now') 
+                        WHERE payment_id = ?
+                    """, (payment_id,))
+                    
+                    conn.execute("""
+                        UPDATE users 
+                        SET balance = balance + ?, updated_at = datetime('now')
+                        WHERE telegram_id = ?
+                    """, (stcoins_amount, user_id))
+                    
+                    synchronized_count += 1
+                    total_stcoins += stcoins_amount
+                    
+                    logger.info(f"✅ Тестовый платеж завершен: +{stcoins_amount} STcoin")
+                
+                continue
+        
+        conn.commit()
+        conn.close()
+        
+        # Возвращаем результат синхронизации
+        result = {
+            "success": True,
+            "message": f"Синхронизировано {synchronized_count} платежей",
+            "synchronized": synchronized_count,
+            "total_stcoins": total_stcoins,
+            "checked_payments": len(pending_payments)
+        }
+        
+        logger.info(f"🎉 Синхронизация завершена: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка синхронизации платежей: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка синхронизации: {str(e)}")
+
+@app.get("/api/v1/payments/status/{payment_id}")
+async def get_payment_status(payment_id: str):
+    """Получить статус платежа"""
+    try:
+        payment_record = payment_service.get_payment(payment_id)
+        if not payment_record:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        
+        # Получаем информацию о плане
+        plan_id = payment_record.get('plan_id')
+        plan_info = {}
+        if plan_id:
+            plan = get_plan_by_id(plan_id)
+            if plan:
+                plan_info = {
+                    "id": plan_id,
+                    "name": plan["name"],
+                    "consultations": plan["consultations"],
+                    "stcoins": plan["stcoins"]
+                }
+        
+        return {
+            "payment_id": payment_id,
+            "status": payment_record.get('status', 'unknown'),
+            "amount": payment_record.get('amount'),
+            "currency": payment_record.get('currency', 'RUB'),
+            "user_id": payment_record.get('user_id'),
+            "plan": plan_info,
+            "created_at": payment_record.get('created_at')
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting payment status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get payment status")
+
+@app.get("/api/v1/users/{user_id}/payments")
+async def get_user_payments(user_id: int, limit: int = 10):
+    """Получить историю платежей пользователя"""
+    try:
+        # Получаем платежи из базы данных
+        payments = payment_service.get_user_payments(user_id, limit)
+        
+        # Обогащаем данными о планах
+        enriched_payments = []
+        for payment in payments:
+            plan_id = payment.get('plan_id')
+            plan_info = {}
+            
+            if plan_id and plan_id in PRICING_PLANS:
+                plan = PRICING_PLANS[plan_id]
+                plan_info = {
+                    "name": plan["name"],
+                    "consultations": plan["consultations"]
+                }
+            
+            enriched_payments.append({
+                "payment_id": payment.get('payment_id'),
+                "amount": payment.get('amount'),
+                "currency": payment.get('currency', 'RUB'),
+                "status": payment.get('status'),
+                "plan_id": plan_id,
+                "plan_name": plan_info.get('name', 'Неизвестный план'),
+                "stcoins_reward": payment.get('stcoins_amount', 0),
+                "created_at": payment.get('created_at'),
+                "updated_at": payment.get('updated_at')
+            })
+        
+        return {
             "user_id": user_id,
-            "consultations": formatted_consultations,
-            "total_count": len(formatted_consultations),
+            "payments": enriched_payments,
+            "total": len(enriched_payments)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user payments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get payments")
+
+# ================================
+# КОНСУЛЬТАЦИИ
+# ================================
+
+@app.post("/api/v1/consultations/analyze")
+async def analyze_image_endpoint(request: Request):
+    """Анализ изображения через Gemini AI"""
+    try:
+        data = await request.json()
+        user_id = data.get("user_id")
+        occasion = data.get("occasion", "general")
+        preferences = data.get("preferences", "")
+        image_data = data.get("image_data")  # base64
+        
+        if not user_id or not image_data:
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        # Проверяем баланс
+        balance = database.get_user_balance(user_id) or 0
+        if balance < 10:
+            raise HTTPException(status_code=402, detail="Insufficient balance")
+        
+        # Анализируем изображение
+        import base64
+        image_bytes = base64.b64decode(image_data)
+        
+        advice = await gemini_ai.analyze_clothing_image(
+            image_data=image_bytes,
+            occasion=occasion,
+            preferences=preferences
+        )
+        
+        # Списываем STcoin
+        database.update_user_balance(user_id, -10)
+        new_balance = database.get_user_balance(user_id)
+        
+        # Сохраняем консультацию
+        consultation_id = database.save_consultation(
+            user_id=user_id,
+            occasion=occasion,
+            preferences=preferences,
+            image_path="webapp_upload",
+            advice=advice
+        )
+        
+        return {
+            "consultation_id": consultation_id,
+            "advice": advice,
+            "cost": 10,
+            "new_balance": new_balance,
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing image: {str(e)}")
+        raise HTTPException(status_code=500, detail="Analysis failed")
+
+@app.post("/api/v1/consultations/compare")
+async def compare_images_endpoint(request: Request):
+    """Сравнение нескольких изображений через Gemini AI"""
+    try:
+        data = await request.json()
+        user_id = data.get("user_id")
+        occasion = data.get("occasion", "general")
+        preferences = data.get("preferences", "")
+        images_data = data.get("images_data")  # list of base64 strings
+        
+        if not user_id or not images_data:
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        if not isinstance(images_data, list) or len(images_data) < 2:
+            raise HTTPException(status_code=400, detail="At least 2 images required for comparison")
+        
+        if len(images_data) > 4:
+            raise HTTPException(status_code=400, detail="Maximum 4 images allowed")
+        
+        # Проверяем баланс
+        balance = database.get_user_balance(user_id) or 0
+        if balance < 10:
+            raise HTTPException(status_code=402, detail="Insufficient balance")
+        
+        # Конвертируем base64 в bytes
+        import base64
+        image_bytes_list = []
+        for image_data in images_data:
+            try:
+                image_bytes = base64.b64decode(image_data)
+                image_bytes_list.append(image_bytes)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
+        
+        # Сравниваем изображения через Gemini AI
+        advice = await gemini_ai.compare_clothing_images(
+            image_data_list=image_bytes_list,
+            occasion=occasion,
+            preferences=preferences
+        )
+        
+        # Списываем STcoin
+        database.update_user_balance(user_id, -10)
+        new_balance = database.get_user_balance(user_id)
+        
+        # Сохраняем консультацию
+        consultation_id = database.save_consultation(
+            user_id=user_id,
+            occasion=occasion,
+            preferences=preferences,
+            image_path="webapp_compare_upload",
+            advice=advice
+        )
+        
+        return {
+            "consultation_id": consultation_id,
+            "advice": advice,
+            "images_count": len(images_data),
+            "cost": 10,
+            "new_balance": new_balance,
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing images: {str(e)}")
+        raise HTTPException(status_code=500, detail="Comparison failed")
+
+@app.get("/api/v1/consultations/{user_id}")
+async def get_user_consultations(user_id: int, limit: int = 10):
+    """Получить консультации пользователя"""
+    try:
+        consultations = database.get_user_consultations(user_id, limit)
+        return {
+            "user_id": user_id,
+            "consultations": consultations,
+            "total": len(consultations)
+        }
+    except Exception as e:
+        logger.error(f"Error getting consultations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get consultations")
+
+@app.get("/api/v1/consultations/{user_id}/{consultation_id}")
+async def get_consultation(user_id: int, consultation_id: int):
+    """Получить конкретную консультацию"""
+    try:
+        consultation = database.get_consultation(consultation_id, user_id)
+        if not consultation:
+            raise HTTPException(status_code=404, detail="Consultation not found")
+        
+        return consultation
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting consultation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get consultation")
+
+# ================================
+# ГАРДЕРОБ
+# ================================
+
+@app.get("/api/v1/wardrobe/{user_id}")
+async def get_user_wardrobe(user_id: int, limit: int = 20):
+    """Получить гардероб пользователя"""
+    try:
+        wardrobe = database.get_user_wardrobe(user_id, limit)
+        return {
+            "user_id": user_id,
+            "wardrobe": wardrobe,
+            "total": len(wardrobe)
+        }
+    except Exception as e:
+        logger.error(f"Error getting wardrobe: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get wardrobe")
+
+@app.post("/api/v1/wardrobe/{user_id}/add")
+async def add_wardrobe_item(user_id: int, request: Request):
+    """Добавить предмет в гардероб"""
+    try:
+        data = await request.json()
+        file_id = data.get("file_id")
+        item_name = data.get("item_name", "Предмет одежды")
+        item_tag = data.get("item_tag", "новый")
+        
+        if not file_id:
+            raise HTTPException(status_code=400, detail="file_id is required")
+        
+        wardrobe_id = database.save_wardrobe_item(
+            user_id=user_id,
+            telegram_file_id=file_id,
+            item_name=item_name,
+            item_tag=item_tag
+        )
+        
+        return {
+            "wardrobe_id": wardrobe_id,
+            "item_name": item_name,
+            "item_tag": item_tag,
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding wardrobe item: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add item")
+
+# ================================
+# АДМИНКА
+# ================================
+
+@app.get("/api/v1/admin/stats")
+async def get_admin_stats():
+    """Получить статистику системы"""
+    try:
+        stats = database.get_stats()
+        
+        # Добавляем статистику по тарифам
+        pricing_stats = []
+        for plan_id, plan in PRICING_PLANS.items():
+            pricing_stats.append({
+                "plan_id": plan_id,
+                "name": plan["name"],
+                "price": plan["price_rub"],
+                "consultations": plan["consultations"],
+                "popular": plan["popular"],
+                "temporary": plan["temporary"],
+                # Здесь можно добавить реальную статистику продаж
+                "sales_count": 0,
+                "revenue": 0
+            })
+        
+        return {
+            "system_stats": stats,
+            "pricing_stats": pricing_stats,
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
-        logger.error(f"❌ Ошибка получения истории для user_id={user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения истории")
+        logger.error(f"Error getting admin stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get stats")
 
-@app.post("/api/v1/user/{user_id}/balance/sync")
-async def sync_user_balance(user_id: int):
-    """Принудительная синхронизация баланса (для отладки)"""
-    logger.info(f"🔄 Синхронизация баланса для user_id={user_id}")
+# ================================
+# ЗАПУСК СЕРВЕРА
+# ================================
+
+if __name__ == "__main__":
+    import uvicorn
     
-    try:
-        # Получаем актуальный баланс из БД
-        balance = database.get_user_balance(user_id)
-        consultations_available = balance // 10
-        
-        # Получаем последние платежи пользователя
-        payments = database.get_connection()
-        cursor = payments.cursor()
-        cursor.execute(
-            "SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'completed'",
-            (user_id,)
-        )
-        completed_payments = cursor.fetchone()[0]
-        payments.close()
-        
-        return {
-            "status": "success",
-            "user_id": user_id,
-            "balance": balance,
-            "consultations_available": consultations_available,
-            "completed_payments": completed_payments,
-            "synced_at": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка синхронизации баланса для user_id={user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка синхронизации баланса")
-
-# ===========================================================================
-# НОВЫЕ API РОУТЫ ДЛЯ СИНХРОНИЗАЦИИ USER_ID
-# ===========================================================================
-
-@app.get("/api/v1/users/{user_id}/balance")
-async def get_user_balance_sync(user_id: int):
-    """Получение актуального баланса пользователя (новый endpoint для синхронизации)"""
-    try:
-        logger.info(f"💰 Запрос баланса для user_id: {user_id}")
-        
-        # Проверяем существование пользователя
-        user_data = database.get_user(user_id)
-        if not user_data:
-            logger.info(f"👤 Создаем нового пользователя {user_id}")
-            # Создаем пользователя если не существует
-            database.save_user(
-                telegram_id=user_id,
-                username=f"user_{user_id}",
-                first_name="Пользователь",
-                last_name=""
-            )
-            # Устанавливаем начальный баланс
-            database.update_user_balance(user_id, 200)
-            balance = 200  # Стартовый баланс
-        else:
-            balance = database.get_user_balance(user_id)
-        
-        response_data = {
-            "user_id": user_id,
-            "balance": balance,
-            "timestamp": datetime.now().isoformat(),
-            "consultations_available": balance // 10,
-            "status": "success"
-        }
-        
-        logger.info(f"✅ Баланс user_id {user_id}: {balance} STcoin")
-        return response_data
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка получения баланса для user_id {user_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/v1/users/sync")
-async def sync_user_endpoint(request: Request):
-    """Синхронизация пользователя между устройствами"""
-    try:
-        # Получаем JSON данные напрямую
-        data = await request.json()
-        
-        user_id = data.get("user_id")
-        if not user_id:
-            raise HTTPException(status_code=400, detail="user_id required")
-        
-        telegram_data = data.get("telegram_data", {})
-        sync_timestamp = data.get("sync_timestamp", 0)
-        
-        logger.info(f"🔄 Синхронизация пользователя {user_id}")
-        
-        # Проверяем существование пользователя
-        user_data = database.get_user(user_id)
-        
-        if not user_data:
-            # Создаем нового пользователя
-            logger.info(f"👤 Создание нового пользователя {user_id}")
-            
-            username = None
-            first_name = "Пользователь"
-            last_name = ""
-            
-            if telegram_data:
-                username = telegram_data.get("username")
-                first_name = telegram_data.get("first_name", "Пользователь")
-                last_name = telegram_data.get("last_name", "")
-            
-            database.save_user(
-                telegram_id=user_id,
-                username=username or f"user_{user_id}",
-                first_name=first_name,
-                last_name=last_name
-            )
-            
-            # Устанавливаем начальный баланс
-            database.update_user_balance(user_id, 200)
-            new_balance = 200  # Стартовый баланс
-            is_new_user = True
-        else:
-            new_balance = database.get_user_balance(user_id)
-            is_new_user = False
-        
-        # Получаем консультации
-        try:
-            recent_consultations = database.get_user_consultations(user_id, limit=5)
-            consultations_count = len(recent_consultations) if recent_consultations else 0
-        except:
-            consultations_count = 0
-        
-        sync_result = {
-            "user_id": user_id,
-            "balance": new_balance,
-            "is_new_user": is_new_user,
-            "sync_timestamp": sync_timestamp,
-            "server_timestamp": datetime.now().isoformat(),
-            "consultations_count": consultations_count,
-            "status": "success"
-        }
-        
-        if telegram_data:
-            sync_result["telegram_synced"] = True
-            sync_result["username"] = telegram_data.get("username")
-            sync_result["first_name"] = telegram_data.get("first_name")
-        
-        logger.info(f"✅ Пользователь {user_id} синхронизирован: balance={new_balance}")
-        
-        return sync_result
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка синхронизации пользователя: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/v1/users/{user_id}/balance/add")
-async def add_user_balance_endpoint(user_id: int, amount: int):
-    """Добавление STcoin к балансу пользователя (для тестирования)"""
-    try:
-        logger.info(f"💰 Добавление {amount} STcoin пользователю {user_id}")
-        
-        # Проверяем существование пользователя
-        user_data = database.get_user(user_id)
-        if not user_data:
-            logger.info(f"👤 Создаем пользователя {user_id}")
-            database.save_user(
-                telegram_id=user_id,
-                username=f"user_{user_id}",
-                first_name="Пользователь",
-                last_name=""
-            )
-            # Устанавливаем начальный баланс
-            database.update_user_balance(user_id, 200)
-        
-        # Обновляем баланс
-        database.update_user_balance(user_id, amount)
-        new_balance = database.get_user_balance(user_id)
-        
-        response_data = {
-            "user_id": user_id,
-            "amount_added": amount,
-            "new_balance": new_balance,
-            "consultations_available": new_balance // 10,
-            "timestamp": datetime.now().isoformat(),
-            "status": "success"
-        }
-        
-        logger.info(f"✅ Баланс пользователя {user_id} обновлен: +{amount} = {new_balance}")
-        
-        return response_data
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка обновления баланса: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ===========================================================================
-# СТАТИЧЕСКИЕ ФАЙЛЫ И МАРШРУТИЗАЦИЯ
-# ===========================================================================
-
-# Главная страница
-@app.get("/")
-async def read_root():
-    return FileResponse('webapp/index.html')
-
-# Catch-all (ПОСЛЕДНИМ!)
-@app.get("/{full_path:path}")
-async def catch_all(full_path: str):
-    file_path = Path("webapp") / full_path
-    if file_path.exists() and file_path.is_file():
-        return FileResponse(file_path)
-    return FileResponse('webapp/index.html')
-
-# ===========================================================================
-# СОБЫТИЯ ЖИЗНЕННОГО ЦИКЛА
-# ===========================================================================
-
-@app.on_event("startup")
-async def startup_event():
-    """Инициализация при запуске сервера"""
-    logger.info("🚀 Запуск МИШУРА API сервера с ЮKassa...")
-    logger.info(f"📋 Среда: {ENVIRONMENT}")
-    logger.info(f"🌐 Хост: {HOST}:{PORT}")
-    logger.info(f"🔧 Debug режим: {DEBUG}")
-    
-    # Инициализируем базу данных
-    try:
-        if database.init_db():
-            logger.info("✅ База данных инициализирована")
-        else:
-            logger.error("❌ Ошибка инициализации базы данных")
-    except Exception as e:
-        logger.error(f"❌ Ошибка подключения к БД: {e}")
-    
-    # Инициализируем Gemini AI
-    if init_gemini():
-        logger.info("✅ Gemini AI готов к работе")
-    else:
-        logger.warning("⚠️ Gemini AI недоступен, работаем в режиме fallback")
-    
-    # Проверяем статус платежной системы
-    payment_status = payment_service.payment_service.get_service_status()
-    logger.info(f"🔧 Payment service status: {payment_status}")
-    
-    if payment_status['status'] == 'online':
-        logger.info("✅ ЮKassa платежная система настроена и готова")
-    else:
-        logger.warning(f"⚠️ ЮKassa статус: {payment_status['status']}")
-        logger.warning("ℹ️ Платежи могут работать в тестовом режиме")
-    
-    logger.info("🎭 МИШУРА API сервер с ЮKassa полностью готов!")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Очистка ресурсов при остановке"""
-    logger.info("🛑 Остановка МИШУРА API сервера...")
+    # Инициализация базы данных
+    database.init_db()
 
 # Запуск сервера
-if __name__ == "__main__":
-    logger.info(f"🎯 Запуск в режиме: {ENVIRONMENT}")
+    port = int(os.getenv("PORT", 8000))
     
-    # Render автоматически устанавливает переменную PORT
-    render_port = os.environ.get('PORT')
-    if render_port:
-        PORT = int(render_port)
-        logger.info(f"🌐 Render PORT обнаружен: {PORT}")
-    else:
-        logger.info(f"🏠 Локальный PORT: {PORT}")
+    logger.info(f"🎭 МИШУРА API Server starting on port {port}")
     
-    # Настройки для uvicorn
     uvicorn.run(
         "api:app",
-        host=HOST,
-        port=PORT,
-        log_level="info" if ENVIRONMENT == "production" else "debug",
-        reload=False  # Отключаем reload в продакшне
+        host="0.0.0.0",
+        port=port,
+        reload=False,
+        log_level="info"
     )

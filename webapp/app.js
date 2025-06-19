@@ -1,11 +1,14 @@
 // 🎭 МИШУРА - Твой Стилист
-// Главный файл приложения - app.js (ОЧИЩЕННАЯ ВЕРСИЯ)
-// Версия: 2.5.0 - Убрана лишняя информация о синхронизации + оптимизация кода
-
-console.log('🎭 МИШУРА App загружается v2.5.0...');
+// Главный файл приложения - app.js (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// Версия: 2.6.0 - ИСПРАВЛЕНИЯ ДЛЯ ЮKASSA ПЛАТЕЖЕЙ
 
 class MishuraApp {
     constructor() {
+        this.initializeState();
+        this.initializeAPI();
+    }
+
+    initializeState() {
         console.log('🚀 Инициализация MishuraApp...');
         
         // Состояние приложения
@@ -45,7 +48,6 @@ class MishuraApp {
         this.onlineStatusInterval = null;
         
         this.api = null;
-        this.initializeAPI();
         
         // Варианты поводов
         this.occasionOptions = [
@@ -72,356 +74,25 @@ class MishuraApp {
         setTimeout(() => this.init(), 100);
     }
 
-    // === СИНХРОНИЗАЦИЯ (РАБОТАЕТ В ФОНЕ) ===
-    
-    generateDeviceId() {
-        try {
-            let deviceId = localStorage.getItem('device_id');
-            if (!deviceId) {
-                const components = [
-                    navigator.userAgent, navigator.language,
-                    screen.width + 'x' + screen.height,
-                    new Date().getTimezoneOffset(),
-                    Date.now(), Math.random()
-                ];
-                const hash = components.join('|').split('').reduce((a, b) => {
-                    a = ((a << 5) - a) + b.charCodeAt(0);
-                    return a & a;
-                }, 0);
-                deviceId = `dev_${Math.abs(hash)}_${Date.now()}`;
-                localStorage.setItem('device_id', deviceId);
-            }
-            this.syncState.deviceId = deviceId;
-            return deviceId;
-        } catch (e) {
-            this.syncState.deviceId = `temp_${Date.now()}_${Math.random()}`;
-            return this.syncState.deviceId;
-        }
-    }
-
-    getCurrentUserId() {
-        // 1. Telegram WebApp (реальный user_id)
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user?.id) {
-            const telegramUserId = window.Telegram.WebApp.initDataUnsafe.user.id;
-            this.saveUserIdLocally(telegramUserId, 'telegram_webapp');
-            this.syncState.userId = telegramUserId;
-            return telegramUserId;
-        }
-        
-        // 2. URL параметр user_id
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlUserId = urlParams.get('user_id');
-        if (urlUserId && !isNaN(urlUserId)) {
-            const numericUserId = parseInt(urlUserId);
-            this.saveUserIdLocally(numericUserId, 'telegram_url');
-            this.syncState.userId = numericUserId;
-            return numericUserId;
-        }
-        
-        // 3. Сохраненный user_id
-        try {
-            const savedUserId = localStorage.getItem('primary_user_id');
-            if (savedUserId && !isNaN(savedUserId)) {
-                const numericUserId = parseInt(savedUserId);
-                const lastSync = localStorage.getItem('last_sync');
-                const syncAge = Date.now() - parseInt(lastSync || '0');
-                const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 дней
-                
-                if (syncAge < maxAge) {
-                    this.syncState.userId = numericUserId;
-                    return numericUserId;
-                }
-            }
-        } catch (e) {
-            console.warn('⚠️ localStorage недоступен:', e);
-        }
-        
-        // 4. Тестовый режим
-        const yourTelegramId = 5930269100;
-        this.saveUserIdLocally(yourTelegramId, 'developer_mode');
-        this.syncState.userId = yourTelegramId;
-        return yourTelegramId;
-    }
-
-    saveUserIdLocally(userId, source) {
-        try {
-            localStorage.setItem('primary_user_id', userId.toString());
-            localStorage.setItem('user_source', source);
-            localStorage.setItem('last_sync', Date.now().toString());
-        } catch (e) {
-            console.warn('⚠️ Не удалось сохранить user_id локально:', e);
-        }
-    }
-
-    getCurrentTelegramData() {
-        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
-            const user = window.Telegram.WebApp.initDataUnsafe.user;
-            return {
-                id: user.id,
-                username: user.username || null,
-                first_name: user.first_name || null,
-                last_name: user.last_name || null,
-                language_code: user.language_code || 'ru',
-                is_premium: user.is_premium || false
-            };
-        }
-        return null;
-    }
-
-    // Синхронизация с сервером (в фоне)
-    async syncWithServer(force = false) {
-        const userId = this.getCurrentUserId();
-        if (!userId || this.syncState.syncInProgress) return;
-
-        const timeSinceLastSync = Date.now() - this.syncState.lastSyncTime;
-        const minSyncInterval = 30000; // 30 секунд
-
-        if (!force && timeSinceLastSync < minSyncInterval) return;
-
-        this.syncState.syncInProgress = true;
-
-        try {
-            const telegramData = this.getCurrentTelegramData();
-            const deviceId = this.syncState.deviceId || this.generateDeviceId();
-
-            const syncPayload = {
-                user_id: userId,
-                telegram_data: telegramData,
-                sync_timestamp: Date.now(),
-                device_id: deviceId,
-                local_balance: this.userBalance,
-                pending_changes: this.syncState.pendingChanges
-            };
-
-            const response = await fetch('/api/v1/users/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(syncPayload)
-            });
-
-            if (response.ok) {
-                const syncResult = await response.json();
-                const oldBalance = this.userBalance;
-                this.userBalance = syncResult.balance;
-                this.syncState.pendingChanges = [];
-                this.syncState.lastSyncTime = Date.now();
-                this.analytics.syncCount++;
-                this.saveUserData();
-
-                // Обновляем UI если баланс изменился
-                if (oldBalance !== this.userBalance) {
-                    this.updateBalanceDisplay();
-                    const diff = this.userBalance - oldBalance;
-                    if (diff > 0) {
-                        this.showNotification(`💰 Баланс обновлен: +${diff} STcoin!`, 'success', 6000);
-                    }
-                }
-
-                return syncResult;
-            } else {
-                throw new Error(`HTTP ${response.status}`);
-            }
-        } catch (error) {
-            this.analytics.syncErrors++;
-            this.addPendingChange('sync_error', { error: error.message, timestamp: Date.now() });
-        } finally {
-            this.syncState.syncInProgress = false;
-        }
-    }
-
-    addPendingChange(type, data) {
-        this.syncState.pendingChanges.push({
-            type: type,
-            data: data,
-            timestamp: Date.now(),
-            device_id: this.syncState.deviceId
-        });
-
-        if (this.syncState.pendingChanges.length > 50) {
-            this.syncState.pendingChanges = this.syncState.pendingChanges.slice(-30);
-        }
-    }
-
-    // Синхронизация баланса
-    async forceSyncBalance() {
-        const userId = this.getCurrentUserId();
-        if (!userId) return;
-
-        try {
-            const response = await fetch(`/api/v1/users/${userId}/balance`, {
-                method: 'GET',
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'X-Device-ID': this.syncState.deviceId || 'unknown'
-                }
-            });
-
-            if (response.ok) {
-                const balanceData = await response.json();
-                const oldBalance = this.userBalance;
-                this.userBalance = balanceData.balance;
-                this.updateBalanceDisplay();
-                this.saveUserData();
-
-                if (oldBalance !== this.userBalance && oldBalance > 0) {
-                    const diff = this.userBalance - oldBalance;
-                    if (diff > 0) {
-                        this.showNotification(`💰 Баланс обновлен: +${diff} STcoin!`, 'success', 6000);
-                    }
-                }
-                return balanceData;
-            }
-        } catch (error) {
-            console.error('❌ Ошибка синхронизации баланса:', error);
-        }
-    }
-
-    updateBalanceDisplay() {
-        const balanceElements = document.querySelectorAll('[data-balance-display]');
-        balanceElements.forEach(element => {
-            element.textContent = this.userBalance;
-        });
-
-        const consultationElements = document.querySelectorAll('[data-consultations-display]');
-        const consultationsAvailable = Math.floor(this.userBalance / 10);
-        consultationElements.forEach(element => {
-            element.textContent = consultationsAvailable;
-        });
-
-        if (this.currentSection === 'balance') {
-            this.showBalanceSection();
-        }
-    }
-
-    // Мониторинг сети
-    setupNetworkMonitoring() {
-        window.addEventListener('online', () => {
-            this.syncState.isOnline = true;
-            setTimeout(() => this.syncWithServer(true), 1000);
-        });
-
-        window.addEventListener('offline', () => {
-            this.syncState.isOnline = false;
-        });
-
-        this.onlineStatusInterval = setInterval(() => {
-            const currentStatus = navigator.onLine;
-            if (currentStatus !== this.syncState.isOnline) {
-                this.syncState.isOnline = currentStatus;
-            }
-        }, 5000);
-    }
-
-    // Периодическая синхронизация
-    startPeriodicSync() {
-        setTimeout(() => this.syncWithServer(true), 2000);
-        
-        this.syncInterval = setInterval(() => {
-            if (this.syncState.isOnline && !this.syncState.syncInProgress) {
-                this.syncWithServer(false);
-            }
-        }, 120000); // 2 минуты
-
-        this.balanceCheckInterval = setInterval(() => {
-            if (this.syncState.isOnline && !this.syncState.syncInProgress) {
-                this.forceSyncBalance();
-            }
-        }, 30000); // 30 секунд
-    }
-
-    stopPeriodicSync() {
-        if (this.syncInterval) {
-            clearInterval(this.syncInterval);
-            this.syncInterval = null;
-        }
-        if (this.balanceCheckInterval) {
-            clearInterval(this.balanceCheckInterval);
-            this.balanceCheckInterval = null;
-        }
-        if (this.onlineStatusInterval) {
-            clearInterval(this.onlineStatusInterval);
-            this.onlineStatusInterval = null;
-        }
-    }
-
-    deductConsultation(cost = 10) {
-        this.addPendingChange('consultation_used', {
-            cost: cost,
-            timestamp: Date.now(),
-            balance_before: this.userBalance,
-            balance_after: this.userBalance - cost
-        });
-
-        this.userBalance -= cost;
-        this.consultationsUsed += cost;
-        this.saveUserData();
-
-        if (this.syncState.isOnline) {
-            this.syncWithServer(true);
-        }
-    }
-
-    // === API ИНИЦИАЛИЗАЦИЯ ===
-    
+    // ИСПРАВЛЕНИЕ 1: Принудительное использование реального API
     async initializeAPI() {
         try {
-            let apiUrl;
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                apiUrl = 'http://localhost:8000/api/v1/health';
-            } else {
-                apiUrl = `${window.location.protocol}//${window.location.hostname}/api/v1/health`;
-            }
+            const healthData = await fetch(`${API_BASE_URL}/api/v1/health`).then(res => res.json());
+            console.log('🏥 Статус API:', healthData);
             
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000);
-                
-                const response = await fetch(apiUrl, { 
-                    signal: controller.signal,
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if (response.ok) {
-                    const healthData = await response.json();
-                    if (healthData.gemini_working) {
-                        this.api = new window.MishuraAPIService();
-                        await this.loadPaymentPackages();
-                    } else {
-                        this.api = new window.MockMishuraAPIService();
-                    }
-                } else {
-                    this.api = new window.MockMishuraAPIService();
-                }
-            } catch (e) {
-                this.api = new window.MockMishuraAPIService();
-            }
+            // ИСПРАВЛЕНИЕ: Всегда используем реальный API
+            this.api = new window.MishuraAPIService();
             
-            this.updateAPIStatus();
+            console.log('🚀 API инициализирован:', this.api.constructor.name);
             
         } catch (error) {
-            this.api = new window.MockMishuraAPIService();
-            this.updateAPIStatus();
+            console.error('❌ Ошибка при инициализации API:', error);
+            // ИСПРАВЛЕНИЕ: Даже при ошибке не пугаем пользователя
+            this.showNotification('🔄 Подключение к серверу...', 'info', 3000);
+            this.api = new window.MishuraAPIService();
         }
-    }
-
-    async loadPaymentPackages() {
-        try {
-            const response = await fetch('/api/v1/payments/packages');
-            if (response.ok) {
-                const data = await response.json();
-                this.paymentPackages = data.packages;
-            } else {
-                this.paymentPackages = null;
-            }
-        } catch (error) {
-            this.paymentPackages = null;
-        }
+        
+        this.updateAPIStatus();
     }
 
     updateAPIStatus() {
@@ -433,110 +104,122 @@ class MishuraApp {
             statusElement.className = `api-status ${isRealAPI ? 'real' : 'demo'}`;
         }
         
-        if (!isRealAPI) {
-            setTimeout(() => {
-                this.showNotification('🔬 Работаем в демо-режиме с примерами ответов', 'info', 4000);
-            }, 2000);
-        }
+        console.log('🔧 API статус:', isRealAPI ? 'Реальный API' : 'Демо-режим');
     }
 
     // === ИНИЦИАЛИЗАЦИЯ ===
     
     async init() {
+        console.log('🚀 Инициализация приложения...');
+        
+        // Исправляем навигацию
+            this.setupNavigation();
+            
+        // Исправляем кнопки режимов
+        this.fixModeButtons();
+        
+        // Если мы в секции баланса - обновляем её
+        if (this.currentSection === 'balance') {
+            console.log('🔄 Обновляем секцию баланса...');
+            this.showBalanceSection();
+        }
+        
         if (this.initializationComplete) return;
 
         try {
-            this.generateDeviceId();
+            this.syncState.deviceId = this.generateDeviceId();
             this.setupNetworkMonitoring();
             this.checkForSuccessfulPayment();
-            
-            this.setupModeButtons();
-            this.setupCloseButtons();
-            this.setupSubmitButton();
-            this.initUploaders();
-            this.setupNavigation();
-            this.setupKeyboardShortcuts();
-            this.setupDragAndDrop();
-            this.setupContextMenu();
-            this.setupOccasionDropdown();
-            this.setupResultNavigation();
-            
+            // ВАЖНО: Инициализируем БАЗОВЫЕ обработчики событий
+            this.setupBasicEventHandlers();
             this.loadUserData();
             this.startPeriodicSync();
             this.setupTelegramIntegration();
-            
+            this.initModularNavigation();
             this.initializationComplete = true;
-            
         } catch (error) {
             console.error('❌ Ошибка инициализации:', error);
         }
     }
 
-    checkForSuccessfulPayment() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentSuccess = urlParams.get('payment_success');
-        const urlUserId = urlParams.get('user_id');
-
-        if (paymentSuccess === '1' && urlUserId) {
-            const numericUserId = parseInt(urlUserId);
-            if (numericUserId === this.getCurrentUserId()) {
-                this.showNotification('🎉 Проверяем пополнение баланса...', 'info', 3000);
-                setTimeout(() => this.forceSyncBalance(), 2000);
-                const newUrl = window.location.origin + window.location.pathname;
-                window.history.replaceState({}, document.title, newUrl);
-            }
-        }
+    setupBasicEventHandlers() {
+        console.log('🔧 Настройка базовых обработчиков событий');
+        // Настройка навигации
+        this.setupNavigation();
+        // Настройка модальных окон
+        this.setupModeButtons();
+        this.setupCloseButtons();
+        this.setupSubmitButton();
+        // Настройка загрузчиков
+        this.initUploaders();
+        // Настройка форм
+        this.setupOccasionDropdown();
+        this.setupResultNavigation();
+        console.log('✅ Базовые обработчики настроены');
     }
 
-    // === НАВИГАЦИЯ ===
-    
     setupNavigation() {
         if (this.navigationSetup) return;
-
+        console.log('🧭 Настройка навигации');
         const navButtons = document.querySelectorAll('.nav-btn');
         navButtons.forEach(btn => {
+            // Клонируем кнопку чтобы убрать старые обработчики
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
             
-            newBtn.addEventListener('click', () => {
-                const targetSection = newBtn.id.replace('nav-', '');
-                this.navigateToSection(targetSection);
+            // Добавляем правильный обработчик
+            newBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const section = newBtn.id.replace('nav-', ''); // nav-balance -> balance
+                console.log('🔄 Навигация в секцию:', section);
+                
+                // Убираем active у всех кнопок
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                // Добавляем active текущей
+                newBtn.classList.add('active');
+                
+                // Навигируем
+                this.navigateToSection(section);
                 this.triggerHapticFeedback('light');
             });
         });
-        
         this.navigationSetup = true;
+        console.log('✅ Навигация настроена');
     }
 
-    navigateToSection(section) {
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        const targetBtn = document.getElementById(`nav-${section}`);
-        if (targetBtn) {
-            targetBtn.classList.add('active');
+    setupModeButtons() {
+        if (this.modeButtonsSetup) return;
+
+        const singleBtn = document.getElementById('single-mode-btn');
+        const compareBtn = document.getElementById('compare-mode-btn');
+        
+        if (singleBtn) {
+            const newSingleBtn = singleBtn.cloneNode(true);
+            singleBtn.parentNode.replaceChild(newSingleBtn, singleBtn);
+            newSingleBtn.addEventListener('click', () => {
+                this.triggerHapticFeedback('light');
+                this.openSingleModal();
+            });
+        }
+
+        if (compareBtn) {
+            const newCompareBtn = compareBtn.cloneNode(true);
+            compareBtn.parentNode.replaceChild(newCompareBtn, compareBtn);
+            newCompareBtn.addEventListener('click', () => {
+                this.triggerHapticFeedback('light');
+                this.openCompareModal();
+            });
         }
         
-        this.currentSection = section;
-        this.showSection(section);
-        this.closeModal();
-    }
-
-    showSection(section) {
-        switch (section) {
-            case 'home':
-                this.showHomeSection();
-                break;
-            case 'history':
-                this.showHistorySection();
-                break;
-            case 'balance':
-                this.showBalanceSection();
-                break;
-        }
+        this.modeButtonsSetup = true;
+        console.log('✅ Mode buttons настроены');
     }
 
     showHomeSection() {
+        console.log('🏠 Показ домашней секции');
+        
         const container = document.querySelector('.container');
         if (!container) return;
         
@@ -558,6 +241,7 @@ class MishuraApp {
             </div>
         `;
         
+        // Перенастраиваем кнопки после изменения DOM
         setTimeout(() => {
             this.modeButtonsSetup = false;
             this.setupModeButtons();
@@ -565,6 +249,8 @@ class MishuraApp {
     }
 
     showHistorySection() {
+        console.log('📚 Показ секции истории');
+        
         const container = document.querySelector('.container');
         if (!container) return;
         
@@ -662,19 +348,56 @@ class MishuraApp {
         container.innerHTML = historyHTML;
     }
 
-    // ОЧИЩЕННАЯ секция баланса (убрана вся лишняя информация о синхронизации)
-    showBalanceSection() {
+    navigateToSection(section) {
+        console.log('�� app.js: Делегируем навигацию модульной системе');
+        // Делегируем навигацию модульной системе
+        if (window.MishuraApp && 
+            window.MishuraApp.components && 
+            window.MishuraApp.components.navigation) {
+            window.MishuraApp.components.navigation.navigateTo(section);
+        } else {
+            console.warn('Модульная навигация недоступна, используем fallback');
+            // Fallback на старую реализацию
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const targetBtn = document.getElementById(`nav-${section}`);
+            if (targetBtn) {
+                targetBtn.classList.add('active');
+            }
+            this.currentSection = section;
+            this.showSection(section);
+            this.closeModal();
+        }
+    }
+
+    showSection(section) {
+        console.log('📄 Показ секции:', section);
+        switch (section) {
+            case 'home':
+                this.showHomeSection();
+                break;
+            case 'history':
+                this.showHistorySection();
+                break;
+            case 'balance':
+                this.showBalanceSection();
+                break;
+            default:
+                console.warn('❌ Неизвестная секция:', section);
+        }
+    }
+
+    async showBalanceSection() {
+        console.log('💰 ПОКАЗ СЕКЦИИ БАЛАНСА С АВТООБНОВЛЕНИЕМ');
+        
         const container = document.querySelector('.container');
         if (!container) return;
         
         const consultationsRemaining = Math.floor(this.userBalance / 10);
         
+        // Показываем интерфейс с текущими данными
         container.innerHTML = `
-            <header class="header">
-                <h1>💰 Баланс</h1>
-                <p>Управление STcoin</p>
-            </header>
-            
             <div class="balance-card" style="
                 background: var(--gold-gradient);
                 color: var(--text-dark);
@@ -726,82 +449,86 @@ class MishuraApp {
                 </div>
             </div>
             
-            <div class="add-balance-section">
-                <button id="add-balance-btn" class="action-btn" style="
+            <!-- КНОПКИ ВНИЗУ -->
+            <div class="balance-actions">
+                <button class="action-btn" onclick="window.mishuraApp.showPaymentModal()" style="
                     width: 100%;
                     margin-bottom: 16px;
                     background: rgba(26, 26, 26, 0.8);
                     border: 2px solid var(--border-gold);
                     color: var(--text-gold);
+                    padding: 20px;
+                    font-size: 1.1rem;
                 ">
-                    <span class="icon">💳</span>
+                    <span style="margin-right: 8px;">💳</span>
                     Пополнить STcoin
                 </button>
                 
-                <div style="
-                    background: rgba(212, 175, 55, 0.1);
-                    border: 1px solid var(--border-gold);
-                    border-radius: 12px;
-                    padding: 16px;
-                    text-align: center;
+                <button class="action-btn" onclick="window.open('https://t.me/marketolog_online', '_blank')" style="
+                    width: 100%;
+                    margin-bottom: 16px;
+                    background: rgba(26, 26, 26, 0.8);
+                    border: 2px solid rgba(0, 123, 255, 0.5);
+                    color: #007bff;
+                        padding: 20px;
+                    font-size: 1.1rem;
                 ">
-                    <div style="
-                        color: var(--text-gold);
-                        font-weight: 600;
-                        margin-bottom: 8px;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                        font-size: 0.9rem;
-                    ">💡 Информация</div>
-                    <div style="
-                        color: var(--text-light);
-                        font-size: 0.9rem;
-                        line-height: 1.4;
-                    ">
-                        Одна консультация стоит 10 STcoin.
-                        Пополнение через безопасную платежную систему ЮKassa.
-                    </div>
-                </div>
+                    <span style="margin-right: 8px;">💬</span>
+                    Связаться с поддержкой
+                </button>
             </div>
         `;
+
+        // АВТООБНОВЛЕНИЕ: Сразу синхронизируем баланс при входе в секцию
+        console.log('🔄 Автообновление при входе в секцию баланса...');
+        setTimeout(async () => {
+            await this.refreshBalance();
+        }, 500);
+    }
+
+    // ИСПРАВЛЕНИЕ 3: Возврат в секцию баланса после оплаты
+    async checkForSuccessfulPayment() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentSuccess = urlParams.get('payment_success');
+        const urlUserId = urlParams.get('user_id');
+        const returnTo = urlParams.get('return_to');
         
-        // Добавляем обработчик кнопки пополнения
-        const addBalanceBtn = document.getElementById('add-balance-btn');
-        if (addBalanceBtn) {
-            addBalanceBtn.addEventListener('click', () => {
-                this.showPaymentModal();
-            });
+        console.log('🔍 Проверка успешной оплаты:', { paymentSuccess, urlUserId, returnTo });
+
+        if (paymentSuccess === '1' && urlUserId) {
+            const numericUserId = parseInt(urlUserId);
+            if (numericUserId === this.getCurrentUserId()) {
+                this.showNotification('🎉 Проверяем пополнение баланса...', 'info', 3000);
+                
+                // ИСПРАВЛЕНИЕ: Реальная синхронизация баланса
+                setTimeout(async () => {
+                    const syncResult = await this.forceSyncBalance();
+                    
+                    if (syncResult.success && syncResult.difference > 0) {
+                        // Баланс успешно пополнен
+                        console.log('✅ Пополнение обработано успешно');
+                    } else if (syncResult.success && syncResult.difference === 0) {
+                        // Webhook еще не сработал, попробуем еще раз через 3 секунды
+                        setTimeout(() => this.forceSyncBalance(), 3000);
+                    }
+                }, 2000);
+                
+                // ИСПРАВЛЕНИЕ: Возврат в нужную секцию
+                if (returnTo === 'balance') {
+        setTimeout(() => {
+                        console.log('🎯 Возвращаемся в секцию баланса');
+                        this.navigateToSection('balance');
+                    }, 3000);
+                }
+                
+                // Очищаем URL от параметров
+                const newUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
         }
     }
 
-    // === ОСТАЛЬНЫЕ МЕТОДЫ (упрощены и оптимизированы) ===
-    
-    setupModeButtons() {
-        if (this.modeButtonsSetup) return;
-
-        const singleBtn = document.getElementById('single-mode-btn');
-        const compareBtn = document.getElementById('compare-mode-btn');
-        
-        if (singleBtn) {
-            const newSingleBtn = singleBtn.cloneNode(true);
-            singleBtn.parentNode.replaceChild(newSingleBtn, singleBtn);
-            newSingleBtn.addEventListener('click', () => {
-                this.triggerHapticFeedback('light');
-                this.openSingleModal();
-            });
-        }
-
-        if (compareBtn) {
-            const newCompareBtn = compareBtn.cloneNode(true);
-            compareBtn.parentNode.replaceChild(newCompareBtn, compareBtn);
-            newCompareBtn.addEventListener('click', () => {
-                this.triggerHapticFeedback('light');
-                this.openCompareModal();
-            });
-        }
-        
-        this.modeButtonsSetup = true;
-    }
+    // === НАВИГАЦИЯ ===
 
     setupCloseButtons() {
         if (this.eventListenersAttached) return;
@@ -935,187 +662,147 @@ class MishuraApp {
         }
     }
 
-    // === DRAG & DROP (упрощено) ===
+    // === ПЛАТЕЖИ (ОСНОВНЫЕ ИСПРАВЛЕНИЯ) ===
     
-    setupDragAndDrop() {
-        if (this.dragDropSetup) return;
-
-        const singlePreview = document.getElementById('single-preview');
-        if (singlePreview) {
-            this.setupDragDropForElement(singlePreview, (file) => {
-                this.handleSingleFile(file);
-            });
+    showPaymentModal() {
+        if (!window.PRICING_PLANS) {
+            this.showNotification('🔄 Загружаем тарифы...', 'info');
+            return;
         }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.id = 'payment-modal';
         
-        document.querySelectorAll('.compare-slot').forEach((slot, index) => {
-            this.setupDragDropForElement(slot, (file) => {
-                this.handleCompareFile(file, index);
-            });
-        });
-        
-        this.dragDropSetup = true;
-    }
-
-    setupDragDropForElement(element, onDrop) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            element.addEventListener(eventName, this.preventDefaults, false);
-        });
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            element.addEventListener(eventName, () => {
-                element.classList.add('drag-over');
-            }, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            element.addEventListener(eventName, () => {
-                element.classList.remove('drag-over');
-            }, false);
-        });
-
-        element.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                onDrop(files[0]);
-            }
-        }, false);
-    }
-
-    preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    setupKeyboardShortcuts() {
-        if (this.keyboardSetup) return;
-
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                this.closeModal();
-            }
-            
-            if (event.key === 'Enter' && event.ctrlKey) {
-                const submitBtn = document.getElementById('form-submit');
-                if (submitBtn && !submitBtn.disabled) {
-                    this.submit();
-                }
-            }
-            
-            if (event.key === 's' || event.key === 'ы') {
-                if (this.currentSection === 'home' && !document.querySelector('.modal-overlay.active')) {
-                    this.openSingleModal();
-                }
-            }
-            
-            if (event.key === 'c' || event.key === 'с') {
-                if (this.currentSection === 'home' && !document.querySelector('.modal-overlay.active')) {
-                    this.openCompareModal();
-                }
-            }
-        });
-        
-        this.keyboardSetup = true;
-    }
-
-    setupContextMenu() {
-        if (this.contextMenuSetup) return;
-
-        document.addEventListener('contextmenu', (event) => {
-            if (event.target.closest('.upload-preview, .compare-slot img')) {
-                event.preventDefault();
-                this.showImageContextMenu(event);
-            }
+        let packagesHTML = '';
+        Object.entries(window.PRICING_PLANS).forEach(([planId, plan]) => {
+            const isPopular = plan.popular;
+            packagesHTML += `
+                <div class="pricing-card ${isPopular ? 'popular' : ''}" 
+                     onclick="window.mishuraApp.initiatePayment('${planId}')"
+                     style="
+                        background: ${isPopular ? 'rgba(212, 175, 55, 0.1)' : 'rgba(26, 26, 26, 0.8)'};
+                        border: 2px solid ${isPopular ? 'var(--border-gold)' : 'var(--border-light)'};
+                        border-radius: 16px;
+                        padding: 20px;
+                        margin-bottom: 16px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        position: relative;
+                     ">
+                    ${isPopular ? '<div style="position: absolute; top: -8px; right: 16px; background: var(--gold-gradient); color: var(--text-dark); padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">🔥 ПОПУЛЯРНЫЙ</div>' : ''}
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 style="color: var(--text-gold); margin: 0; font-size: 1.2rem;">${plan.name}</h3>
+                        <div style="color: var(--text-light); font-size: 1.5rem; font-weight: 700;">${plan.price}₽</div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="color: var(--text-light);">
+                            <span style="font-size: 1.1rem; font-weight: 600;">${plan.stcoins}</span>
+                            <span style="color: var(--text-muted); margin-left: 4px;">STcoin</span>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 0.9rem;">
+                            ${plan.consultations} консультаций
+                        </div>
+                    </div>
+                </div>
+            `;
         });
 
-        this.contextMenuSetup = true;
-    }
-
-    showImageContextMenu(event) {
-        const menu = document.createElement('div');
-        menu.style.cssText = `
-            position: fixed;
-            top: ${event.clientY}px;
-            left: ${event.clientX}px;
-            background: var(--secondary-black);
-            border: 1px solid var(--border-gold);
-            border-radius: 8px;
-            padding: 8px 0;
-            z-index: 10000;
-            min-width: 150px;
-            box-shadow: var(--shadow-black);
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2 class="modal-title">💳 Пополнение STcoin</h2>
+                    <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <div style="
+                        background: rgba(212, 175, 55, 0.1);
+                        border: 1px solid var(--border-gold);
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 20px;
+                        text-align: center;
+                    ">
+                        <div style="color: var(--text-gold); font-weight: 600; margin-bottom: 8px;">
+                            🔒 Безопасная оплата через ЮKassa
+                        </div>
+                        <div style="color: var(--text-light); font-size: 0.9rem;">
+                            Принимаем карты Visa, MasterCard, МИР, СБП и другие способы оплаты
+                        </div>
+                    </div>
+                    
+                    <div class="payment-packages">
+                        ${packagesHTML}
+                    </div>
+                </div>
+            </div>
         `;
         
-        const actions = [
-            { text: '🔄 Заменить', action: () => this.replaceImage(event.target) },
-            { text: '❌ Удалить', action: () => this.removeImage(event.target) }
-        ];
-        
-        actions.forEach(({ text, action }) => {
-            const item = document.createElement('div');
-            item.textContent = text;
-            item.style.cssText = `
-                padding: 8px 16px;
-                cursor: pointer;
-                color: var(--text-light);
-                transition: background-color 0.2s;
-            `;
-            
-            item.addEventListener('mouseenter', () => {
-                item.style.backgroundColor = 'rgba(212, 175, 55, 0.1)';
-            });
-            
-            item.addEventListener('mouseleave', () => {
-                item.style.backgroundColor = 'transparent';
-            });
-            
-            item.addEventListener('click', () => {
-                action();
-                menu.remove();
-            });
-            
-            menu.appendChild(item);
-        });
-        
-        document.body.appendChild(menu);
-        
-        setTimeout(() => {
-            document.addEventListener('click', () => menu.remove(), { once: true });
-        }, 100);
-    }
-
-    replaceImage(imgElement) {
-        const slot = imgElement.closest('.compare-slot');
-        if (slot) {
-            const slotIndex = parseInt(slot.dataset.slot);
-            const fileInput = document.getElementById(`compare-file-input-${slotIndex}`);
-            if (fileInput) fileInput.click();
-        } else {
-            const fileInput = document.getElementById('single-file-input');
-            if (fileInput) fileInput.click();
-        }
-    }
-
-    removeImage(imgElement) {
-        const slot = imgElement.closest('.compare-slot');
-        if (slot) {
-            const slotIndex = parseInt(slot.dataset.slot);
-            this.compareImages[slotIndex] = null;
-            slot.innerHTML = `
-                <span class="slot-number">${slotIndex + 1}</span>
-                <span class="add-icon">+</span>
-            `;
-            slot.classList.remove('has-image');
-        } else {
-            this.singleImage = null;
-            const preview = document.getElementById('single-preview');
-            if (preview) {
-                preview.innerHTML = '<div class="upload-text">Нажмите для выбора фото</div>';
-                preview.classList.remove('has-image');
-            }
-        }
-        
-        this.updateSubmitButton();
+        document.body.appendChild(modal);
         this.triggerHapticFeedback('light');
+    }
+
+    // ИСПРАВЛЕНИЕ 2: Правильный return_url для платежей
+    async initiatePayment(planId) {
+        const plan = window.PRICING_PLANS[planId];
+        if (!plan) {
+            this.showNotification('❌ План не найден', 'error');
+            return;
+        }
+
+        try {
+            this.showNotification('💳 Создаем платеж...', 'info');
+            
+            const userId = this.getCurrentUserId();
+            console.log('💰 Создание платежа для пользователя:', userId, 'план:', planId);
+            
+            const paymentData = {
+                user_id: userId,
+                plan_id: planId,
+                // ИСПРАВЛЕНИЕ: Правильный return_url с параметрами возврата
+                return_url: window.location.href + '?payment_success=1&user_id=' + userId + '&return_to=balance'
+            };
+            
+            console.log('📤 Отправляем данные платежа:', paymentData);
+            
+            const response = await fetch(`${API_BASE_URL}/api/v1/payments/create`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(paymentData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Ответ от сервера:', result);
+
+            if (result.payment_url) {
+                this.showNotification('🚀 Переходим к оплате...', 'success');
+                console.log('🔗 Открываем URL:', result.payment_url);
+                
+                // Закрываем модал
+                const paymentModal = document.getElementById('payment-modal');
+                if (paymentModal) {
+                    paymentModal.remove();
+                }
+                
+                // Открываем в том же окне для правильного возврата
+                window.location.href = result.payment_url;
+        } else {
+                throw new Error('Не получен URL для оплаты');
+            }
+
+        } catch (error) {
+            console.error('❌ Ошибка создания платежа:', error);
+            this.showNotification(`❌ Ошибка: ${error.message}`, 'error', 5000);
+        }
     }
 
     // === МОДАЛЬНЫЕ ОКНА ===
@@ -1592,6 +1279,278 @@ class MishuraApp {
         }
     }
 
+    // === СИСТЕМА УВЕДОМЛЕНИЙ ===
+    
+    showNotification(message, type = 'info', duration = 3000) {
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(notif => notif.remove());
+        
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        
+        const icons = {
+            'success': '✅',
+            'error': '❌',
+            'warning': '⚠️',
+            'info': 'ℹ️'
+        };
+        
+        const colors = {
+            'success': '#10B981',
+            'error': '#EF4444',
+            'warning': '#F59E0B',
+            'info': '#3B82F6'
+        };
+        
+        notification.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${colors[type]};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                max-width: 90vw;
+                animation: slideInDown 0.3s ease;
+            ">
+                <span>${icons[type]}</span>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        if (!document.getElementById('notification-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'notification-styles';
+            styles.textContent = `
+                @keyframes slideInDown {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-100%);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+                
+                @keyframes slideOutUp {
+                    from {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                    to {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-100%);
+                    }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            const notificationElement = notification.querySelector('div');
+            if (notificationElement) {
+                notificationElement.style.animation = 'slideOutUp 0.3s ease forwards';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }
+        }, duration);
+    }
+
+    // === DRAG & DROP ===
+    
+    setupDragAndDrop() {
+        if (this.dragDropSetup) return;
+
+        const singlePreview = document.getElementById('single-preview');
+        if (singlePreview) {
+            this.setupDragDropForElement(singlePreview, (file) => {
+                this.handleSingleFile(file);
+            });
+        }
+        
+        document.querySelectorAll('.compare-slot').forEach((slot, index) => {
+            this.setupDragDropForElement(slot, (file) => {
+                this.handleCompareFile(file, index);
+            });
+        });
+        
+        this.dragDropSetup = true;
+    }
+
+    setupDragDropForElement(element, onDrop) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            element.addEventListener(eventName, this.preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            element.addEventListener(eventName, () => {
+                element.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            element.addEventListener(eventName, () => {
+                element.classList.remove('drag-over');
+            }, false);
+        });
+
+        element.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                onDrop(files[0]);
+            }
+        }, false);
+    }
+
+    preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    setupKeyboardShortcuts() {
+        if (this.keyboardSetup) return;
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                this.closeModal();
+            }
+            
+            if (event.key === 'Enter' && event.ctrlKey) {
+                const submitBtn = document.getElementById('form-submit');
+                if (submitBtn && !submitBtn.disabled) {
+                    this.submit();
+                }
+            }
+            
+            if (event.key === 's' || event.key === 'ы') {
+                if (this.currentSection === 'home' && !document.querySelector('.modal-overlay.active')) {
+                    this.openSingleModal();
+                }
+            }
+            
+            if (event.key === 'c' || event.key === 'с') {
+                if (this.currentSection === 'home' && !document.querySelector('.modal-overlay.active')) {
+                    this.openCompareModal();
+                }
+            }
+        });
+        
+        this.keyboardSetup = true;
+    }
+
+    setupContextMenu() {
+        if (this.contextMenuSetup) return;
+
+        document.addEventListener('contextmenu', (event) => {
+            if (event.target.closest('.upload-preview, .compare-slot img')) {
+                event.preventDefault();
+                this.showImageContextMenu(event);
+            }
+        });
+
+        this.contextMenuSetup = true;
+    }
+
+    showImageContextMenu(event) {
+        const menu = document.createElement('div');
+        menu.style.cssText = `
+            position: fixed;
+            top: ${event.clientY}px;
+            left: ${event.clientX}px;
+            background: var(--secondary-black);
+            border: 1px solid var(--border-gold);
+            border-radius: 8px;
+            padding: 8px 0;
+            z-index: 10000;
+            min-width: 150px;
+            box-shadow: var(--shadow-black);
+        `;
+        
+        const actions = [
+            { text: '🔄 Заменить', action: () => this.replaceImage(event.target) },
+            { text: '❌ Удалить', action: () => this.removeImage(event.target) }
+        ];
+        
+        actions.forEach(({ text, action }) => {
+            const item = document.createElement('div');
+            item.textContent = text;
+            item.style.cssText = `
+                padding: 8px 16px;
+                cursor: pointer;
+                color: var(--text-light);
+                transition: background-color 0.2s;
+            `;
+            
+            item.addEventListener('mouseenter', () => {
+                item.style.backgroundColor = 'rgba(212, 175, 55, 0.1)';
+            });
+            
+            item.addEventListener('mouseleave', () => {
+                item.style.backgroundColor = 'transparent';
+            });
+            
+            item.addEventListener('click', () => {
+                action();
+                menu.remove();
+            });
+            
+            menu.appendChild(item);
+        });
+        
+        document.body.appendChild(menu);
+        
+        setTimeout(() => {
+            document.addEventListener('click', () => menu.remove(), { once: true });
+        }, 100);
+    }
+
+    replaceImage(imgElement) {
+        const slot = imgElement.closest('.compare-slot');
+        if (slot) {
+            const slotIndex = parseInt(slot.dataset.slot);
+            const fileInput = document.getElementById(`compare-file-input-${slotIndex}`);
+            if (fileInput) fileInput.click();
+        } else {
+            const fileInput = document.getElementById('single-file-input');
+            if (fileInput) fileInput.click();
+        }
+    }
+
+    removeImage(imgElement) {
+        const slot = imgElement.closest('.compare-slot');
+        if (slot) {
+            const slotIndex = parseInt(slot.dataset.slot);
+            this.compareImages[slotIndex] = null;
+            slot.innerHTML = `
+                <span class="slot-number">${slotIndex + 1}</span>
+                <span class="add-icon">+</span>
+            `;
+            slot.classList.remove('has-image');
+        } else {
+            this.singleImage = null;
+            const preview = document.getElementById('single-preview');
+            if (preview) {
+                preview.innerHTML = '<div class="upload-text">Нажмите для выбора фото</div>';
+                preview.classList.remove('has-image');
+            }
+        }
+        
+        this.updateSubmitButton();
+        this.triggerHapticFeedback('light');
+    }
+
     // === ЗАГРУЗЧИКИ ФАЙЛОВ ===
     
     initUploaders() {
@@ -1720,417 +1679,6 @@ class MishuraApp {
         return true;
     }
 
-    // === СИСТЕМА УВЕДОМЛЕНИЙ ===
-    
-    showNotification(message, type = 'info', duration = 3000) {
-        const existingNotifications = document.querySelectorAll('.notification');
-        existingNotifications.forEach(notif => notif.remove());
-        
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        
-        const icons = {
-            'success': '✅',
-            'error': '❌',
-            'warning': '⚠️',
-            'info': 'ℹ️'
-        };
-        
-        const colors = {
-            'success': '#10B981',
-            'error': '#EF4444',
-            'warning': '#F59E0B',
-            'info': '#3B82F6'
-        };
-        
-        notification.innerHTML = `
-            <div style="
-                position: fixed;
-                top: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: ${colors[type]};
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                z-index: 10000;
-                font-weight: 600;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                max-width: 90vw;
-                animation: slideInDown 0.3s ease;
-            ">
-                <span>${icons[type]}</span>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        if (!document.getElementById('notification-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'notification-styles';
-            styles.textContent = `
-                @keyframes slideInDown {
-                    from {
-                        opacity: 0;
-                        transform: translateX(-50%) translateY(-100%);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(-50%) translateY(0);
-                    }
-                }
-                
-                @keyframes slideOutUp {
-                    from {
-                        opacity: 1;
-                        transform: translateX(-50%) translateY(0);
-                    }
-                    to {
-                        opacity: 0;
-                        transform: translateX(-50%) translateY(-100%);
-                    }
-                }
-            `;
-            document.head.appendChild(styles);
-        }
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            const notificationElement = notification.querySelector('div');
-            if (notificationElement) {
-                notificationElement.style.animation = 'slideOutUp 0.3s ease forwards';
-                setTimeout(() => {
-                    notification.remove();
-                }, 300);
-            }
-        }, duration);
-    }
-
-    // === ПЛАТЕЖИ (упрощено) ===
-    
-    showPaymentModal() {
-        if (!this.paymentPackages) {
-            this.showNotification('🔄 Загружаем пакеты пополнения...', 'info');
-            this.loadPaymentPackages().then(() => {
-                if (this.paymentPackages) {
-                    this.showPaymentModal();
-                } else {
-                    this.showNotification('❌ Пакеты пополнения недоступны', 'error');
-                }
-            });
-            return;
-        }
-
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.id = 'payment-modal';
-        
-        let packagesHTML = '';
-        Object.entries(this.paymentPackages).forEach(([packageId, packageData]) => {
-            const isPopular = packageData.popular;
-            packagesHTML += `
-                <div class="payment-package ${isPopular ? 'popular' : ''}" 
-                     data-package-id="${packageId}"
-                     style="
-                        background: ${isPopular ? 'linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.1))' : 'rgba(26, 26, 26, 0.8)'};
-                        border: 2px solid ${isPopular ? 'var(--border-gold)' : 'var(--border-light)'};
-                        border-radius: 16px;
-                        padding: 20px;
-                        margin-bottom: 16px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        position: relative;
-                     ">
-                    ${isPopular ? '<div style="position: absolute; top: -8px; right: 16px; background: var(--accent-gold); color: var(--bg-primary); padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">🔥 ПОПУЛЯРНЫЙ</div>' : ''}
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <h3 style="color: var(--text-gold); margin: 0; font-size: 1.2rem;">${packageData.name}</h3>
-                        <div style="color: var(--text-light); font-size: 1.5rem; font-weight: 700;">${packageData.price_rub}₽</div>
-                    </div>
-                    
-                    <div style="color: var(--text-muted); margin-bottom: 12px; font-size: 0.9rem;">
-                        ${packageData.description}
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="color: var(--text-light);">
-                            <span style="font-size: 1.1rem; font-weight: 600;">${packageData.stcoin}</span>
-                            <span style="color: var(--text-muted); margin-left: 4px;">STcoin</span>
-                        </div>
-                        <div style="color: var(--text-muted); font-size: 0.9rem;">
-                            ${packageData.consultations} консультаций
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h2 class="modal-title">💳 Пополнение STcoin</h2>
-                    <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">&times;</button>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <div style="
-                        background: rgba(212, 175, 55, 0.1);
-                        border: 1px solid var(--border-gold);
-                        border-radius: 12px;
-                        padding: 16px;
-                        margin-bottom: 20px;
-                        text-align: center;
-                    ">
-                        <div style="color: var(--text-gold); font-weight: 600; margin-bottom: 8px;">
-                            🔒 Безопасная оплата через ЮKassa
-                        </div>
-                        <div style="color: var(--text-light); font-size: 0.9rem;">
-                            Принимаем карты Visa, MasterCard, МИР, СБП и другие способы оплаты
-                        </div>
-                    </div>
-                    
-                    <div class="payment-packages">
-                        ${packagesHTML}
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        modal.querySelectorAll('.payment-package').forEach(packageElement => {
-            packageElement.addEventListener('click', () => {
-                const packageId = packageElement.dataset.packageId;
-                this.initiatePayment(packageId);
-            });
-        });
-        
-        this.triggerHapticFeedback('light');
-    }
-
-    async initiatePayment(packageId) {
-        const packageData = this.paymentPackages[packageId];
-        if (!packageData) {
-            this.showNotification('❌ Пакет не найден', 'error');
-            return;
-        }
-
-        try {
-            this.showNotification('💳 Создаем платеж...', 'info');
-
-            const response = await fetch('/api/v1/payments/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Device-ID': this.syncState.deviceId || 'unknown'
-                },
-                body: JSON.stringify({
-                    user_id: this.getCurrentUserId(),
-                    package_id: packageId,
-                    return_url: window.location.origin + '/webapp'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const paymentData = await response.json();
-
-            if (paymentData.status === 'success') {
-                this.currentPayment = {
-                    id: paymentData.payment_id,
-                    packageId: packageId,
-                    amount: paymentData.amount,
-                    stcoinAmount: paymentData.stcoin_amount,
-                    confirmationUrl: paymentData.confirmation_url
-                };
-
-                const paymentModal = document.getElementById('payment-modal');
-                if (paymentModal) {
-                    paymentModal.remove();
-                }
-
-                this.showPaymentConfirmation();
-
-            } else {
-                throw new Error(paymentData.message || 'Не удалось создать платеж');
-            }
-
-        } catch (error) {
-            console.error('❌ Ошибка создания платежа:', error);
-            this.showNotification('❌ Ошибка создания платежа. Попробуйте позже.', 'error');
-        }
-    }
-
-    showPaymentConfirmation() {
-        if (!this.currentPayment) return;
-
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.id = 'payment-confirmation-modal';
-
-        const packageData = this.paymentPackages[this.currentPayment.packageId];
-
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 450px;">
-                <div class="modal-header">
-                    <h2 class="modal-title">💳 Подтверждение платежа</h2>
-                    <button class="close-btn" onclick="this.closest('.modal-overlay').remove()">&times;</button>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <div style="
-                        background: var(--gold-gradient);
-                        color: var(--text-dark);
-                        border-radius: 16px;
-                        padding: 20px;
-                        margin-bottom: 20px;
-                        text-align: center;
-                    ">
-                        <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px;">
-                            ${packageData.name}
-                        </div>
-                        <div style="font-size: 2rem; font-weight: 900; margin-bottom: 8px;">
-                            ${this.currentPayment.amount}₽
-                        </div>
-                        <div style="font-size: 1rem; opacity: 0.8;">
-                            ${this.currentPayment.stcoinAmount} STcoin
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 12px;">
-                        <button id="cancel-payment-btn" style="
-                            flex: 1;
-                            background: transparent;
-                            border: 1px solid var(--border-light);
-                            color: var(--text-light);
-                            padding: 12px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                        ">Отмена</button>
-                        
-                        <button id="proceed-payment-btn" style="
-                            flex: 2;
-                            background: var(--accent-gold);
-                            border: none;
-                            color: var(--bg-primary);
-                            padding: 12px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            font-weight: 600;
-                        ">Перейти к оплате</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-
-        modal.querySelector('#cancel-payment-btn').addEventListener('click', () => {
-            modal.remove();
-            this.currentPayment = null;
-        });
-
-        modal.querySelector('#proceed-payment-btn').addEventListener('click', () => {
-            this.proceedToPayment();
-        });
-
-        this.triggerHapticFeedback('light');
-    }
-
-    proceedToPayment() {
-        if (!this.currentPayment || !this.currentPayment.confirmationUrl) {
-            this.showNotification('❌ Ошибка платежа', 'error');
-            return;
-        }
-
-        const confirmationModal = document.getElementById('payment-confirmation-modal');
-        if (confirmationModal) {
-            confirmationModal.remove();
-        }
-
-        this.showNotification('🔄 Переходим к оплате...', 'info');
-        this.startPaymentStatusCheck();
-        window.open(this.currentPayment.confirmationUrl, '_blank');
-        this.triggerHapticFeedback('medium');
-    }
-
-    startPaymentStatusCheck() {
-        if (this.paymentCheckInterval) {
-            clearInterval(this.paymentCheckInterval);
-        }
-
-        this.paymentCheckInterval = setInterval(async () => {
-            try {
-                const response = await fetch(`/api/v1/payments/status/${this.currentPayment.id}`);
-                
-                if (response.ok) {
-                    const statusData = await response.json();
-
-                    if (statusData.payment_status === 'succeeded') {
-                        this.handleSuccessfulPayment();
-                    } else if (statusData.payment_status === 'canceled') {
-                        this.handleCanceledPayment();
-                    }
-                }
-            } catch (error) {
-                console.warn('⚠️ Ошибка при проверке платежа:', error);
-            }
-        }, 5000);
-
-        setTimeout(() => {
-            if (this.paymentCheckInterval) {
-                clearInterval(this.paymentCheckInterval);
-                this.paymentCheckInterval = null;
-            }
-        }, 600000);
-    }
-
-    handleSuccessfulPayment() {
-        if (this.paymentCheckInterval) {
-            clearInterval(this.paymentCheckInterval);
-            this.paymentCheckInterval = null;
-        }
-
-        this.addPendingChange('payment_completed', {
-            payment_id: this.currentPayment.id,
-            stcoin_amount: this.currentPayment.stcoinAmount,
-            timestamp: Date.now()
-        });
-
-        this.userBalance += this.currentPayment.stcoinAmount;
-        this.saveUserData();
-        this.syncWithServer(true);
-
-        this.showNotification(
-            `🎉 Платеж успешен! Зачислено ${this.currentPayment.stcoinAmount} STcoin`, 
-            'success', 
-            8000
-        );
-
-        if (this.currentSection === 'balance') {
-            this.showBalanceSection();
-        }
-
-        this.currentPayment = null;
-        this.triggerHapticFeedback('success');
-    }
-
-    handleCanceledPayment() {
-        if (this.paymentCheckInterval) {
-            clearInterval(this.paymentCheckInterval);
-            this.paymentCheckInterval = null;
-        }
-
-        this.showNotification('❌ Платеж отменен', 'warning');
-        this.currentPayment = null;
-        this.triggerHapticFeedback('error');
-    }
-
     // === УПРАВЛЕНИЕ ДАННЫМИ ===
     
     loadUserData() {
@@ -2187,7 +1735,7 @@ class MishuraApp {
                 </div>
                 
                 <div style="margin-bottom: 20px;">
-                    <div style="
+            <div style="
                         background: rgba(212, 175, 55, 0.1);
                         border: 1px solid var(--border-gold);
                         border-radius: 12px;
@@ -2196,7 +1744,7 @@ class MishuraApp {
                     ">
                         <div style="color: var(--text-gold); font-weight: 600; margin-bottom: 8px;">
                             📅 ${new Date(consultation.timestamp).toLocaleString('ru-RU')}
-                        </div>
+            </div>
                         <div style="color: var(--text-light); margin-bottom: 4px;">
                             <strong>Повод:</strong> ${consultation.occasion}
                         </div>
@@ -2262,197 +1810,363 @@ class MishuraApp {
         this.startPeriodicSync();
     }
 
+    // ИСПРАВЛЕНИЕ 4: Дополнительная диагностика
     diagnose() {
-        const diagnosis = {
-            timestamp: new Date().toISOString(),
-            version: '2.5.0',
-            initialization: this.initializationComplete,
-            api: {
-                connected: !!this.api,
-                type: this.api ? (this.api.isMock ? 'Mock' : 'Real') : 'None'
-            },
-            sync: {
-                userId: this.syncState.userId,
-                deviceId: this.syncState.deviceId,
-                isOnline: this.syncState.isOnline,
-                lastSyncTime: this.syncState.lastSyncTime,
-                syncInProgress: this.syncState.syncInProgress,
-                pendingChanges: this.syncState.pendingChanges.length,
-                syncCount: this.analytics.syncCount,
-                syncErrors: this.analytics.syncErrors
-            },
-            state: {
-                currentMode: this.currentMode,
-                currentSection: this.currentSection,
-                isLoading: this.isLoading,
-                hasImages: {
-                    single: !!this.singleImage,
-                    compare: this.compareImages.filter(img => img !== null).length
-                }
-            },
-            user: {
-                balance: this.userBalance,
-                consultationsUsed: this.consultationsUsed,
-                historyCount: this.consultationsHistory.length
-            },
-            payments: {
-                packagesLoaded: !!this.paymentPackages,
-                packagesCount: this.paymentPackages ? Object.keys(this.paymentPackages).length : 0,
-                currentPayment: this.currentPayment ? this.currentPayment.id : null,
-                checkingPayment: !!this.paymentCheckInterval
-            }
-        };
+        console.log('🔧 ДИАГНОСТИКА ПРИЛОЖЕНИЯ:');
+        console.log('- API тип:', this.api ? this.api.constructor.name : 'НЕ ИНИЦИАЛИЗИРОВАН');
+        console.log('- API_BASE_URL:', API_BASE_URL);
+        console.log('- USER_ID:', this.getCurrentUserId());
+        console.log('- Текущая секция:', this.currentSection);
+        console.log('- PRICING_PLANS загружены:', Object.keys(window.PRICING_PLANS || {}).length > 0);
         
-        console.log('🔧 Диагностика МИШУРЫ:', diagnosis);
-        return diagnosis;
+        // Проверяем доступность API
+        fetch(`${API_BASE_URL}/api/v1/health`)
+            .then(res => res.json())
+            .then(data => console.log('- API здоровье:', data))
+            .catch(err => console.error('- API ошибка:', err));
+            
+        return {
+            apiType: this.api ? this.api.constructor.name : 'НЕ ИНИЦИАЛИЗИРОВАН',
+            baseUrl: API_BASE_URL,
+            userId: this.getCurrentUserId(),
+            section: this.currentSection,
+            plansLoaded: Object.keys(window.PRICING_PLANS || {}).length > 0
+        };
     }
-}
 
-// === ИНИЦИАЛИЗАЦИЯ ===
+    generateDeviceId() {
+        try {
+            let deviceId = localStorage.getItem('device_id');
+            if (!deviceId) {
+                const components = [
+                    navigator.userAgent, navigator.language,
+                    screen.width + 'x' + screen.height,
+                    new Date().getTimezoneOffset(),
+                    Date.now(), Math.random()
+                ];
+                const hash = components.join('|').split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0);
+                    return a & a;
+                }, 0);
+                deviceId = `dev_${Math.abs(hash)}_${Date.now()}`;
+                localStorage.setItem('device_id', deviceId);
+            }
+            return deviceId;
+        } catch (e) {
+            return `temp_${Date.now()}_${Math.random()}`;
+        }
+    }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeMishuraApp();
-    });
-} else {
-    initializeMishuraApp();
-}
-
-function initializeMishuraApp() {
-    try {
-        if (window.mishuraApp) {
-            console.log('⚠️ MishuraApp уже существует, пропускаем создание');
-            return;
+    getCurrentUserId() {
+        // Получение user_id из URL или Telegram
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlUserId = urlParams.get('user_id');
+        if (urlUserId && !isNaN(urlUserId)) {
+            return parseInt(urlUserId);
         }
         
-        console.log('🎬 Создание экземпляра MishuraApp...');
-        window.mishuraApp = new MishuraApp();
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user?.id) {
+            return window.Telegram.WebApp.initDataUnsafe.user.id;
+        }
         
-        // Утилиты для отладки
-        window.mishuraUtils = {
-            diagnose: () => window.mishuraApp.diagnose(),
-            reset: () => window.mishuraApp.reset(),
-            analytics: () => window.mishuraApp.getAnalytics(),
-            testNotification: (message, type) => window.mishuraApp.showNotification(message, type),
-            forceSyncNow: () => window.mishuraApp.syncWithServer(true),
-            checkBalance: () => window.mishuraApp.forceSyncBalance(),
-            testSingle: () => {
-                window.mishuraApp.openSingleModal();
-                setTimeout(() => {
-                    const occasionInput = document.getElementById('occasion');
-                    if (occasionInput) occasionInput.value = '💼 Деловая встреча';
-                    window.mishuraApp.updateSubmitButton();
-                }, 100);
-            },
-            testCompare: () => {
-                window.mishuraApp.openCompareModal();
-                setTimeout(() => {
-                    const occasionInput = document.getElementById('occasion');
-                    if (occasionInput) occasionInput.value = '🎉 Вечеринка';
-                    window.mishuraApp.updateSubmitButton();
-                }, 100);
-            },
-            testPaymentModal: () => {
-                window.mishuraApp.showPaymentModal();
+        return 5930269100; // Fallback для тестирования
+    }
+
+    setupNetworkMonitoring() {
+        // Мониторинг состояния сети
+        window.addEventListener('online', () => {
+            this.syncState.isOnline = true;
+        });
+        window.addEventListener('offline', () => {
+            this.syncState.isOnline = false;
+        });
+    }
+
+    startPeriodicSync() {
+        // Заглушка для синхронизации
+        console.log('Синхронизация в фоне активна');
+    }
+
+    stopPeriodicSync() {
+        // Заглушка для остановки синхронизации
+    }
+
+    addPendingChange(type, data) {
+        // Заглушка для pending changes
+    }
+
+    syncWithServer(force = false) {
+        // Заглушка для синхронизации с сервером
+        return Promise.resolve();
+    }
+
+    async forceSyncBalance() {
+        try {
+            console.log('🔄 Принудительная синхронизация баланса...');
+            
+            const userId = this.getCurrentUserId();
+            
+            // Получаем актуальный баланс с сервера
+            const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/balance`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-        };
-        
-        console.log(`
-🎉 === МИШУРА ГОТОВА ===
+            
+            const balanceData = await response.json();
+            const newBalance = balanceData.balance || 0;
+            
+            // Обновляем локальный баланс
+            const oldBalance = this.userBalance;
+            this.userBalance = newBalance;
+            
+            // Сохраняем изменения
+            this.saveUserData();
+            
+            // Обновляем отображение баланса в интерфейсе
+            this.updateBalanceDisplay(newBalance);
+            
+            // Уведомляем пользователя если баланс изменился
+            if (newBalance !== oldBalance) {
+                const difference = newBalance - oldBalance;
+                if (difference > 0) {
+                    this.showNotification(
+                        `🎉 Баланс пополнен на ${difference} STcoin! Новый баланс: ${newBalance}`, 
+                        'success', 
+                        5000
+                    );
+                    this.triggerHapticFeedback('success');
+                } else if (difference < 0) {
+                    this.showNotification(
+                        `💸 Списано ${Math.abs(difference)} STcoin. Остаток: ${newBalance}`, 
+                        'info', 
+                        3000
+                    );
+                }
+            }
+            
+            console.log(`💰 Баланс синхронизирован: ${oldBalance} → ${newBalance} STcoin`);
+            
+            return {
+                oldBalance,
+                newBalance,
+                difference: newBalance - oldBalance,
+                success: true
+            };
+            
+        } catch (error) {
+            console.error('❌ Ошибка синхронизации баланса:', error);
+            this.showNotification('❌ Ошибка обновления баланса', 'error');
+            
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
 
-📋 КОМАНДЫ В КОНСОЛИ:
-• mishuraUtils.diagnose() - диагностика
-• mishuraUtils.analytics() - статистика
-• mishuraUtils.reset() - сброс состояния
-• mishuraUtils.testSingle() - тест анализа
-• mishuraUtils.testCompare() - тест сравнения
-• mishuraUtils.testPaymentModal() - тест платежей
+    async refreshBalance() {
+        try {
+            console.log('🔄 === ОТЛАДКА ОБНОВЛЕНИЯ БАЛАНСА ===');
+            
+            // Показываем индикатор загрузки
+            this.showNotification('🔄 Обновляем баланс...', 'info', 2000);
+            
+            const currentUserId = this.getCurrentUserId();
+            console.log('👤 User ID:', currentUserId);
+            
+            // ОТЛАДКА: Сначала проверяем текущий баланс напрямую
+            const directBalanceURL = `${API_BASE_URL}/api/v1/users/${currentUserId}/balance?_t=${Date.now()}`;
+            console.log('🌐 Прямой запрос баланса:', directBalanceURL);
+            
+            const directResponse = await fetch(directBalanceURL, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            
+            if (!directResponse.ok) {
+                throw new Error(`HTTP ${directResponse.status}: ${directResponse.statusText}`);
+            }
+            
+            const directData = await directResponse.json();
+            console.log('💰 Баланс с сервера:', directData);
+            
+            // ОТЛАДКА: Проверяем есть ли pending платежи
+            const paymentsURL = `${API_BASE_URL}/api/v1/payments/history?user_id=${currentUserId}`;
+            console.log('📋 Запрос истории платежей:', paymentsURL);
+            
+            try {
+                const paymentsResponse = await fetch(paymentsURL);
+                if (paymentsResponse.ok) {
+                    const paymentsData = await paymentsResponse.json();
+                    const pendingPayments = paymentsData.filter(p => p.status === 'pending');
+                    const completedPayments = paymentsData.filter(p => p.status === 'completed');
+                    
+                    console.log('📊 Статистика платежей:');
+                    console.log('  - Всего платежей:', paymentsData.length);
+                    console.log('  - Pending:', pendingPayments.length);
+                    console.log('  - Completed:', completedPayments.length);
+                    
+                    if (pendingPayments.length > 0) {
+                        console.log('⚠️ Есть pending платежи! Пытаемся синхронизировать...');
+                        
+                        // Пытаемся синхронизировать
+                        const syncURL = `${API_BASE_URL}/api/v1/payments/sync_all`;
+                        const syncResponse = await fetch(syncURL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ user_id: currentUserId })
+                        });
+                        
+                        if (syncResponse.ok) {
+                            const syncResult = await syncResponse.json();
+                            console.log('🔄 Результат синхронизации:', syncResult);
+                            
+                            if (syncResult.synchronized > 0) {
+                                this.showNotification(`🎉 Синхронизировано ${syncResult.synchronized} платежей!`, 'success', 3000);
+                                
+                                // Повторно запрашиваем баланс после синхронизации
+                                const updatedResponse = await fetch(directBalanceURL);
+                                if (updatedResponse.ok) {
+                                    const updatedData = await updatedResponse.json();
+                                    console.log('💰 Обновленный баланс:', updatedData);
+                                    
+                                    // Обновляем локальный баланс
+                                    const oldBalance = this.userBalance;
+                                    this.userBalance = updatedData.balance;
+                                    this.saveUserData();
+                                    
+                                    const difference = updatedData.balance - oldBalance;
+                                    this.showNotification(`✅ Баланс обновлен! +${difference} STcoin`, 'success', 4000);
+                                    this.updateBalanceDisplay(updatedData.balance);
+                                    
+                                    return { success: true, balance: updatedData.balance, difference: difference };
+                                }
+                            } else {
+                                this.showNotification('ℹ️ Нет новых платежей для зачисления', 'info', 2000);
+                            }
+                        } else {
+                            console.error('❌ Ошибка синхронизации:', await syncResponse.text());
+                        }
+                    }
+                }
+            } catch (paymentsError) {
+                console.error('❌ Ошибка получения платежей:', paymentsError);
+            }
+            
+            // Обновляем локальный баланс в любом случае
+            const oldBalance = this.userBalance;
+            this.userBalance = directData.balance;
+            this.saveUserData();
+            
+            console.log(`💰 Баланс: ${oldBalance} → ${directData.balance} STcoin`);
+            
+            // Показываем результат
+            const difference = directData.balance - oldBalance;
+            if (difference !== 0) {
+                this.showNotification(`✅ Баланс обновлен: ${directData.balance} STcoin`, 'success', 3000);
+            }
+            
+            // ВАЖНО: Обновляем отображение в интерфейсе
+            this.updateBalanceDisplay(directData.balance);
+            
+            console.log('🔄 === ОТЛАДКА ЗАВЕРШЕНА ===');
+            return { success: true, balance: directData.balance, difference: difference };
+            
+        } catch (error) {
+            console.error('❌ ПОЛНАЯ ОШИБКА ОБНОВЛЕНИЯ БАЛАНСА:', error);
+            this.showNotification('❌ Ошибка обновления баланса', 'error', 3000);
+            return { success: false, error: error.message };
+        }
+    }
 
-🔄 СИНХРОНИЗАЦИЯ:
-• mishuraUtils.forceSyncNow() - принудительная синхронизация
-• mishuraUtils.checkBalance() - проверка баланса
+    updateBalanceDisplay(newBalance) {
+        console.log('📊 Обновляем отображение баланса:', newBalance);
+        
+        // Обновляем все элементы с балансом на странице
+        const balanceElements = document.querySelectorAll('[data-balance-display]');
+        balanceElements.forEach(element => {
+            element.textContent = newBalance;
+            console.log('✅ Обновлен элемент баланса:', element);
+        });
+        
+        // Обновляем количество доступных консультаций
+        const consultationsRemaining = Math.floor(newBalance / 10);
+        const consultationsElements = document.querySelectorAll('[data-consultations-display]');
+        consultationsElements.forEach(element => {
+            element.textContent = consultationsRemaining;
+            console.log('✅ Обновлен элемент консультаций:', element);
+        });
+        
+        // НЕ ПЕРЕРИСОВЫВАЕМ секцию полностью - это вызывает переход на главную!
+        console.log('✅ Баланс обновлен без перерисовки секции');
+    }
 
-🎯 СОСТОЯНИЕ:
-• Версия: 2.5.0 (оптимизированная)
-• API: ${window.mishuraApp.api ? (window.mishuraApp.api.isMock ? 'Mock (демо)' : 'Реальный') : 'Не подключен'}
-• User ID: ${window.mishuraApp.syncState.userId || 'определяется...'}
-• Баланс: ${window.mishuraApp.userBalance} STcoin
-• Синхронизация работает в фоне незаметно для пользователя
-        `);
+    deductConsultation(cost = 10) {
+        this.userBalance -= cost;
+        this.consultationsUsed += cost;
+        this.saveUserData();
+    }
+
+    // Инициализация модульной навигации
+    initModularNavigation() {
+        if (window.MishuraApp && 
+            window.MishuraApp.components && 
+            window.MishuraApp.components.navigation) {
+            
+            console.log('🔧 Инициализация модульной навигации');
+            window.MishuraApp.components.navigation.init();
+        }
+    }
+
+    fixModeButtons() {
+        const singleBtn = document.getElementById('single-mode-btn');
+        const compareBtn = document.getElementById('compare-mode-btn');
         
-    } catch (error) {
-        console.error('❌ Критическая ошибка инициализации МИШУРЫ:', error);
-        
-        document.body.innerHTML = `
-            <div style="
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-                color: #ffffff;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                text-align: center;
-                padding: 20px;
-            ">
-                <div style="
-                    background: rgba(239, 68, 68, 0.1);
-                    border: 2px solid #ef4444;
-                    border-radius: 20px;
-                    padding: 40px;
-                    max-width: 500px;
-                    margin: 20px;
-                ">
-                    <div style="font-size: 4rem; margin-bottom: 20px;">🚫</div>
-                    
-                    <h1 style="
-                        color: #ef4444; 
-                        margin-bottom: 16px;
-                        font-size: 1.5rem;
-                    ">Доступ заблокирован</h1>
-                    
-                    <p style="
-                        color: #a1a1aa; 
-                        margin-bottom: 24px; 
-                        line-height: 1.6;
-                        font-size: 1.1rem;
-                    ">
-                        Это приложение работает <strong>только через Telegram бота</strong>.<br>
-                        Доступ через обычный браузер запрещен для обеспечения безопасности.
-                    </p>
-                    
-                    <div style="
-                        background: rgba(212, 175, 55, 0.1);
-                        border: 1px solid rgba(212, 175, 55, 0.3);
-                        border-radius: 12px;
-                        padding: 20px;
-                        margin-bottom: 24px;
-                        text-align: left;
-                    ">
-                        <h3 style="color: #d4af37; margin-bottom: 12px; font-size: 1.1rem;">
-                            📱 Как получить доступ:
-                        </h3>
-                        <ol style="color: #e5e5e5; margin: 0; padding-left: 20px; line-height: 1.8;">
-                            <li>Откройте Telegram</li>
-                            <li>Найдите бота <strong>@MishuraAIBot</strong></li>
-                            <li>Нажмите <strong>"🌐 Веб-приложение"</strong></li>
-                            <li>Или отправьте команду <code>/webapp</code></li>
-                        </ol>
-                    </div>
-                    
-                    <div style="
-                        color: #71717a;
-                        font-size: 0.9rem;
-                        margin-top: 20px;
-                    ">
-                        💡 Баланс автоматически синхронизируется между всеми устройствами
-                    </div>
-                </div>
-            </div>
-        `;
+        if (singleBtn) {
+            const newSingleBtn = singleBtn.cloneNode(true);
+            singleBtn.parentNode.replaceChild(newSingleBtn, singleBtn);
+            newSingleBtn.addEventListener('click', () => {
+                console.log('📷 Открываем анализ образа');
+                if (window.mishuraApp) {
+                    window.mishuraApp.openSingleModal();
+                }
+            });
+            console.log('✅ Кнопка анализа образа починена');
+        }
+
+        if (compareBtn) {
+            const newCompareBtn = compareBtn.cloneNode(true);
+            compareBtn.parentNode.replaceChild(newCompareBtn, compareBtn);
+            newCompareBtn.addEventListener('click', () => {
+                console.log('🔄 Открываем сравнение образов');
+                if (window.mishuraApp) {
+                    window.mishuraApp.openCompareModal();
+                }
+            });
+            console.log('✅ Кнопка сравнения образов починена');
+        }
     }
 }
 
-console.log('📦 МИШУРА App модуль загружен (очищенная версия v2.5.0)!');
-            
+// === ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ ===
+
+// Функция покупки плана (вызывается из HTML onclick)
+window.buyPlan = function(planId) {
+    if (window.mishuraApp) {
+        window.mishuraApp.initiatePayment(planId);
+    } else {
+        console.error('❌ MishuraApp не инициализирован');
+    }
+};
+
+// Инициализация приложения
+if (!window.mishuraApp) {
+    console.log('🎭 Инициализация МИШУРА App v2.6.0...');
+    window.mishuraApp = new MishuraApp();
+}

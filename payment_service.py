@@ -1,591 +1,655 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
-==========================================================================================
-ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
-КОМПОНЕНТ: Сервис платежей ЮKassa (payment_service.py)
-ВЕРСИЯ: 1.2.0 - ПРОДАКШН С РЕАЛЬНЫМ API
-ДАТА ОБНОВЛЕНИЯ: 2025-06-16
-
-НАЗНАЧЕНИЕ:
-Модуль для интеграции с платежной системой ЮKassa.
-Обработка создания платежей, webhook'ов и управления транзакциями.
-
-СТАТУС: ✅ ПОЛНОСТЬЮ ПРОТЕСТИРОВАНО - готово к продакшну
-- Создание реальных платежей ✅
-- Обработка webhook'ов ✅  
-- Автоматическое начисление STcoin ✅
-==========================================================================================
+🎭 МИШУРА - Payment Service
+Сервис для работы с платежами ЮKassa
 """
 
 import os
-import sys
-import json
-import hmac
-import hashlib
+import sqlite3
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Dict, Any, List
-from decimal import Decimal
-import uuid
-import traceback
-
-# Добавляем путь для импорта database.py
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-try:
-    from yookassa import Configuration, Payment
-    from yookassa.domain.exceptions import ApiError, UnauthorizedError
-except ImportError:
-    print("❌ ОШИБКА: Модуль yookassa не установлен")
-    print("💡 Установите: pip install yookassa")
-    sys.exit(1)
-
-try:
-    import database
-except ImportError:
-    print("❌ ОШИБКА: Не удалось импортировать database.py")
-    sys.exit(1)
 
 # Настройка логирования
-logger = logging.getLogger("MishuraPayments")
-if not logger.handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s',
-        handlers=[
-            logging.FileHandler('payments.log', encoding='utf-8'),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+logger = logging.getLogger(__name__)
 
-# Загрузка переменных окружения
-from dotenv import load_dotenv
-load_dotenv()
+# Путь к базе данных
+DATABASE_PATH = os.getenv('DB_PATH', 'styleai.db')
 
-# Конфигурация ЮKassa
-YUKASSA_SHOP_ID = os.getenv('YUKASSA_SHOP_ID')
-YUKASSA_SECRET_KEY = os.getenv('YUKASSA_SECRET_KEY')
-WEBHOOK_URL = os.getenv('WEBHOOK_URL')
+# ================================
+# ОСНОВНЫЕ ФУНКЦИИ ПЛАТЕЖЕЙ
+# ================================
 
-# Настройки платежей
-PAYMENT_PACKAGES = {
-    'basic': {
-        'name': 'Базовый пакет',
-        'stcoin': 100,
-        'consultations': 10,
-        'price_rub': 299,
-        'description': '10 консультаций стилиста',
-        'popular': False
-    },
-    'standard': {
-        'name': 'Стандартный пакет',
-        'stcoin': 250,
-        'consultations': 25,
-        'price_rub': 699,
-        'description': '25 консультаций + бонус',
-        'popular': True
-    },
-    'premium': {
-        'name': 'Премиум пакет',
-        'stcoin': 500,
-        'consultations': 50,
-        'price_rub': 1299,
-        'description': '50 консультаций + VIP поддержка',
-        'popular': False
-    },
-    'ultimate': {
-        'name': 'Безлимитный пакет',
-        'stcoin': 1000,
-        'consultations': 100,
-        'price_rub': 2499,
-        'description': '100 консультаций + эксклюзивные функции',
-        'popular': False
-    }
-}
+def save_payment(payment_id: str, user_id: int, amount: float, currency: str, 
+                status: str, plan_id: str = None, stcoins_amount: int = None):
+    """Сохранить платеж с информацией о тарифном плане"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Проверяем, существует ли таблица с нужными колонками
+        cursor.execute("PRAGMA table_info(payments)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        # Базовый запрос
+        if 'plan_id' in columns and 'stcoins_amount' in columns:
+            # Новая схема с plan_id и stcoins_amount
+            cursor.execute("""
+                INSERT INTO payments (
+                    payment_id, user_id, amount, currency, status, 
+                    plan_id, stcoins_amount, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                payment_id, user_id, amount, currency, status,
+                plan_id, stcoins_amount, datetime.now()
+            ))
+        else:
+            # Старая схема - только базовые поля
+            cursor.execute("""
+                INSERT INTO payments (
+                    payment_id, user_id, amount, currency, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                payment_id, user_id, amount, currency, status, datetime.now()
+            ))
+        
+        conn.commit()
+        logger.info(f"Payment saved: {payment_id} for user {user_id}, plan {plan_id}")
+    except Exception as e:
+        logger.error(f"Error saving payment: {e}")
+        raise
+    finally:
+        conn.close()
 
-class PaymentService:
-    """Сервис для работы с платежами ЮKassa"""
-    
-    def __init__(self):
-        """Инициализация сервиса платежей"""
-        self.configured = False
-        self.test_mode = True
-        self.init_yukassa()
-    
-    def init_yukassa(self) -> bool:
-        """Инициализация ЮKassa с реальным API"""
-        try:
-            if not YUKASSA_SHOP_ID or not YUKASSA_SECRET_KEY:
-                logger.error("❌ YUKASSA_SHOP_ID или YUKASSA_SECRET_KEY не найдены в переменных окружения")
-                return False
+def get_payment(payment_id: str) -> Optional[Dict[str, Any]]:
+    """Получить платеж по ID"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT payment_id, user_id, amount, currency, status, 
+                   plan_id, stcoins_amount, created_at
+            FROM payments 
+            WHERE payment_id = ?
+        """, (payment_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            return None
+        
+        return {
+            'payment_id': row[0],
+            'user_id': row[1],
+            'amount': row[2],
+            'currency': row[3],
+            'status': row[4],
+            'plan_id': row[5] if len(row) > 5 else None,
+            'stcoins_amount': row[6] if len(row) > 6 else None,
+            'created_at': row[7] if len(row) > 7 else row[5]  # Fallback для старой схемы
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting payment {payment_id}: {e}")
+        return None
+    finally:
+        conn.close()
+
+def update_payment_status(payment_id: str, status: str):
+    """Обновить статус платежа"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE payments 
+            SET status = ?, updated_at = ?
+            WHERE payment_id = ?
+        """, (status, datetime.now(), payment_id))
+        
+        conn.commit()
+        
+        if cursor.rowcount == 0:
+            logger.warning(f"Payment {payment_id} not found for status update")
+        else:
+            logger.info(f"Payment {payment_id} status updated to {status}")
+        
+    except Exception as e:
+        logger.error(f"Error updating payment status: {e}")
+        raise
+    finally:
+        conn.close()
+
+def get_user_payments(user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    """Получить платежи пользователя"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT payment_id, amount, currency, status, plan_id, 
+                   stcoins_amount, created_at
+            FROM payments 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        """, (user_id, limit))
+        
+        rows = cursor.fetchall()
+        payments = []
+        
+        for row in rows:
+            payment = {
+                'payment_id': row[0],
+                'amount': row[1],
+                'currency': row[2],
+                'status': row[3],
+                'plan_id': row[4] if len(row) > 4 else None,
+                'stcoins_amount': row[5] if len(row) > 5 else None,
+                'created_at': row[6] if len(row) > 6 else row[4]  # Fallback
+            }
+            payments.append(payment)
+        
+        return payments
+        
+    except Exception as e:
+        logger.error(f"Error getting user payments: {e}")
+        return []
+    finally:
+        conn.close()
+
+# ================================
+# СТАТИСТИКА И АНАЛИТИКА
+# ================================
+
+def get_payment_stats() -> Dict[str, Any]:
+    """Получить статистику платежей"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Общая статистика
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_payments,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_payments,
+                COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_payments,
+                COUNT(CASE WHEN status = 'canceled' THEN 1 END) as canceled_payments,
+                SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as total_revenue,
+                AVG(CASE WHEN status = 'completed' THEN amount ELSE NULL END) as avg_payment
+            FROM payments
+        """)
+        
+        stats_row = cursor.fetchone()
+        
+        # Статистика по планам (если есть колонка plan_id)
+        cursor.execute("PRAGMA table_info(payments)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        plans_stats = []
+        if 'plan_id' in columns:
+            cursor.execute("""
+                SELECT 
+                    plan_id,
+                    COUNT(*) as sales_count,
+                    SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as revenue,
+                    SUM(CASE WHEN status = 'completed' THEN stcoins_amount ELSE 0 END) as stcoins_sold
+                FROM payments 
+                WHERE plan_id IS NOT NULL
+                GROUP BY plan_id
+                ORDER BY sales_count DESC
+            """)
             
-            # Настройка ЮKassa
-            Configuration.configure(YUKASSA_SHOP_ID, YUKASSA_SECRET_KEY)
-            
-            # Проверяем реальное подключение к ЮKassa
-            try:
-                # Создаем минимальный тестовый платеж для проверки API
-                test_payment = Payment.create({
-                    "amount": {
-                        "value": "1.00",
-                        "currency": "RUB"
-                    },
-                    "confirmation": {
-                        "type": "redirect",
-                        "return_url": "https://test.example.com"
-                    },
-                    "description": "Тест подключения к ЮKassa API",
-                    "test": True  # Тестовый платеж
+            plans_rows = cursor.fetchall()
+            for row in plans_rows:
+                plans_stats.append({
+                    'plan_id': row[0],
+                    'sales_count': row[1],
+                    'revenue': row[2],
+                    'stcoins_sold': row[3]
                 })
-                
-                if test_payment.id:
-                    logger.info("✅ ЮKassa реальный API подключен успешно")
-                    logger.info(f"🔧 Shop ID: {YUKASSA_SHOP_ID}")
-                    logger.info(f"🔧 Test payment created: {test_payment.id}")
-                    logger.info(f"🔧 Confirmation URL: {test_payment.confirmation.confirmation_url}")
-                    
-                    # Определяем режим на основе ключей
-                    self.test_mode = YUKASSA_SECRET_KEY.startswith('test_')
-                    logger.info(f"🔧 Test mode: {self.test_mode}")
-                    
-                    self.configured = True
-                    return True
-                else:
-                    raise Exception("Не удалось создать тестовый платеж")
-                
-            except Exception as e:
-                logger.error(f"❌ Ошибка проверки ЮKassa API: {e}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"❌ Ошибка инициализации ЮKassa: {e}")
-            return False
-    
-    def get_packages(self) -> Dict[str, Any]:
-        """Получить доступные пакеты пополнения"""
-        logger.info("📦 Запрос пакетов пополнения")
+        
         return {
-            'status': 'success',
-            'packages': PAYMENT_PACKAGES,
-            'currency': 'RUB',
-            'test_mode': self.test_mode,
-            'timestamp': datetime.now().isoformat()
+            'total_payments': stats_row[0] or 0,
+            'successful_payments': stats_row[1] or 0,
+            'pending_payments': stats_row[2] or 0,
+            'canceled_payments': stats_row[3] or 0,
+            'total_revenue': stats_row[4] or 0.0,
+            'average_payment': stats_row[5] or 0.0,
+            'plans_stats': plans_stats,
+            'success_rate': (stats_row[1] / stats_row[0] * 100) if stats_row[0] > 0 else 0
         }
-    
-    def create_payment(
-        self, 
-        user_id: int, 
-        package_id: str, 
-        return_url: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Создать платеж для пополнения баланса
         
-        Args:
-            user_id: Telegram ID пользователя
-            package_id: ID пакета из PAYMENT_PACKAGES
-            return_url: URL для возврата после оплаты
-        
-        Returns:
-            Dict с данными созданного платежа или ошибкой
-        """
-        logger.info(f"💳 Создание платежа для user_id={user_id}, package={package_id}")
-        
-        try:
-            # Проверяем пакет
-            if package_id not in PAYMENT_PACKAGES:
-                raise ValueError(f"Неизвестный пакет: {package_id}")
-            
-            package = PAYMENT_PACKAGES[package_id]
-            
-            # Проверяем пользователя
-            user = database.get_user(user_id)
-            if not user:
-                # Создаем пользователя если его нет
-                database.save_user(user_id, None, None, None)
-                user = database.get_user(user_id)
-            
-            # Генерируем уникальный ID платежа
-            payment_id = str(uuid.uuid4())
-            
-            # Создаем реальный платеж в ЮKassa
-            payment_data = {
-                "amount": {
-                    "value": f"{package['price_rub']:.2f}",
-                    "currency": "RUB"
-                },
-                "confirmation": {
-                    "type": "redirect",
-                    "return_url": return_url or f"{WEBHOOK_URL.replace('/api/v1/payments/webhook', '/webapp')}" if WEBHOOK_URL else "http://localhost:8000/webapp"
-                },
-                "capture": True,
-                "description": f"МИШУРА: {package['name']} для пользователя {user_id}",
-                "test": self.test_mode,  # Используем реальный test_mode
-                "metadata": {
-                    "user_id": str(user_id),
-                    "package_id": package_id,
-                    "stcoin_amount": str(package['stcoin']),
-                    "internal_payment_id": payment_id
-                }
-            }
-            
-            logger.info(f"🚀 Создание {'тестового' if self.test_mode else 'реального'} платежа в ЮKassa")
-            logger.debug(f"Payment data: {json.dumps(payment_data, ensure_ascii=False, indent=2)}")
-            
-            yukassa_payment = Payment.create(payment_data)
-            
-            if not yukassa_payment.id:
-                raise Exception("Не удалось создать платеж в ЮKassa")
-            
-            logger.info(f"✅ Платеж создан в ЮKassa: {yukassa_payment.id}")
-            logger.info(f"🔗 Confirmation URL: {yukassa_payment.confirmation.confirmation_url}")
-            
-            # Сохраняем платеж в базу данных
-            db_payment_id = database.record_payment(
-                user_id=user_id,
-                amount_rub=package['price_rub'],
-                status='pending',
-                payment_provider_id=yukassa_payment.id
-            )
-            
-            if not db_payment_id:
-                # Отменяем платеж в ЮKassa если не удалось сохранить в БД
-                try:
-                    Payment.cancel(yukassa_payment.id)
-                    logger.warning(f"⚠️ Платеж {yukassa_payment.id} отменен из-за ошибки БД")
-                except:
-                    pass
-                raise Exception("Не удалось сохранить платеж в базу данных")
-            
-            result = {
-                'status': 'success',
-                'payment_id': yukassa_payment.id,
-                'internal_payment_id': db_payment_id,
-                'confirmation_url': yukassa_payment.confirmation.confirmation_url,
-                'amount': package['price_rub'],
-                'currency': 'RUB',
-                'stcoin_amount': package['stcoin'],
-                'package': package,
-                'test_mode': self.test_mode,
-                'expires_at': (datetime.now() + timedelta(hours=1)).isoformat(),
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            logger.info(f"✅ Платеж успешно создан и сохранен в БД")
-            return result
-            
-        except ValueError as e:
-            logger.error(f"❌ Ошибка валидации при создании платежа: {e}")
-            return {
-                'status': 'error',
-                'error': 'validation_error',
-                'message': str(e),
-                'timestamp': datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка создания платежа: {e}")
-            return {
-                'status': 'error',
-                'error': 'payment_creation_error',
-                'message': f'Ошибка создания платежа: {str(e)}',
-                'timestamp': datetime.now().isoformat()
-            }
-    
-    def process_webhook(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Обработка webhook от ЮKassa
-        
-        Args:
-            webhook_data: Данные webhook от ЮKassa
-        
-        Returns:
-            Dict с результатом обработки
-        """
-        logger.info("🔔 Обработка webhook от ЮKassa")
-        logger.debug(f"Webhook данные: {json.dumps(webhook_data, ensure_ascii=False, indent=2)}")
-        
-        try:
-            # Проверяем структуру webhook
-            if 'object' not in webhook_data or 'event' not in webhook_data:
-                raise ValueError("Неверная структура webhook")
-            
-            event = webhook_data['event']
-            payment_object = webhook_data['object']
-            
-            logger.info(f"📨 Webhook событие: {event}")
-            
-            # Обрабатываем только успешные платежи
-            if event == 'payment.succeeded':
-                return self._process_successful_payment(payment_object)
-            elif event == 'payment.canceled':
-                return self._process_canceled_payment(payment_object)
-            else:
-                logger.info(f"ℹ️ Игнорируем событие: {event}")
-                return {
-                    'status': 'ignored',
-                    'event': event,
-                    'message': 'Событие не требует обработки'
-                }
-                
-        except Exception as e:
-            logger.error(f"❌ Ошибка обработки webhook: {e}")
-            return {
-                'status': 'error',
-                'error': 'webhook_processing_error',
-                'message': str(e)
-            }
-    
-    def _process_successful_payment(self, payment_object: Dict[str, Any]) -> Dict[str, Any]:
-        """Обработка успешного платежа"""
-        try:
-            payment_id = payment_object['id']
-            amount = float(payment_object['amount']['value'])
-            metadata = payment_object.get('metadata', {})
-            
-            logger.info(f"💰 Обработка успешного платежа: {payment_id}, сумма: {amount} RUB")
-            
-            # Получаем данные из metadata
-            user_id = int(metadata.get('user_id', 0))
-            package_id = metadata.get('package_id', '')
-            stcoin_amount = int(metadata.get('stcoin_amount', 0))
-            
-            if not user_id or not package_id or not stcoin_amount:
-                raise ValueError("Недостаточно данных в metadata платежа")
-            
-            # Проверяем пакет
-            if package_id not in PAYMENT_PACKAGES:
-                raise ValueError(f"Неизвестный пакет в платеже: {package_id}")
-            
-            package = PAYMENT_PACKAGES[package_id]
-            
-            # Проверяем сумму
-            if abs(amount - package['price_rub']) > 0.01:  # Допуск на копейки
-                logger.warning(f"⚠️ Сумма платежа не соответствует пакету: {amount} != {package['price_rub']}")
-            
-            # Обновляем статус платежа в БД
-            # Ищем платеж по payment_provider_id
-            payments = database.get_connection()
-            cursor = payments.cursor()
-            cursor.execute(
-                "SELECT id, user_id FROM payments WHERE payment_provider_id = ? AND status = 'pending'",
-                (payment_id,)
-            )
-            payment_record = cursor.fetchone()
-            payments.close()
-            
-            if not payment_record:
-                logger.warning(f"⚠️ Платеж {payment_id} не найден в БД или уже обработан")
-                # Все равно пытаемся начислить средства
-            else:
-                database.update_payment_status(payment_record[0], 'completed')
-                logger.info(f"✅ Статус платежа {payment_id} обновлен на 'completed'")
-            
-            # Начисляем STcoin пользователю
-            current_balance = database.get_user_balance(user_id)
-            new_balance = current_balance + stcoin_amount
-            
-            success = database.update_user_balance(user_id, stcoin_amount)
-            
-            if success:
-                logger.info(f"✅ Пользователю {user_id} начислено {stcoin_amount} STcoin")
-                logger.info(f"💎 Новый баланс пользователя: {new_balance} STcoin")
-                
-                return {
-                    'status': 'success',
-                    'payment_id': payment_id,
-                    'user_id': user_id,
-                    'package_id': package_id,
-                    'stcoin_added': stcoin_amount,
-                    'new_balance': new_balance,
-                    'amount_paid': amount,
-                    'message': f'Платеж обработан. Начислено {stcoin_amount} STcoin.'
-                }
-            else:
-                raise Exception("Не удалось начислить STcoin пользователю")
-                
-        except Exception as e:
-            logger.error(f"❌ Ошибка обработки успешного платежа: {e}")
-            return {
-                'status': 'error',
-                'error': 'payment_processing_error',
-                'message': str(e)
-            }
-    
-    def _process_canceled_payment(self, payment_object: Dict[str, Any]) -> Dict[str, Any]:
-        """Обработка отмененного платежа"""
-        try:
-            payment_id = payment_object['id']
-            
-            logger.info(f"❌ Обработка отмененного платежа: {payment_id}")
-            
-            # Обновляем статус в БД
-            payments = database.get_connection()
-            cursor = payments.cursor()
-            cursor.execute(
-                "SELECT id FROM payments WHERE payment_provider_id = ?",
-                (payment_id,)
-            )
-            payment_record = cursor.fetchone()
-            payments.close()
-            
-            if payment_record:
-                database.update_payment_status(payment_record[0], 'canceled')
-                logger.info(f"📝 Статус платежа {payment_id} обновлен на 'canceled'")
-            
-            return {
-                'status': 'success',
-                'payment_id': payment_id,
-                'message': 'Платеж отменен'
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка обработки отмененного платежа: {e}")
-            return {
-                'status': 'error',
-                'error': 'cancelation_processing_error',
-                'message': str(e)
-            }
-    
-    def get_payment_status(self, payment_id: str) -> Dict[str, Any]:
-        """
-        Получить статус платежа из ЮKassa
-        
-        Args:
-            payment_id: ID платежа в ЮKassa
-        
-        Returns:
-            Dict со статусом платежа
-        """
-        logger.info(f"🔍 Запрос статуса платежа: {payment_id}")
-        
-        try:
-            # Обработка старых mock платежей
-            if payment_id.startswith('test_'):
-                logger.info("🧪 Статус mock платежа")
-                return {
-                    'status': 'success',
-                    'payment_id': payment_id,
-                    'payment_status': 'pending',
-                    'amount': 699.0,
-                    'currency': 'RUB',
-                    'created_at': datetime.now().isoformat(),
-                    'description': 'Mock платеж МИШУРА',
-                    'metadata': {},
-                    'test_mode': True,
-                    'timestamp': datetime.now().isoformat()
-                }
-            
-            if not self.configured:
-                raise Exception("ЮKassa не настроена")
-            
-            # Получаем статус реального платежа из ЮKassa
-            payment = Payment.find_one(payment_id)
-            
-            if not payment:
-                raise Exception(f"Платеж {payment_id} не найден в ЮKassa")
-            
-            # ИСПРАВЛЕНИЕ: правильная обработка дат
-            created_at_iso = None
-            if hasattr(payment, 'created_at') and payment.created_at:
-                if hasattr(payment.created_at, 'isoformat'):
-                    # Это datetime объект
-                    created_at_iso = payment.created_at.isoformat()
-                else:
-                    # Это уже строка
-                    created_at_iso = str(payment.created_at)
-            
-            result = {
-                'status': 'success',
-                'payment_id': payment.id,
-                'payment_status': payment.status,
-                'amount': float(payment.amount.value),
-                'currency': payment.amount.currency,
-                'created_at': created_at_iso,
-                'description': payment.description,
-                'metadata': payment.metadata or {},
-                'test_mode': self.test_mode,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            # Добавляем URL для оплаты если платеж в ожидании
-            if payment.status == 'pending' and hasattr(payment, 'confirmation') and payment.confirmation:
-                if hasattr(payment.confirmation, 'confirmation_url'):
-                    result['confirmation_url'] = payment.confirmation.confirmation_url
-            
-            logger.info(f"✅ Статус платежа {payment_id}: {payment.status}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка получения статуса платежа: {e}")
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
-            return {
-                'status': 'error',
-                'error': 'payment_status_error',
-                'message': str(e),
-                'timestamp': datetime.now().isoformat()
-            }
-    
-    def validate_webhook_signature(self, webhook_body: str, signature: str) -> bool:
-        """
-        Проверка подписи webhook (дополнительная безопасность)
-        
-        Args:
-            webhook_body: Тело webhook запроса
-            signature: Подпись из заголовка
-        
-        Returns:
-            True если подпись корректна
-        """
-        # Примечание: ЮKassa в тестовом режиме может не отправлять подписи
-        # В продакшне рекомендуется включить эту проверку
-        
-        if not YUKASSA_SECRET_KEY:
-            return True  # Пропускаем проверку если нет ключа
-        
-        try:
-            expected_signature = hmac.new(
-                YUKASSA_SECRET_KEY.encode('utf-8'),
-                webhook_body.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
-            
-            return hmac.compare_digest(signature, expected_signature)
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Ошибка проверки подписи webhook: {e}")
-            return True  # В тестовом режиме пропускаем ошибки подписи
-    
-    def get_service_status(self) -> Dict[str, Any]:
-        """Получить статус сервиса платежей"""
+    except Exception as e:
+        logger.error(f"Error getting payment stats: {e}")
         return {
-            'status': 'online' if self.configured else 'offline',
-            'yukassa_configured': self.configured,
-            'test_mode': self.test_mode,
-            'shop_id': YUKASSA_SHOP_ID[:10] + '...' if YUKASSA_SHOP_ID else None,
-            'webhook_url': WEBHOOK_URL,
-            'packages_count': len(PAYMENT_PACKAGES),
-            'timestamp': datetime.now().isoformat()
+            'total_payments': 0,
+            'successful_payments': 0,
+            'pending_payments': 0,
+            'canceled_payments': 0,
+            'total_revenue': 0.0,
+            'average_payment': 0.0,
+            'plans_stats': [],
+            'success_rate': 0
         }
+    finally:
+        conn.close()
 
-# Создаем глобальный экземпляр сервиса
-payment_service = PaymentService()
+def get_revenue_by_period(days: int = 30) -> List[Dict[str, Any]]:
+    """Получить доходы за период"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as payments_count,
+                SUM(amount) as daily_revenue,
+                SUM(CASE WHEN status = 'completed' THEN stcoins_amount ELSE 0 END) as stcoins_sold
+            FROM payments 
+            WHERE created_at >= datetime('now', '-{} days')
+                AND status = 'completed'
+            GROUP BY DATE(created_at)
+            ORDER BY date DESC
+        """.format(days))
+        
+        rows = cursor.fetchall()
+        revenue_data = []
+        
+        for row in rows:
+            revenue_data.append({
+                'date': row[0],
+                'payments_count': row[1],
+                'revenue': row[2],
+                'stcoins_sold': row[3]
+            })
+        
+        return revenue_data
+        
+    except Exception as e:
+        logger.error(f"Error getting revenue data: {e}")
+        return []
+    finally:
+        conn.close()
 
-# Тестирование при запуске как основной модуль
+# ================================
+# ПЛАН-СПЕЦИФИЧНЫЕ ФУНКЦИИ
+# ================================
+
+def get_plan_purchases(plan_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+    """Получить покупки конкретного плана"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT payment_id, user_id, amount, status, stcoins_amount, created_at
+            FROM payments 
+            WHERE plan_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        """, (plan_id, limit))
+        
+        rows = cursor.fetchall()
+        purchases = []
+        
+        for row in rows:
+            purchases.append({
+                'payment_id': row[0],
+                'user_id': row[1],
+                'amount': row[2],
+                'status': row[3],
+                'stcoins_amount': row[4],
+                'created_at': row[5]
+            })
+        
+        return purchases
+                
+    except Exception as e:
+        logger.error(f"Error getting plan purchases: {e}")
+        return []
+    finally:
+        conn.close()
+
+def get_most_popular_plans(limit: int = 5) -> List[Dict[str, Any]]:
+    """Получить самые популярные планы"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                plan_id,
+                COUNT(*) as total_purchases,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_purchases,
+                SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as revenue,
+                AVG(CASE WHEN status = 'completed' THEN amount ELSE NULL END) as avg_amount
+            FROM payments 
+            WHERE plan_id IS NOT NULL
+            GROUP BY plan_id
+            ORDER BY successful_purchases DESC
+            LIMIT ?
+        """, (limit,))
+        
+        rows = cursor.fetchall()
+        popular_plans = []
+        
+        for row in rows:
+            popular_plans.append({
+                'plan_id': row[0],
+                'total_purchases': row[1],
+                'successful_purchases': row[2],
+                'revenue': row[3] or 0.0,
+                'average_amount': row[4] or 0.0,
+                'conversion_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0
+            })
+        
+        return popular_plans
+        
+    except Exception as e:
+        logger.error(f"Error getting popular plans: {e}")
+        return []
+    finally:
+        conn.close()
+
+# ================================
+# УТИЛИТЫ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ================================
+
+def check_payment_exists(payment_id: str) -> bool:
+    """Проверить существование платежа"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT 1 FROM payments WHERE payment_id = ?", (payment_id,))
+        return cursor.fetchone() is not None
+        
+    except Exception as e:
+        logger.error(f"Error checking payment existence: {e}")
+        return False
+    finally:
+        conn.close()
+
+def cleanup_old_pending_payments(days: int = 7):
+    """Очистка старых неоплаченных платежей"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE payments 
+            SET status = 'expired'
+            WHERE status = 'pending' 
+                AND created_at < datetime('now', '-{} days')
+        """.format(days))
+        
+        expired_count = cursor.rowcount
+        conn.commit()
+        
+        if expired_count > 0:
+            logger.info(f"Marked {expired_count} pending payments as expired")
+        
+        return expired_count
+                
+    except Exception as e:
+        logger.error(f"Error cleaning up old payments: {e}")
+        return 0
+    finally:
+        conn.close()
+
+def get_user_payment_history(user_id: int, status: str = None) -> List[Dict[str, Any]]:
+    """Получить историю платежей пользователя с фильтром"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        if status:
+            cursor.execute("""
+                SELECT payment_id, amount, currency, status, plan_id, 
+                       stcoins_amount, created_at
+                FROM payments 
+                WHERE user_id = ? AND status = ?
+                ORDER BY created_at DESC
+            """, (user_id, status))
+        else:
+            cursor.execute("""
+                SELECT payment_id, amount, currency, status, plan_id, 
+                       stcoins_amount, created_at
+                FROM payments 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+            """, (user_id,))
+        
+        rows = cursor.fetchall()
+        history = []
+        
+        for row in rows:
+            payment = {
+                'payment_id': row[0],
+                'amount': row[1],
+                'currency': row[2],
+                'status': row[3],
+                'plan_id': row[4] if len(row) > 4 else None,
+                'stcoins_amount': row[5] if len(row) > 5 else None,
+                'created_at': row[6] if len(row) > 6 else row[4]
+            }
+            history.append(payment)
+        
+        return history
+        
+    except Exception as e:
+        logger.error(f"Error getting user payment history: {e}")
+        return []
+    finally:
+        conn.close()
+
+# ================================
+# ИНИЦИАЛИЗАЦИЯ И МИГРАЦИИ
+# ================================
+
+def init_payment_tables():
+    """Инициализация таблиц платежей"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Создаем базовую таблицу платежей
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                payment_id TEXT UNIQUE NOT NULL,
+                user_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                currency TEXT DEFAULT 'RUB',
+                status TEXT NOT NULL,
+                plan_id TEXT,
+                stcoins_amount INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Создаем индексы для быстрого поиска
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_payments_plan_id ON payments(plan_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at)")
+        
+        conn.commit()
+        logger.info("Payment tables initialized successfully")
+            
+    except Exception as e:
+        logger.error(f"Error initializing payment tables: {e}")
+        raise
+    finally:
+        conn.close()
+
+def migrate_payment_schema():
+    """Миграция схемы платежей для поддержки новых полей"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Проверяем существующие колонки
+        cursor.execute("PRAGMA table_info(payments)")
+        existing_columns = [column[1] for column in cursor.fetchall()]
+        
+        # Добавляем новые колонки если их нет
+        if 'plan_id' not in existing_columns:
+            cursor.execute("ALTER TABLE payments ADD COLUMN plan_id TEXT")
+            logger.info("Added plan_id column to payments table")
+        
+        if 'stcoins_amount' not in existing_columns:
+            cursor.execute("ALTER TABLE payments ADD COLUMN stcoins_amount INTEGER")
+            logger.info("Added stcoins_amount column to payments table")
+        
+        if 'updated_at' not in existing_columns:
+            cursor.execute("ALTER TABLE payments ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            logger.info("Added updated_at column to payments table")
+        
+        conn.commit()
+        logger.info("Payment schema migration completed")
+        
+    except Exception as e:
+        logger.error(f"Error migrating payment schema: {e}")
+        raise
+    finally:
+        conn.close()
+
+# ================================
+# ЭКСПОРТ И ИМПОРТ
+# ================================
+
+def export_payments_csv(filename: str = None) -> str:
+    """Экспорт платежей в CSV"""
+    import csv
+    from io import StringIO
+    
+    if not filename:
+        filename = f"payments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT payment_id, user_id, amount, currency, status, 
+                   plan_id, stcoins_amount, created_at, updated_at
+            FROM payments
+            ORDER BY created_at DESC
+        """)
+        
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Заголовки
+        writer.writerow([
+            'Payment ID', 'User ID', 'Amount', 'Currency', 'Status',
+            'Plan ID', 'STcoins Amount', 'Created At', 'Updated At'
+        ])
+        
+        # Данные
+        for row in cursor.fetchall():
+            writer.writerow(row)
+        
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Сохраняем в файл если указан путь
+        if filename.endswith('.csv'):
+            with open(filename, 'w', newline='', encoding='utf-8') as f:
+                f.write(csv_content)
+            logger.info(f"Payments exported to {filename}")
+        
+        return csv_content
+            
+    except Exception as e:
+        logger.error(f"Error exporting payments: {e}")
+        return ""
+    finally:
+        conn.close()
+
+# ================================
+# ОСНОВНАЯ ИНИЦИАЛИЗАЦИЯ
+# ================================
+
+def init_payment_service():
+    """Инициализация сервиса платежей"""
+    try:
+        init_payment_tables()
+        migrate_payment_schema()
+        
+        # Очищаем старые неоплаченные платежи
+        cleanup_old_pending_payments(7)
+        
+        logger.info("Payment service initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Error initializing payment service: {e}")
+        raise
+
+# Автоматическая инициализация при импорте
+if __name__ != "__main__":
+    try:
+        init_payment_service()
+    except Exception as e:
+        logger.warning(f"Failed to auto-initialize payment service: {e}")
+
+# ================================
+# ТЕСТИРОВАНИЕ И ОТЛАДКА
+# ================================
+
 if __name__ == "__main__":
-    logger.info("🧪 Тестирование PaymentService...")
+    # Тестирование функций
+    print("🧪 Testing Payment Service...")
     
-    # Тест инициализации
-    service = PaymentService()
-    print(f"Конфигурация: {service.configured}")
-    print(f"Тестовый режим: {service.test_mode}")
-    
-    # Тест получения пакетов
-    packages = service.get_packages()
-    print(f"Пакеты: {json.dumps(packages, ensure_ascii=False, indent=2)}")
-    
-    # Тест статуса сервиса
-    status = service.get_service_status()
-    print(f"Статус сервиса: {json.dumps(status, ensure_ascii=False, indent=2)}")
-    
-    print("✅ Тестирование завершено")
+    try:
+        # Инициализация
+        init_payment_service()
+        print("✅ Payment service initialized")
+        
+        # Тестовые данные
+        test_payment_id = "test_payment_123"
+        test_user_id = 12345
+        
+        # Тест сохранения платежа
+        save_payment(
+            payment_id=test_payment_id,
+            user_id=test_user_id,
+            amount=150.0,
+            currency="RUB",
+            status="pending",
+            plan_id="basic",
+            stcoins_amount=100
+        )
+        print("✅ Payment saved")
+        
+        # Тест получения платежа
+        payment = get_payment(test_payment_id)
+        if payment:
+            print(f"✅ Payment retrieved: {payment['status']}")
+        
+        # Тест обновления статуса
+        update_payment_status(test_payment_id, "completed")
+        print("✅ Payment status updated")
+        
+        # Тест статистики
+        stats = get_payment_stats()
+        print(f"✅ Payment stats: {stats['total_payments']} total payments")
+        
+        # Очистка тестовых данных
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM payments WHERE payment_id = ?", (test_payment_id,))
+        conn.commit()
+        conn.close()
+        print("✅ Test data cleaned up")
+        
+        print("🎉 All tests passed!")
+        
+    except Exception as e:
+        print(f"❌ Test failed: {e}")

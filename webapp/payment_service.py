@@ -1,145 +1,351 @@
-import logging
-import asyncio
-from typing import Dict, Any, Optional
+# 🔄 ПОЛНАЯ ЗАМЕНА payment_service.py - исправление webhook и поиска платежей
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
+import logging
+import uuid
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+from yookassa import Configuration, Payment
+
 logger = logging.getLogger(__name__)
 
 class PaymentService:
-    def __init__(self):
-        self.payments = {}  # Временное хранилище для демонстрации
-        self.test_mode = True  # Режим тестирования для автоматической обработки платежей
+    """Сервис для работы с платежами через ЮKassa"""
     
-    async def create_payment(self, user_id: str, plan_id: str, return_url: str) -> Dict[str, Any]:
-        """
-        Создание нового платежа
-        """
+    def __init__(self, shop_id: str, secret_key: str, db, test_mode: bool = False):
+        """Инициализация сервиса платежей"""
+        self.db = db
+        self.test_mode = test_mode
+        
+        # Настройка ЮKassa
+        Configuration.account_id = shop_id
+        Configuration.secret_key = secret_key
+        
+        logger.info(f"ЮKassa настроена: shop_id={shop_id}")
+        
+        # Инициализация таблицы платежей
+        self._init_payments_db()
+    
+    def _init_payments_db(self):
+        """Инициализация/обновление таблицы платежей"""
         try:
-            # Генерируем уникальный ID платежа
-            payment_id = f"payment_{user_id}_{plan_id}_{int(asyncio.get_event_loop().time())}"
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
             
-            # Создаем запись о платеже
-            payment = {
-                "id": payment_id,
-                "user_id": user_id,
+            # Создаем таблицу если не существует
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    payment_id TEXT UNIQUE NOT NULL,
+                    yookassa_payment_id TEXT UNIQUE,
+                    user_id INTEGER NOT NULL,
+                    telegram_id INTEGER NOT NULL,
+                    plan_id TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    currency TEXT DEFAULT 'RUB',
+                    status TEXT DEFAULT 'pending',
+                    stcoins_amount INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    processed_at TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            """)
+            
+            # Проверяем существующие колонки
+            cursor.execute("PRAGMA table_info(payments)")
+            columns = [row[1] for row in cursor.fetchall()]
+            
+            # Добавляем отсутствующие колонки
+            required_columns = {
+                'yookassa_payment_id': 'TEXT UNIQUE',
+                'processed_at': 'TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+            }
+            
+            for column, column_type in required_columns.items():
+                if column not in columns:
+                    cursor.execute(f"ALTER TABLE payments ADD COLUMN {column} {column_type}")
+                    logger.info(f"✅ Добавлена колонка {column} в таблицу payments")
+            
+            # Создаем индексы для быстрого поиска
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_payments_yookassa_id 
+                ON payments(yookassa_payment_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_payments_telegram_id 
+                ON payments(telegram_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_payments_status 
+                ON payments(status)
+            """)
+            
+            conn.commit()
+            logger.info("✅ Таблица payments уже содержит все необходимые поля")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка инициализации таблицы payments: {e}")
+            if conn:
+                conn.rollback()
+            raise
+        finally:
+            if conn:
+                conn.close()
+        
+        logger.info("Payment schema migration completed")
+    
+    def create_payment(self, payment_id: str, amount: float, description: str, 
+                      return_url: str, user_id: int, telegram_id: int, 
+                      plan_id: str, stcoins_amount: int) -> Dict[str, Any]:
+        """Создание платежа через ЮKassa"""
+        
+        try:
+            logger.info(f"🔧 Создание платежа ЮKassa:")
+            logger.info(f"   payment_id: {payment_id}")
+            logger.info(f"   amount: {amount}")
+            logger.info(f"   return_url: {return_url}")
+            logger.info(f"   test_mode: {self.test_mode}")
+            
+            # Создаем платеж в ЮKassa
+            payment_data = {
+                "amount": {
+                    "value": str(amount),
+                    "currency": "RUB"
+                },
+                "confirmation": {
+                    "type": "redirect",
+                    "return_url": return_url
+                },
+                "capture": True,
+                "description": description,
+                "test": self.test_mode,
+                "metadata": {
+                    "payment_id": payment_id,
+                    "telegram_id": str(telegram_id),
+                    "plan_id": plan_id,
+                    "stcoins": str(stcoins_amount)
+                }
+            }
+            
+            logger.info(f"📤 Отправка данных в ЮKassa: {payment_data}")
+            
+            # Отправляем запрос в ЮKassa
+            payment = Payment.create(payment_data)
+            
+            logger.info(f"📥 Ответ от ЮKassa: {payment}")
+            
+            if not payment or not payment.id:
+                raise Exception("ЮKassa не вернула ID платежа")
+            
+            yookassa_payment_id = payment.id
+            payment_url = payment.confirmation.confirmation_url
+            
+            logger.info(f"✅ ЮKassa платеж создан: {yookassa_payment_id}")
+            logger.info(f"🔗 URL оплаты: {payment_url}")
+            
+            # 🚨 ИСПРАВЛЕНИЕ: Сохраняем платеж с yookassa_payment_id
+            self.save_payment(
+                payment_id=payment_id,
+                yookassa_payment_id=yookassa_payment_id,
+                user_id=user_id,
+                telegram_id=telegram_id,
+                plan_id=plan_id,
+                amount=amount,
+                stcoins_amount=stcoins_amount
+            )
+            
+            return {
+                "payment_id": payment_id,
+                "yookassa_payment_id": yookassa_payment_id,
+                "payment_url": payment_url,
+                "status": payment.status
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка создания платежа ЮKassa: {e}", exc_info=True)
+            raise
+    
+    def save_payment(self, payment_id: str, yookassa_payment_id: str, user_id: int, 
+                    telegram_id: int, plan_id: str, amount: float, stcoins_amount: int):
+        """Сохранение платежа в базу данных"""
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO payments (
+                    payment_id, yookassa_payment_id, user_id, telegram_id, 
+                    plan_id, amount, stcoins_amount, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            """, (
+                payment_id, yookassa_payment_id, user_id, telegram_id,
+                plan_id, amount, stcoins_amount, datetime.now()
+            ))
+            
+            conn.commit()
+            
+            logger.info(f"Payment saved: {payment_id} for user {telegram_id}, plan {plan_id}, amount {amount}, stcoins {stcoins_amount}")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка сохранения платежа: {e}")
+            if conn:
+                conn.rollback()
+            raise
+        finally:
+            if conn:
+                conn.close()
+    
+    def process_successful_payment(self, yookassa_payment_id: str) -> bool:
+        """Обработка успешного платежа"""
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # 🚨 ИСПРАВЛЕНИЕ: Ищем платеж по yookassa_payment_id
+            cursor.execute("""
+                SELECT payment_id, user_id, telegram_id, plan_id, amount, stcoins_amount, status
+                FROM payments 
+                WHERE yookassa_payment_id = ?
+            """, (yookassa_payment_id,))
+            
+            payment = cursor.fetchone()
+            
+            if not payment:
+                logger.error(f"Payment {yookassa_payment_id} not found in database")
+                return False
+            
+            payment_id, user_id, telegram_id, plan_id, amount, stcoins_amount, current_status = payment
+            
+            # Проверяем, не был ли платеж уже обработан
+            if current_status == 'succeeded':
+                logger.info(f"Payment {payment_id} already processed")
+                return True
+            
+            logger.info(f"💰 Обработка платежа: payment_id={payment_id}, stcoins={stcoins_amount}")
+            
+            # Обновляем статус платежа
+            cursor.execute("""
+                UPDATE payments 
+                SET status = 'succeeded', processed_at = ?, updated_at = ?
+                WHERE yookassa_payment_id = ?
+            """, (datetime.now(), datetime.now(), yookassa_payment_id))
+            
+            # 💰 Пополняем баланс пользователя
+            current_balance = self.db.get_user_balance(telegram_id)
+            new_balance = current_balance + stcoins_amount
+            
+            logger.info(f"💰 Пополнение баланса: {current_balance} + {stcoins_amount} = {new_balance}")
+            
+            # Обновляем баланс
+            cursor.execute("""
+                UPDATE users 
+                SET balance = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE telegram_id = ?
+            """, (new_balance, telegram_id))
+            
+            conn.commit()
+            
+            logger.info(f"✅ Платеж {payment_id} успешно обработан, баланс пользователя {telegram_id} обновлен: {new_balance}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка обработки платежа {yookassa_payment_id}: {e}", exc_info=True)
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if conn:
+                conn.close()
+    
+    def get_payment_status(self, payment_id: str, telegram_id: int) -> Optional[Dict[str, Any]]:
+        """Получение статуса платежа"""
+        
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT payment_id, yookassa_payment_id, plan_id, amount, 
+                       stcoins_amount, status, created_at, processed_at
+                FROM payments 
+                WHERE payment_id = ? AND telegram_id = ?
+            """, (payment_id, telegram_id))
+            
+            payment = cursor.fetchone()
+            
+            if not payment:
+                return None
+            
+            payment_id, yookassa_payment_id, plan_id, amount, stcoins_amount, status, created_at, processed_at = payment
+            
+            # Если платеж в статусе pending, проверяем актуальный статус в ЮKassa
+            if status == 'pending' and yookassa_payment_id:
+                try:
+                    yookassa_payment = Payment.find_one(yookassa_payment_id)
+                    if yookassa_payment and yookassa_payment.status == 'succeeded':
+                        # Обрабатываем успешный платеж
+                        self.process_successful_payment(yookassa_payment_id)
+                        status = 'succeeded'
+                except Exception as e:
+                    logger.error(f"Ошибка проверки статуса в ЮKassa: {e}")
+            
+            return {
+                "payment_id": payment_id,
+                "yookassa_payment_id": yookassa_payment_id,
                 "plan_id": plan_id,
-                "status": "pending",
-                "return_url": return_url,
-                "created_at": asyncio.get_event_loop().time()
-            }
-            
-            # Сохраняем платеж
-            self.payments[payment_id] = payment
-            
-            logger.info(f"📝 Создан платеж {payment_id} для пользователя {user_id}")
-            
-            return payment
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка создания платежа: {e}")
-            raise
-    
-    async def process_successful_payment(self, payment_id: str, user_id: str, plan_id: str) -> Dict[str, Any]:
-        """
-        Обработка успешного платежа
-        """
-        try:
-            if payment_id not in self.payments:
-                raise ValueError(f"Платеж {payment_id} не найден")
-            
-            payment = self.payments[payment_id]
-            payment["status"] = "completed"
-            payment["completed_at"] = asyncio.get_event_loop().time()
-            
-            logger.info(f"✅ Платеж {payment_id} успешно обработан")
-            
-            return payment
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка обработки платежа: {e}")
-            raise
-    
-    async def create_payment_and_process(self, user_id: str, plan_id: str, return_url: str):
-        """
-        Создание платежа с автоматической обработкой в тестовом режиме
-        """
-        # Создаем платеж
-        payment = await self.create_payment(user_id, plan_id, return_url)
-        
-        # В тестовом режиме - сразу обрабатываем как успешный
-        if self.test_mode:
-            await asyncio.sleep(2)  # Имитация задержки
-            await self.process_successful_payment(payment["id"], user_id, plan_id)
-        
-        return payment
-    
-    async def get_payment_status(self, payment_id: str) -> Dict[str, Any]:
-        """
-        Получение статуса платежа
-        В реальном приложении здесь будет интеграция с платежной системой
-        """
-        try:
-            # В демо-версии просто возвращаем случайный статус
-            import random
-            statuses = ["pending", "completed", "failed"]
-            status = random.choice(statuses)
-            
-            logger.info(f"📊 Получен статус платежа {payment_id}: {status}")
-            
-            return {
-                "payment_id": payment_id,
+                "amount": amount,
+                "stcoins_amount": stcoins_amount,
                 "status": status,
-                "amount": 100,  # Демо-сумма
-                "currency": "STcoin"
+                "created_at": created_at,
+                "processed_at": processed_at
             }
             
         except Exception as e:
-            logger.error(f"❌ Ошибка получения статуса платежа: {e}")
-            return {
-                "payment_id": payment_id,
-                "status": "error",
-                "error": str(e)
-            }
-
-def get_user_payments(user_id: int, limit: int = 10):
-    """Получить платежи пользователя"""
-    try:
-        import database
-        conn = database.get_connection()
-        cursor = conn.cursor()
+            logger.error(f"Ошибка получения статуса платежа {payment_id}: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+    
+    def get_user_payments(self, telegram_id: int, limit: int = 10) -> list:
+        """Получение списка платежей пользователя"""
         
-        cursor.execute("""
-            SELECT payment_id, user_id, amount, currency, status, 
-                   plan_id, stcoins_amount, created_at, updated_at
-            FROM payments 
-            WHERE user_id = ? 
-            ORDER BY created_at DESC 
-            LIMIT ?
-        """, (user_id, limit))
-        
-        rows = cursor.fetchall()
-        conn.close()
-        
-        payments = []
-        for row in rows:
-            payments.append({
-                'payment_id': row[0],
-                'user_id': row[1],
-                'amount': row[2],
-                'currency': row[3],
-                'status': row[4],
-                'plan_id': row[5],
-                'stcoins_amount': row[6],
-                'created_at': row[7],
-                'updated_at': row[8]
-            })
-        
-        return payments
-        
-    except Exception as e:
-        print(f"Ошибка получения платежей: {e}")
-        return []
-
-# Создаем экземпляр сервиса
-payment_service = PaymentService() 
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT payment_id, plan_id, amount, stcoins_amount, 
+                       status, created_at, processed_at
+                FROM payments 
+                WHERE telegram_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (telegram_id, limit))
+            
+            payments = []
+            for row in cursor.fetchall():
+                payment_id, plan_id, amount, stcoins_amount, status, created_at, processed_at = row
+                payments.append({
+                    "payment_id": payment_id,
+                    "plan_id": plan_id,
+                    "amount": amount,
+                    "stcoins_amount": stcoins_amount,
+                    "status": status,
+                    "created_at": created_at,
+                    "processed_at": processed_at
+                })
+            
+            return payments
+            
+        except Exception as e:
+            logger.error(f"Ошибка получения платежей пользователя {telegram_id}: {e}")
+            return []
+        finally:
+            if conn:
+                conn.close()

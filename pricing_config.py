@@ -1,5 +1,5 @@
 # 💰 Конфигурация тарифных планов МИШУРА
-# Файл: pricing_config.py (НОВЫЙ ФАЙЛ - создать в корневой директории)
+# Файл: pricing_config.py (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 
 # Основная конфигурация тарифных планов
 PRICING_PLANS = {
@@ -8,6 +8,8 @@ PRICING_PLANS = {
         "description": "Попробуйте нашего ИИ-стилиста",
         "consultations": 1,
         "stcoins": 10,
+        "coins": 10,  # ДОБАВЛЕНО: альтернативное название
+        "price": 20.00,  # ДОБАВЛЕНО: основное поле для цены
         "price_rub": 20,
         "price_kop": 2000,  # цена в копейках для ЮKassa
         "discount": 0,
@@ -20,6 +22,8 @@ PRICING_PLANS = {
         "description": "Отличный старт для регулярных консультаций", 
         "consultations": 10,
         "stcoins": 100,
+        "coins": 100,  # ДОБАВЛЕНО
+        "price": 150.00,  # ДОБАВЛЕНО
         "price_rub": 150,
         "price_kop": 15000,
         "discount": 25,  # экономия 25%
@@ -32,6 +36,8 @@ PRICING_PLANS = {
         "description": "Популярный выбор для стильной жизни",
         "consultations": 30,
         "stcoins": 300,
+        "coins": 300,  # ДОБАВЛЕНО
+        "price": 300.00,  # ДОБАВЛЕНО
         "price_rub": 300,
         "price_kop": 30000,
         "discount": 50,  # экономия 50%
@@ -44,6 +50,8 @@ PRICING_PLANS = {
         "description": "Максимум стиля и экономии",
         "consultations": 100,
         "stcoins": 1000,
+        "coins": 1000,  # ДОБАВЛЕНО
+        "price": 800.00,  # ДОБАВЛЕНО
         "price_rub": 800,
         "price_kop": 80000,
         "discount": 60,  # экономия 60%
@@ -82,7 +90,7 @@ def get_price_per_consultation(plan_id):
     plan = PRICING_PLANS.get(plan_id)
     if not plan:
         return None
-    return plan["price_rub"] / plan["consultations"]
+    return plan["price"] / plan["consultations"]
 
 def format_discount(plan_id):
     """Форматировать текст скидки"""
@@ -138,7 +146,7 @@ def format_plan_description(plan_id):
 • Персональные рекомендации
 • Сохранение в гардероб
 
-💰 **Стоимость:** {plan['price_rub']} руб.
+💰 **Стоимость:** {plan['price']} руб.
 📊 **За консультацию:** {price_per_consultation:.1f} руб.
 """
     
@@ -158,11 +166,11 @@ def format_pricing_summary():
     summary = ""
     
     for plan_id, plan in PRICING_PLANS.items():
-        price_per_consultation = plan["price_rub"] / plan["consultations"]
+        price_per_consultation = plan["price"] / plan["consultations"]
         
         summary += f"""
 {plan['color']} **{plan['name']}**
-• {plan['consultations']} консультаций за {plan['price_rub']} руб.
+• {plan['consultations']} консультаций за {plan['price']} руб.
 • {price_per_consultation:.1f} руб/консультация"""
         
         if plan['discount'] > 0:

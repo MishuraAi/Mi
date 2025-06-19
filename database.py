@@ -769,6 +769,198 @@ def get_wardrobe_stats(user_id: int) -> Dict[str, int]:
         logger.error(f"Непредвиденная ошибка при получении статистики гардероба для user_id={user_id}: {e_gen}", exc_info=True)
     return stats
 
+# --- ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ПЛАТЕЖЕЙ (НОВЫЕ) ---
+def get_payment_by_id(payment_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Получает платеж по payment_id (строковому ID).
+    
+    Args:
+        payment_id: Строковый ID платежа
+        
+    Returns:
+        Optional[Dict]: Информация о платеже или None
+    """
+    logger.debug(f"Запрос платежа по payment_id: {payment_id}")
+    
+    try:
+        with get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT payment_id, telegram_id, plan_id, amount, status, 
+                       stcoins_amount, yookassa_payment_id, created_at, updated_at
+                FROM payments 
+                WHERE payment_id = ?
+            """, (payment_id,))
+            
+            payment = cursor.fetchone()
+            
+            if payment:
+                result = dict(payment)
+                logger.info(f"Платеж {payment_id} найден")
+                return result
+            else:
+                logger.info(f"Платеж {payment_id} не найден")
+                return None
+                
+    except Exception as e:
+        logger.error(f"Ошибка получения платежа {payment_id}: {str(e)}")
+        return None
+
+def save_payment_record(payment_id: str, telegram_id: int, plan_id: str, 
+                       amount: float, stcoins_amount: int = 0, 
+                       yookassa_payment_id: str = None) -> bool:
+    """
+    Сохраняет запись о платеже в БД.
+    
+    Args:
+        payment_id: Уникальный ID платежа
+        telegram_id: Telegram ID пользователя  
+        plan_id: ID тарифного плана
+        amount: Сумма платежа в рублях
+        stcoins_amount: Количество STcoin для начисления
+        yookassa_payment_id: ID платежа в ЮKassa
+        
+    Returns:
+        bool: True если сохранено успешно
+    """
+    logger.info(f"Сохранение платежа: payment_id={payment_id}, telegram_id={telegram_id}, plan={plan_id}")
+    
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO payments 
+                (payment_id, telegram_id, plan_id, amount, stcoins_amount, yookassa_payment_id, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+            """, (payment_id, telegram_id, plan_id, amount, stcoins_amount, yookassa_payment_id))
+            
+            conn.commit()
+            logger.info(f"✅ Платеж {payment_id} сохранен в БД")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Ошибка сохранения платежа {payment_id}: {str(e)}")
+        return False
+
+def update_payment_status_by_id(payment_id: str, status: str) -> bool:
+    """
+    Обновляет статус платежа по payment_id.
+    
+    Args:
+        payment_id: ID платежа
+        status: Новый статус ('pending', 'succeeded', 'canceled', 'completed')
+        
+    Returns:
+        bool: True если обновлено успешно
+    """
+    logger.info(f"Обновление статуса платежа {payment_id} на '{status}'")
+    
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE payments 
+                SET status = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE payment_id = ?
+            """, (status, payment_id))
+            
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                logger.info(f"✅ Статус платежа {payment_id} обновлен на '{status}'")
+                return True
+            else:
+                logger.warning(f"⚠️ Платеж {payment_id} не найден для обновления статуса")
+                return False
+                
+    except Exception as e:
+        logger.error(f"❌ Ошибка обновления статуса платежа {payment_id}: {str(e)}")
+        return False
+
+def get_user_payments_list(telegram_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Получает список платежей пользователя.
+    
+    Args:
+        telegram_id: Telegram ID пользователя
+        limit: Максимальное количество записей
+        
+    Returns:
+        List[Dict]: Список платежей
+    """
+    logger.debug(f"Запрос платежей пользователя {telegram_id}, limit={limit}")
+    
+    try:
+        with get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT payment_id, plan_id, amount, stcoins_amount, status, created_at, updated_at
+                FROM payments 
+                WHERE telegram_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (telegram_id, limit))
+            
+            payments = cursor.fetchall()
+            
+            result = []
+            for payment in payments:
+                result.append(dict(payment))
+                
+            logger.info(f"Найдено {len(result)} платежей для пользователя {telegram_id}")
+            return result
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения платежей пользователя {telegram_id}: {str(e)}")
+        return []
+
+def create_test_user_with_balance(telegram_id: int = 5930269100, balance: int = 1000) -> bool:
+    """
+    Создает тестового пользователя с начальным балансом.
+    
+    Args:
+        telegram_id: Telegram ID пользователя
+        balance: Начальный баланс в STcoin
+        
+    Returns:
+        bool: True если создан успешно
+    """
+    logger.info(f"Создание тестового пользователя {telegram_id} с балансом {balance}")
+    
+    try:
+        # Проверяем существует ли пользователь
+        existing_user = get_user_by_telegram_id(telegram_id)
+        
+        if existing_user:
+            # Обновляем баланс существующему пользователю
+            success = update_user_balance(telegram_id, balance)
+            if success:
+                logger.info(f"✅ Баланс пользователя {telegram_id} обновлен до {balance}")
+                return True
+        else:
+            # Создаем нового пользователя
+            user_id = save_user(
+                telegram_id=telegram_id,
+                username="test_user",
+                first_name="Test",
+                last_name="User"
+            )
+            
+            if user_id:
+                # Устанавливаем баланс
+                success = update_user_balance(telegram_id, balance)
+                if success:
+                    logger.info(f"✅ Создан тестовый пользователь {telegram_id} с балансом {balance}")
+                    return True
+                    
+        return False
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка создания тестового пользователя: {str(e)}")
+        return False
+
 # Пример инициализации при импорте или запуске (если нужно)
 if __name__ == "__main__":
     logger.info("Запуск database.py как основного скрипта (для тестов или инициализации).")

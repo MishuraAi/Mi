@@ -349,25 +349,33 @@ class MishuraApp {
     }
 
     navigateToSection(section) {
-        console.log('�� app.js: Делегируем навигацию модульной системе');
-        // Делегируем навигацию модульной системе
+        console.log('🧭 app.js: Навигация в секцию:', section);
+        
+        // ИСПРАВЛЕНИЕ: Обновляем навигационные кнопки
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        const targetBtn = document.getElementById(`nav-${section}`);
+        if (targetBtn) {
+            targetBtn.classList.add('active');
+        }
+        
+        // ИСПРАВЛЕНИЕ: Обновляем текущую секцию
+        this.currentSection = section;
+        
+        // ИСПРАВЛЕНИЕ: Закрываем модалы
+        this.closeModal();
+        
+        // ИСПРАВЛЕНИЕ: Показываем нужную секцию
         if (window.MishuraApp && 
             window.MishuraApp.components && 
             window.MishuraApp.components.navigation) {
+            // Используем модульную навигацию если доступна
             window.MishuraApp.components.navigation.navigateTo(section);
         } else {
-            console.warn('Модульная навигация недоступна, используем fallback');
-            // Fallback на старую реализацию
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            const targetBtn = document.getElementById(`nav-${section}`);
-            if (targetBtn) {
-                targetBtn.classList.add('active');
-            }
-            this.currentSection = section;
+            // Fallback на прямой вызов
+            console.log('📄 Прямой показ секции:', section);
             this.showSection(section);
-            this.closeModal();
         }
     }
 
@@ -498,32 +506,52 @@ class MishuraApp {
         if (paymentSuccess === '1' && urlUserId) {
             const numericUserId = parseInt(urlUserId);
             if (numericUserId === this.getCurrentUserId()) {
-                this.showNotification('🎉 Проверяем пополнение баланса...', 'info', 3000);
+                console.log('🎉 Обрабатываем успешную оплату...');
                 
-                // ИСПРАВЛЕНИЕ: Реальная синхронизация баланса
+                // ИСПРАВЛЕНИЕ: Сразу переходим в секцию баланса
+                setTimeout(() => {
+                    console.log('🎯 Переходим в секцию баланса');
+                    this.navigateToSection('balance');
+                }, 500);
+                
+                // ИСПРАВЛЕНИЕ: Принудительно обновляем баланс через 2 секунды
                 setTimeout(async () => {
-                    const syncResult = await this.forceSyncBalance();
+                    console.log('🔄 Принудительное обновление баланса...');
+                    const oldBalance = this.userBalance;
                     
-                    if (syncResult.success && syncResult.difference > 0) {
-                        // Баланс успешно пополнен
-                        console.log('✅ Пополнение обработано успешно');
-                    } else if (syncResult.success && syncResult.difference === 0) {
-                        // Webhook еще не сработал, попробуем еще раз через 3 секунды
-                        setTimeout(() => this.forceSyncBalance(), 3000);
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/v1/users/${numericUserId}/balance?_t=${Date.now()}`);
+                        if (response.ok) {
+                            const balanceData = await response.json();
+                            const newBalance = balanceData.balance;
+                            
+                            // Обновляем локальный баланс
+                            this.userBalance = newBalance;
+                            this.saveUserData();
+                            
+                            // Обновляем отображение
+                            this.updateBalanceDisplay(newBalance);
+                            
+                            const difference = newBalance - oldBalance;
+                            if (difference > 0) {
+                                this.showNotification(`🎉 Баланс пополнен на ${difference} STcoin!`, 'success', 5000);
+                                this.triggerHapticFeedback('success');
+                            }
+                            
+                            console.log(`✅ Баланс обновлен: ${oldBalance} → ${newBalance} STcoin`);
+                        }
+                    } catch (error) {
+                        console.error('❌ Ошибка обновления баланса:', error);
+                        // Попытаемся еще раз через 5 секунд
+                        setTimeout(() => this.forceSyncBalance(), 5000);
                     }
                 }, 2000);
                 
-                // ИСПРАВЛЕНИЕ: Возврат в нужную секцию
-                if (returnTo === 'balance') {
-        setTimeout(() => {
-                        console.log('🎯 Возвращаемся в секцию баланса');
-                        this.navigateToSection('balance');
-                    }, 3000);
-                }
-                
-                // Очищаем URL от параметров
-                const newUrl = window.location.origin + window.location.pathname;
-                window.history.replaceState({}, document.title, newUrl);
+                // ИСПРАВЛЕНИЕ: Очищаем URL от параметров только после обработки
+                setTimeout(() => {
+                    const newUrl = window.location.origin + window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                }, 3000);
             }
         }
     }
@@ -759,14 +787,17 @@ class MishuraApp {
             const userId = this.getUserId();
             console.log('💰 Создание платежа для пользователя:', userId, 'план:', planId);
             
+            // ИСПРАВЛЕНИЕ: Правильный return_url для возврата в секцию баланса
+            const baseUrl = window.location.origin + window.location.pathname;
+            const returnUrl = `${baseUrl}?payment_success=1&user_id=${userId}&return_to=balance`;
+            
             const paymentData = {
-                telegram_id: userId,  // ИСПРАВЛЕНО: правильное поле
+                telegram_id: userId,
                 plan_id: planId,
                 username: 'webapp_user',
                 first_name: 'WebApp',
                 last_name: 'User',
-                // ИСПРАВЛЕНИЕ: Правильный return_url с параметрами возврата
-                return_url: window.location.href + '?payment_success=1&user_id=' + userId + '&return_to=balance'
+                return_url: returnUrl
             };
             
             console.log('📤 Отправляем данные платежа:', paymentData);
@@ -780,7 +811,8 @@ class MishuraApp {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 
             const result = await response.json();
@@ -796,9 +828,26 @@ class MishuraApp {
                     paymentModal.remove();
                 }
                 
-                // Открываем в том же окне для правильного возврата
-                window.location.href = result.payment_url;
-        } else {
+                // ИСПРАВЛЕНИЕ: В TEST_MODE не открываем внешний URL, а сразу обрабатываем
+                if (result.debug_info && result.debug_info.test_mode) {
+                    console.log('🧪 TEST MODE: имитируем возврат после оплаты');
+                    
+                    // Имитируем возврат с платежной системы через 2 секунды
+                    setTimeout(() => {
+                        // Добавляем параметры в URL
+                        const newUrl = returnUrl;
+                        window.history.pushState({}, document.title, newUrl);
+                        
+                        // Запускаем проверку успешной оплаты
+                        this.checkForSuccessfulPayment();
+                    }, 2000);
+                    
+                } else {
+                    // В реальном режиме открываем платежную страницу
+                    window.location.href = result.payment_url;
+                }
+                
+            } else {
                 throw new Error('Не получен URL для оплаты');
             }
 

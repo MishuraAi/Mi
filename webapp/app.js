@@ -756,12 +756,15 @@ class MishuraApp {
         try {
             this.showNotification('💳 Создаем платеж...', 'info');
             
-            const userId = this.getCurrentUserId();
+            const userId = this.getUserId();
             console.log('💰 Создание платежа для пользователя:', userId, 'план:', planId);
             
             const paymentData = {
-                user_id: userId,
+                telegram_id: userId,  // ИСПРАВЛЕНО: правильное поле
                 plan_id: planId,
+                username: 'webapp_user',
+                first_name: 'WebApp',
+                last_name: 'User',
                 // ИСПРАВЛЕНИЕ: Правильный return_url с параметрами возврата
                 return_url: window.location.href + '?payment_success=1&user_id=' + userId + '&return_to=balance'
             };
@@ -2150,6 +2153,81 @@ class MishuraApp {
                 }
             });
             console.log('✅ Кнопка сравнения образов починена');
+        }
+    }
+
+    // 1. ЗАМЕНА getUserId
+    getUserId() {
+        try {
+            console.log('🔍 Получение User ID...');
+            // 1. Проверяем Telegram WebApp
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user?.id) {
+                const telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
+                console.log('✅ Получен Telegram ID из WebApp:', telegramId);
+                return telegramId;
+            }
+            // 2. Проверяем URL параметры (для тестирования)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('user_id')) {
+                const userId = parseInt(urlParams.get('user_id'));
+                console.log('✅ Получен user_id из URL:', userId);
+                return userId;
+            }
+            // 3. Проверяем localStorage
+            const storedId = localStorage.getItem('telegram_user_id');
+            if (storedId && !isNaN(storedId)) {
+                const userId = parseInt(storedId);
+                console.log('✅ Получен user_id из localStorage:', userId);
+                return userId;
+            }
+            // 4. Тестовый ID для разработки
+            const testId = 5930269100;
+            console.warn('⚠️ Используется тестовый telegram_id:', testId);
+            // Сохраняем тестовый ID в localStorage для следующих запросов
+            localStorage.setItem('telegram_user_id', testId.toString());
+            return testId;
+        } catch (error) {
+            console.error('❌ Ошибка получения user ID:', error);
+            // Fallback: тестовый ID
+            const fallbackId = 5930269100;
+            console.warn('🔄 Используется fallback telegram_id:', fallbackId);
+            return fallbackId;
+        }
+    }
+
+    // 2. ЗАМЕНА createPayment
+    async createPayment(planId) {
+        try {
+            const telegramId = this.getUserId();
+            if (!telegramId) {
+                throw new Error('Не удалось получить telegram_id пользователя');
+            }
+            console.log('💳 Создание платежа:', { telegramId, planId });
+            const paymentData = {
+                telegram_id: telegramId,  // ВАЖНО: передаем правильный ключ
+                plan_id: planId,
+                username: 'webapp_user',
+                first_name: 'WebApp',
+                last_name: 'User'
+            };
+            console.log('📤 Отправляем данные платежа:', paymentData);
+            const response = await fetch(`${API_BASE_URL}/api/v1/payments/create`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(paymentData)
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            const result = await response.json();
+            console.log('✅ Платеж создан:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ Ошибка создания платежа:', error);
+            throw error;
         }
     }
 }

@@ -1,8 +1,8 @@
 -- ==========================================================================================
 -- ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 -- КОМПОНЕНТ: Схема базы данных SQLite (schema.sql)
--- ВЕРСИЯ: 1.2.1 - ИСПРАВЛЕНА ошибка с payment_provider_id
--- ДАТА ОБНОВЛЕНИЯ: 2025-06-18
+-- ВЕРСИЯ: 1.3.0 - ИСПРАВЛЕНА ошибка с user_id в payments
+-- ДАТА ОБНОВЛЕНИЯ: 2025-06-19
 -- ==========================================================================================
 
 -- Включаем поддержку внешних ключей
@@ -31,19 +31,20 @@ CREATE TABLE IF NOT EXISTS consultations (
     FOREIGN KEY (user_id) REFERENCES users(telegram_id)
 );
 
--- Таблица платежей (обновлена для ЮKassa)
+-- Таблица платежей (ИСПРАВЛЕНО: убрана ошибочная ссылка на user_id)
 CREATE TABLE IF NOT EXISTS payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     payment_id TEXT UNIQUE NOT NULL,
-    user_id INTEGER NOT NULL,
+    telegram_id INTEGER NOT NULL,  -- ИСПРАВЛЕНО: ссылается на telegram_id напрямую
     amount REAL NOT NULL,
     currency TEXT DEFAULT 'RUB',
     status TEXT DEFAULT 'pending',
     plan_id TEXT,
     stcoins_amount INTEGER DEFAULT 0,
+    yookassa_payment_id TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(telegram_id)
+    FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
 );
 
 -- Таблица гардероба пользователей
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS wardrobe (
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_consultations_user_id ON consultations(user_id);
 CREATE INDEX IF NOT EXISTS idx_consultations_created_at ON consultations(created_at);
-CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_telegram_id ON payments(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_payments_payment_id ON payments(payment_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 CREATE INDEX IF NOT EXISTS idx_wardrobe_user_id ON wardrobe(user_id);
@@ -74,7 +75,7 @@ VALUES (12345, 'demo_user', 'Демо', 'Пользователь', 200);
 -- Комментарии к таблицам
 -- users: Основная информация о пользователях Telegram
 -- consultations: История консультаций с ИИ-стилистом  
--- payments: Транзакции пополнения баланса через ЮKassa
+-- payments: Транзакции пополнения баланса через ЮKassa (ИСПРАВЛЕНО)
 -- wardrobe: Личный гардероб пользователей с сохраненными предметами одежды
 
 -- Версии схемы:
@@ -82,3 +83,4 @@ VALUES (12345, 'demo_user', 'Демо', 'Пользователь', 200);
 -- 1.1.0: Добавлена таблица payments для системы баланса
 -- 1.2.0: Добавлена колонка payment_provider_id для интеграции с ЮKassa
 -- 1.2.1: ИСПРАВЛЕНО - убран индекс на несуществующую колонку payment_provider_id
+-- 1.3.0: ИСПРАВЛЕНО - убрана ошибочная ссылка user_id в payments, используется telegram_id

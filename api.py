@@ -1053,6 +1053,260 @@ async def get_admin_stats():
         raise HTTPException(status_code=500, detail="Failed to get stats")
 
 # ================================
+# ОТЛАДОЧНЫЕ ЭНДПОИНТЫ
+# ================================
+
+@app.post("/api/v1/debug/fix-database")
+async def fix_database():
+    """Пересоздать базу данных с правильной схемой"""
+    try:
+        import os
+        from database import get_connection
+        
+        # Удаляем старую базу
+        if os.path.exists("styleai.db"):
+            os.remove("styleai.db")
+            logger.info("Старая база данных удалена")
+            
+        # Создаем новую с правильной схемой
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Правильная схема без ошибок
+        schema = """
+        -- Таблица пользователей
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id INTEGER UNIQUE NOT NULL,
+            username TEXT,
+            first_name TEXT,
+            last_name TEXT,
+            balance INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Таблица консультаций
+        CREATE TABLE IF NOT EXISTS consultations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            occasion TEXT,
+            preferences TEXT,
+            image_path TEXT,
+            advice TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(telegram_id)
+        );
+
+        -- Таблица гардероба
+        CREATE TABLE IF NOT EXISTS wardrobe (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            telegram_file_id TEXT NOT NULL,
+            item_name TEXT,
+            item_tag TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(telegram_id)
+        );
+
+        -- Таблица платежей (БЕЗ ОШИБОК)
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            payment_id TEXT UNIQUE NOT NULL,
+            telegram_id INTEGER NOT NULL,
+            plan_id TEXT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            status TEXT DEFAULT 'pending',
+            yookassa_payment_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
+        );
+
+        -- Индексы
+        CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
+        CREATE INDEX IF NOT EXISTS idx_consultations_user_id ON consultations(user_id);
+        CREATE INDEX IF NOT EXISTS idx_wardrobe_user_id ON wardrobe(user_id);
+        CREATE INDEX IF NOT EXISTS idx_payments_telegram_id ON payments(telegram_id);
+        CREATE INDEX IF NOT EXISTS idx_payments_payment_id ON payments(payment_id);
+        """
+        
+        cursor.executescript(schema)
+        conn.commit()
+        conn.close()
+        
+        logger.info("База данных пересоздана с правильной схемой")
+        
+        return {
+            "success": True,
+            "message": "База данных пересоздана с правильной схемой",
+            "tables_created": ["users", "consultations", "wardrobe", "payments"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка пересоздания базы данных: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/v1/debug/create-test-user-with-balance")
+async def create_test_user_with_balance():
+    """Создать тестового пользователя с балансом"""
+    try:
+        from database import save_user, update_user_balance, get_user_by_telegram_id
+        
+        test_telegram_id = 5930269100
+        
+        # Проверяем не существует ли уже
+        existing_user = get_user_by_telegram_id(test_telegram_id)
+        if existing_user:
+            # Просто добавляем баланс
+            update_user_balance(test_telegram_id, 1000)
+            return {
+                "success": True,
+                "user_id": existing_user['id'],
+                "telegram_id": test_telegram_id,
+                "balance_added": 1000,
+                "message": "Баланс тестового пользователя пополнен на 1000 STcoin",
+                "existing_user": True
+            }
+        
+        # Создаем нового пользователя
+        user_id = save_user(
+            telegram_id=test_telegram_id,
+            username="test_webapp_user",
+            first_name="Test",
+            last_name="User"
+        )
+        
+        # Добавляем баланс
+        update_user_balance(test_telegram_id, 1000)
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "telegram_id": test_telegram_id,
+            "balance": 1000,
+            "message": "Тестовый пользователь создан с балансом 1000 STcoin",
+            "existing_user": False
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка создания тестового пользователя: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get("/debug", response_class=HTMLResponse)
+async def debug_page():
+    """Простая HTML страница для диагностики"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>МИШУРА - Отладка</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+            .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; margin: 5px; cursor: pointer; }
+            .btn:hover { background: #0056b3; }
+            .result { background: #2d2d2d; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+            .success { border-left-color: #28a745; }
+            .error { border-left-color: #dc3545; }
+            h1 { color: #ffd700; }
+            h2 { color: #17a2b8; margin-top: 30px; }
+            pre { background: #000; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        </style>
+    </head>
+    <body>
+        <h1>🎭 МИШУРА - Панель отладки</h1>
+        
+        <h2>🔧 Быстрые исправления:</h2>
+        <button class="btn" onclick="fixDatabase()">🔧 Исправить базу данных</button>
+        <button class="btn" onclick="createTestUser()">👤 Создать тестового пользователя</button>
+        <button class="btn" onclick="testPayment()">💳 Тест платежа</button>
+        
+        <h2>🔍 Диагностика:</h2>
+        <button class="btn" onclick="checkHealth()">❤️ Проверить здоровье API</button>
+        <button class="btn" onclick="checkBalance()">💰 Проверить баланс</button>
+        
+        <div id="result" class="result" style="display: none;"></div>
+        
+        <script>
+            function showResult(data, isError = false) {
+                const result = document.getElementById('result');
+                result.style.display = 'block';
+                result.className = 'result ' + (isError ? 'error' : 'success');
+                result.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            }
+            
+            async function fixDatabase() {
+                try {
+                    const response = await fetch('/api/v1/debug/fix-database', { method: 'POST' });
+                    const result = await response.json();
+                    showResult(result, !result.success);
+                } catch (error) {
+                    showResult({error: error.message}, true);
+                }
+            }
+            
+            async function createTestUser() {
+                try {
+                    const response = await fetch('/api/v1/debug/create-test-user-with-balance', { method: 'POST' });
+                    const result = await response.json();
+                    showResult(result, !result.success);
+                } catch (error) {
+                    showResult({error: error.message}, true);
+                }
+            }
+            
+            async function testPayment() {
+                try {
+                    const testData = {
+                        telegram_id: 5930269100,
+                        plan_id: "basic",
+                        username: "test_user",
+                        first_name: "Test",
+                        last_name: "User"
+                    };
+                    
+                    const response = await fetch('/api/v1/payments/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(testData)
+                    });
+                    const result = await response.json();
+                    showResult(result, !response.ok);
+                } catch (error) {
+                    showResult({error: error.message}, true);
+                }
+            }
+            
+            async function checkHealth() {
+                try {
+                    const response = await fetch('/api/v1/health');
+                    const result = await response.json();
+                    showResult(result, result.status !== 'healthy');
+                } catch (error) {
+                    showResult({error: error.message}, true);
+                }
+            }
+            
+            async function checkBalance() {
+                try {
+                    const response = await fetch('/api/v1/users/5930269100/balance');
+                    const result = await response.json();
+                    showResult(result);
+                } catch (error) {
+                    showResult({error: error.message}, true);
+                }
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+# ================================
 # ЗАПУСК СЕРВЕРА
 # ================================
 

@@ -46,7 +46,7 @@ HOST = os.getenv('HOST', '0.0.0.0')
 # Режимы работы
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
-TEST_MODE = os.getenv('TEST_MODE', 'True').lower() == 'true'  # По умолчанию включен
+TEST_MODE = os.getenv('TEST_MODE', 'False').lower() == 'true'  # По умолчанию выключен
 
 # ЮKassa конфигурация  
 YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID')

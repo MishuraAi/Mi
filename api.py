@@ -18,6 +18,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Загружаем .env файл для локальной разработки
+load_dotenv()
 
 # ЮKassa
 from yookassa import Configuration, Payment
@@ -26,12 +30,52 @@ import yookassa
 # Локальные импорты
 import database
 import gemini_ai
-import payment_service
 from pricing_config import PRICING_PLANS, YOOKASSA_PLANS_CONFIG, get_plan_by_id, get_yookassa_config
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Конфигурация с поддержкой разных названий переменных
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or os.getenv('TELEGRAM_TOKEN')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+WEBAPP_URL = os.getenv('WEBAPP_URL', 'http://localhost:8001')
+PORT = int(os.getenv('PORT', os.getenv('BACKEND_PORT', 10000)))
+HOST = os.getenv('HOST', '0.0.0.0')
+
+# Режимы работы
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
+TEST_MODE = os.getenv('TEST_MODE', 'True').lower() == 'true'  # По умолчанию включен
+
+# ЮKassa конфигурация  
+YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID')
+YOOKASSA_SECRET_KEY = os.getenv('YOOKASSA_SECRET_KEY')
+
+# Логирование конфигурации
+logger.info(f"🔧 Конфигурация:")
+logger.info(f"   ENVIRONMENT: {ENVIRONMENT}")
+logger.info(f"   DEBUG: {DEBUG}")
+logger.info(f"   TEST_MODE: {TEST_MODE}")
+logger.info(f"   PORT: {PORT}")
+logger.info(f"   TELEGRAM_TOKEN: {'установлен' if TELEGRAM_TOKEN else 'НЕ УСТАНОВЛЕН'}")
+logger.info(f"   GEMINI_API_KEY: {'установлен' if GEMINI_API_KEY else 'НЕ УСТАНОВЛЕН'}")
+logger.info(f"   YOOKASSA: {'настроена' if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY else 'НЕ НАСТРОЕНА'}")
+
+# Проверяем критически важные переменные
+if not TELEGRAM_TOKEN:
+    logger.error("❌ TELEGRAM_BOT_TOKEN не установлен!")
+    
+if not GEMINI_API_KEY:
+    logger.error("❌ GEMINI_API_KEY не установлен!")
+    
+if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
+    logger.error("❌ ЮKassa переменные не установлены!")
+
+# В продакшн режиме TEST_MODE должен быть False для реальных платежей
+# Но пока оставляем True для тестирования
+if ENVIRONMENT == 'production':
+    logger.warning(f"🏭 ПРОДАКШН режим, TEST_MODE: {TEST_MODE}")
 
 # Создание FastAPI приложения
 app = FastAPI(
@@ -49,9 +93,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Конфигурация ЮKassa
-YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID')
-YOOKASSA_SECRET_KEY = os.getenv('YOOKASSA_SECRET_KEY')
+# Инициализация сервисов
+try:
+    if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
+        from payment_service import PaymentService
+        payment_service = PaymentService()
+        logger.info("✅ Payment service инициализирован")
+    else:
+        logger.error("❌ ЮKassa не настроена - отсутствуют SHOP_ID или SECRET_KEY")
+        payment_service = None
+except Exception as e:
+    logger.error(f"❌ Ошибка инициализации payment_service: {str(e)}")
+    payment_service = None
 
 if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
     Configuration.account_id = YOOKASSA_SHOP_ID
@@ -194,6 +247,39 @@ async def get_user_balance(user_id: int):
         logger.error(f"Error getting balance: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get balance")
 
+@app.get("/api/v1/users/{telegram_id}/balance")
+async def get_user_balance_endpoint(telegram_id: int):
+    try:
+        from database import get_user_balance, get_user_by_telegram_id
+        
+        # Проверяем существует ли пользователь
+        user = get_user_by_telegram_id(telegram_id)
+        if not user:
+            logger.warning(f"🔍 Пользователь telegram_id={telegram_id} не найден, создаем...")
+            
+            # Создаем пользователя с базовыми данными
+            from database import save_user
+            user_id = save_user(
+                telegram_id=telegram_id,
+                username=f'user_{telegram_id}',
+                first_name='User',
+                last_name=''
+            )
+            logger.info(f"✅ Пользователь создан: user_id={user_id}")
+        
+        balance = get_user_balance(telegram_id)
+        logger.info(f"💰 Баланс для telegram_id={telegram_id}: {balance}")
+        
+        return {
+            "telegram_id": telegram_id,
+            "balance": balance,
+            "currency": "STcoin"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения баланса для {telegram_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/v1/users/{user_id}/balance")
 async def update_user_balance(user_id: int, request: BalanceUpdateRequest):
     """Обновить баланс пользователя (админ)"""
@@ -255,81 +341,128 @@ async def get_pricing_plans():
 
 @app.post("/api/v1/payments/create")
 async def create_payment_endpoint(request: Request):
-    """Создание платежа с новыми тарифными планами"""
     try:
         data = await request.json()
-        user_id = data.get("user_id")
-        plan_id = data.get("plan_id")
-        return_url = data.get("return_url", "https://t.me/your_bot_name")
+        telegram_id = data.get('telegram_id')
+        plan_id = data.get('plan_id')
         
-        if not user_id or not plan_id:
-            raise HTTPException(status_code=400, detail="Missing user_id or plan_id")
+        logger.info(f"🔍 НАЧАЛО создания платежа:")
+        logger.info(f"   telegram_id: {telegram_id}")
+        logger.info(f"   plan_id: {plan_id}")
+        logger.info(f"   TEST_MODE: {TEST_MODE}")
+        logger.info(f"   payment_service: {'инициализирован' if payment_service else 'НЕ ИНИЦИАЛИЗИРОВАН'}")
         
-        # Проверяем существование плана
-        plan = get_plan_by_id(plan_id)
-        if not plan:
-            raise HTTPException(status_code=400, detail="Invalid plan_id")
+        if not telegram_id or not plan_id:
+            raise HTTPException(status_code=400, detail="Отсутствуют обязательные поля")
         
-        yookassa_config = get_yookassa_config(plan_id)
-        if not yookassa_config:
-            raise HTTPException(status_code=400, detail="YooKassa config not found")
+        if not payment_service:
+            logger.error("❌ Payment service не инициализирован")
+            raise HTTPException(status_code=500, detail="Платежная система недоступна")
         
-        # Создаем платеж в ЮKassa
-        payment = Payment.create({
-            "amount": yookassa_config["amount"],
-            "currency": "RUB",
-            "description": yookassa_config["description"],
-            "confirmation": {
-                "type": "redirect",
-                "return_url": return_url
-            },
-            "capture": True,
-            "metadata": {
-                "user_id": str(user_id),
-                "plan_id": plan_id,
-                "stcoins_reward": str(yookassa_config["stcoins_reward"]),
-                "consultations_count": str(plan["consultations"])
-            }
-        })
+        # КРИТИЧЕСКИ ВАЖНО: Создаем пользователя если его нет
+        from database import save_user, get_user_by_telegram_id
         
-        # Сохраняем платеж в базу
-        payment_service.save_payment(
-            payment_id=payment.id,
-            user_id=user_id,
-            amount=float(yookassa_config["amount"]["value"]),
-            currency="RUB",
-            status="pending",
-            plan_id=plan_id,
-            stcoins_amount=yookassa_config["stcoins_reward"]
-        )
+        # Проверяем существует ли пользователь
+        existing_user = get_user_by_telegram_id(telegram_id)
+        logger.info(f"🔍 Проверка пользователя: {existing_user}")
         
-        # ДЛЯ ТЕСТОВОГО РЕЖИМА: автоматически завершаем платеж
-        if YOOKASSA_SECRET_KEY and YOOKASSA_SECRET_KEY.startswith('test_'):
-            # Это тестовый режим - сразу зачисляем STcoin
-            database.update_user_balance(user_id, yookassa_config["stcoins_reward"])
-            payment_service.update_payment_status(payment.id, 'completed')
-            logger.info(f"🧪 TEST MODE: Auto-completed payment {payment.id}, added {yookassa_config['stcoins_reward']} STcoin")
+        if not existing_user:
+            # Создаем нового пользователя с базовыми данными
+            try:
+                user_id = save_user(
+                    telegram_id=telegram_id,
+                    username=data.get('username', f'user_{telegram_id}'),
+                    first_name=data.get('first_name', 'User'),
+                    last_name=data.get('last_name', '')
+                )
+                logger.info(f"✅ Создан новый пользователь: user_id={user_id}, telegram_id={telegram_id}")
+                
+                # Проверяем что пользователь действительно создался
+                verify_user = get_user_by_telegram_id(telegram_id)
+                logger.info(f"🔍 Верификация пользователя: {verify_user}")
+                
+            except Exception as user_error:
+                logger.error(f"❌ Ошибка создания пользователя: {str(user_error)}")
+                raise HTTPException(status_code=500, detail=f"Ошибка создания пользователя: {str(user_error)}")
+        else:
+            logger.info(f"✅ Пользователь уже существует: {existing_user}")
         
-        logger.info(f"Created payment {payment.id} for user {user_id}, plan {plan_id} ({plan['name']})")
+        # Получаем конфигурацию тарифа
+        from pricing_config import PRICING_PLANS
+        plan_config = PRICING_PLANS.get(plan_id)
+        if not plan_config:
+            logger.error(f"❌ Недопустимый план: {plan_id}")
+            raise HTTPException(status_code=400, detail="Недопустимый план")
+        
+        logger.info(f"💎 Тарифный план: {plan_config}")
+        
+        # Создаем платеж
+        try:
+            payment_data = await payment_service.create_payment(
+                amount=plan_config["price"],
+                description=f"МИШУРА - {plan_config['name']}",
+                telegram_id=telegram_id,
+                plan_id=plan_id
+            )
+            logger.info(f"💳 Платеж создан: {payment_data}")
+        except Exception as payment_error:
+            logger.error(f"❌ Ошибка создания платежа: {str(payment_error)}")
+            raise HTTPException(status_code=500, detail=f"Ошибка создания платежа: {str(payment_error)}")
+        
+        # В тестовом режиме автоматически завершаем платеж
+        if TEST_MODE:
+            payment_id = payment_data["payment_id"]
+            logger.info(f"🧪 TEST MODE: автоматическое завершение платежа {payment_id}")
+            
+            try:
+                # Обновляем статус платежа
+                payment_service.update_payment_status(payment_id, "succeeded")
+                logger.info(f"✅ Статус платежа обновлен на 'succeeded'")
+                
+                # Начисляем средства пользователю
+                from database import update_user_balance, get_user_balance
+                coins_to_add = plan_config["coins"]
+                
+                # Проверяем баланс ДО начисления
+                balance_before = get_user_balance(telegram_id)
+                logger.info(f"💰 Баланс ДО начисления: {balance_before}")
+                
+                update_user_balance(telegram_id, coins_to_add)
+                
+                # Проверяем баланс ПОСЛЕ начисления
+                balance_after = get_user_balance(telegram_id)
+                logger.info(f"💰 Баланс ПОСЛЕ начисления: {balance_after}")
+                
+                if balance_after > balance_before:
+                    logger.info(f"✅ Баланс успешно обновлен: +{coins_to_add} STcoin для telegram_id={telegram_id}")
+                else:
+                    logger.error(f"❌ Баланс НЕ обновился! До: {balance_before}, После: {balance_after}")
+                
+            except Exception as balance_error:
+                logger.error(f"❌ Ошибка в тестовом режиме: {str(balance_error)}")
+                # Не прерываем выполнение, так как платеж уже создан
+            
+            logger.info(f"🧪 TEST MODE: платеж {payment_id} автоматически завершен, добавлено {coins_to_add} STcoin")
+        
+        plan_name = plan_config["name"]
+        result_message = f"✅ Платеж создан: {payment_data['payment_id']} для пользователя {telegram_id}, план {plan_id} ({plan_name})"
+        logger.info(result_message)
         
         return {
-            "payment_id": payment.id,
-            "payment_url": payment.confirmation.confirmation_url,
-            "amount": yookassa_config["amount"]["value"],
-            "plan": {
-                "id": plan_id,
-                "name": plan["name"],
-                "consultations": plan["consultations"],
-                "stcoins": plan["stcoins"],
-                "price": plan["price_rub"]
+            **payment_data,
+            "debug_info": {
+                "test_mode": TEST_MODE,
+                "user_created": not bool(existing_user),
+                "plan_config": plan_config
             }
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating payment: {str(e)}")
-        raise HTTPException(status_code=500, detail="Payment creation failed")
+        error_msg = f"❌ Общая ошибка создания платежа: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/api/v1/payments/webhook")
 async def payment_webhook_endpoint(request: Request):

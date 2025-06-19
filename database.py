@@ -116,45 +116,61 @@ def init_db(schema_file_path: str = SCHEMA_FILE) -> bool:
     return False
 
 # --- ФУНКЦИИ ДЛЯ РАБОТЫ С ПОЛЬЗОВАТЕЛЯМИ ---
-def save_user(telegram_id: int, username: Optional[str], first_name: Optional[str], last_name: Optional[str]) -> bool:
-    """
-    Сохраняет или обновляет (по telegram_id) информацию о пользователе.
-
-    Args:
-        telegram_id (int): Telegram ID пользователя.
-        username (Optional[str]): Имя пользователя в Telegram.
-        first_name (Optional[str]): Имя пользователя.
-        last_name (Optional[str]): Фамилия пользователя.
-
-    Returns:
-        bool: True, если операция выполнена успешно, иначе False.
-
-    Raises:
-        sqlite3.Error: При ошибках выполнения SQL-запросов.
-    """
-    logger.debug(f"Сохранение/обновление пользователя: telegram_id={telegram_id}, username={username}")
-    sql = '''
-    INSERT INTO users (telegram_id, username, first_name, last_name, balance, created_at)
-    VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
-    ON CONFLICT(telegram_id) DO UPDATE SET
-        username = excluded.username,
-        first_name = excluded.first_name,
-        last_name = excluded.last_name;
-    '''
-    # Примечание: created_at не будет обновляться при конфликте, что обычно и требуется.
-    # Баланс при первой регистрации устанавливается в 0 (или другое значение по умолчанию из схемы).
+def get_user_by_telegram_id(telegram_id):
+    """Получить пользователя по telegram_id"""
     try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (telegram_id, username, first_name, last_name))
-            conn.commit()
-        logger.info(f"Пользователь telegram_id={telegram_id} успешно сохранен/обновлен.")
-        return True
-    except sqlite3.Error as e:
-        logger.error(f"Ошибка SQLite при сохранении пользователя telegram_id={telegram_id}: {e}", exc_info=True)
-    except Exception as e_gen:
-        logger.error(f"Непредвиденная ошибка при сохранении пользователя telegram_id={telegram_id}: {e_gen}", exc_info=True)
-    return False
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, telegram_id, username, first_name, last_name, created_at
+            FROM users 
+            WHERE telegram_id = ?
+        """, (telegram_id,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            return {
+                'id': user[0],
+                'telegram_id': user[1], 
+                'username': user[2],
+                'first_name': user[3],
+                'last_name': user[4],
+                'created_at': user[5]
+            }
+        return None
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения пользователя {telegram_id}: {str(e)}")
+        return None
+
+def save_user(telegram_id, username=None, first_name=None, last_name=None):
+    """Сохранить пользователя, возвращает user_id"""
+    try:
+        # Проверяем, не существует ли уже пользователь
+        existing_user = get_user_by_telegram_id(telegram_id)
+        if existing_user:
+            logger.info(f"Пользователь telegram_id={telegram_id} уже существует, возвращаем ID {existing_user['id']}")
+            return existing_user['id']
+        
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO users (telegram_id, username, first_name, last_name)
+            VALUES (?, ?, ?, ?)
+        """, (telegram_id, username, first_name, last_name))
+        
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Пользователь создан: ID={user_id}, telegram_id={telegram_id}")
+        return user_id
+        
+    except Exception as e:
+        logger.error(f"Ошибка сохранения пользователя {telegram_id}: {str(e)}")
+        raise
 
 def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
     """

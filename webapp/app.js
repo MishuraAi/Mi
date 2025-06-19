@@ -787,7 +787,7 @@ class MishuraApp {
             const userId = this.getUserId();
             console.log('💰 Создание платежа для пользователя:', userId, 'план:', planId);
             
-            // ИСПРАВЛЕНИЕ: Правильный return_url для возврата в секцию баланса
+            // Правильный return_url для возврата в секцию баланса
             const baseUrl = window.location.origin + window.location.pathname;
             const returnUrl = `${baseUrl}?payment_success=1&user_id=${userId}&return_to=balance`;
             
@@ -820,32 +820,16 @@ class MishuraApp {
 
             if (result.payment_url) {
                 this.showNotification('🚀 Переходим к оплате...', 'success');
-                console.log('🔗 Открываем URL:', result.payment_url);
+                console.log('🔗 Переходим на страницу оплаты ЮKassa:', result.payment_url);
                 
-                // Закрываем модал
+                // Закрываем модал платежей
                 const paymentModal = document.getElementById('payment-modal');
                 if (paymentModal) {
                     paymentModal.remove();
                 }
                 
-                // ИСПРАВЛЕНИЕ: В TEST_MODE не открываем внешний URL, а сразу обрабатываем
-                if (result.debug_info && result.debug_info.test_mode) {
-                    console.log('🧪 TEST MODE: имитируем возврат после оплаты');
-                    
-                    // Имитируем возврат с платежной системы через 2 секунды
-                    setTimeout(() => {
-                        // Добавляем параметры в URL
-                        const newUrl = returnUrl;
-                        window.history.pushState({}, document.title, newUrl);
-                        
-                        // Запускаем проверку успешной оплаты
-                        this.checkForSuccessfulPayment();
-                    }, 2000);
-                    
-                } else {
-                    // В реальном режиме открываем платежную страницу
-                    window.location.href = result.payment_url;
-                }
+                // ПРОДАКШН: Переходим на реальную страницу оплаты ЮKassa
+                window.location.href = result.payment_url;
                 
             } else {
                 throw new Error('Не получен URL для оплаты');

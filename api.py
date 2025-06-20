@@ -6,6 +6,7 @@ import logging
 import base64
 from datetime import datetime
 from typing import Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -25,13 +26,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Инициализация FastAPI
-app = FastAPI(title="🎭 МИШУРА API", version="2.6.1")
-
 # Глобальные переменные
-db = None
-gemini_ai = None
-payment_service = None
+db: Optional[MishuraDB] = None
+gemini_ai: Optional[MishuraGeminiAI] = None
+payment_service: Optional[PaymentService] = None
 
 # Конфигурация
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
@@ -75,37 +73,47 @@ class PaymentWebhookData(BaseModel):
     event: str
     object: dict
 
-# Инициализация компонентов
-try:
-    db = MishuraDB()
-    logger.info("✅ Database инициализирована")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global db, gemini_ai, payment_service
+    # Startup
+    logger.info("🚀 Запуск МИШУРА API Server...")
+    try:
+        db = MishuraDB()
+        logger.info("✅ Database инициализирована")
+        db.init_db()
+        logger.info("✅ Таблицы базы данных проверены/созданы")
+        
+        gemini_ai = MishuraGeminiAI()
+        logger.info("✅ Gemini AI инициализирован")
+        
+        if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
+            payment_service = PaymentService(
+                shop_id=YOOKASSA_SHOP_ID,
+                secret_key=YOOKASSA_SECRET_KEY,
+                db=db,
+                test_mode=TEST_MODE
+            )
+            logger.info("✅ Payment service инициализирован")
+        else:
+            logger.warning("⚠️ Payment service НЕ ИНИЦИАЛИЗИРОВАН - отсутствуют настройки ЮKassa")
+            payment_service = None
+
+    except Exception as e:
+        logger.error(f"❌ Критическая ошибка при запуске: {e}", exc_info=True)
+        # В случае ошибки при запуске, FastAPI не запустится корректно
+        raise
     
-    gemini_ai = MishuraGeminiAI()
-    logger.info("✅ Gemini AI инициализирован")
-    
-    if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
-        payment_service = PaymentService(
-            shop_id=YOOKASSA_SHOP_ID,
-            secret_key=YOOKASSA_SECRET_KEY,
-            db=db,
-            test_mode=TEST_MODE
-        )
-        logger.info("✅ Payment service инициализирован")
-    else:
-        logger.warning("⚠️ Payment service НЕ ИНИЦИАЛИЗИРОВАН - отсутствуют настройки ЮKassa")
-        payment_service = None
+    yield
+    # Shutdown (если нужно)
+    logger.info("🛑 Сервер МИШУРА API остановлен.")
 
-except Exception as e:
-    logger.error(f"❌ Ошибка инициализации: {e}")
-    raise
-
-if payment_service:
-    logger.info("ЮKassa configured successfully")
-else:
-    logger.warning("ЮKassa not configured - payments disabled")
-
-# Статические файлы
-app.mount("/static", StaticFiles(directory="webapp"), name="static")
+# Инициализация FastAPI
+app = FastAPI(
+    title="🎭 МИШУРА API", 
+    version="2.7.0",
+    lifespan=lifespan
+)
 
 # Тарифные планы
 PRICING_PLANS = {
@@ -175,6 +183,10 @@ async def home():
     with open("webapp/index.html", "r", encoding="utf-8") as f:
         content = f.read()
     return HTMLResponse(content=content)
+
+@app.head("/")
+async def head_root():
+    return Response(status_code=200)
 
 @app.get("/webapp")
 async def webapp_redirect():
@@ -553,18 +565,6 @@ async def get_payment_status(payment_id: str, telegram_id: int):
     except Exception as e:
         logger.error(f"Ошибка получения статуса платежа {payment_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-# === STARTUP EVENT ===
-
-@app.on_event("startup")
-async def startup_event():
-    """Инициализация при запуске"""
-    logger.info("🚀 Запуск МИШУРА API Server...")
-    
-    # Инициализация базы данных
-    if db:
-        db.init_db()
-        logger.info("✅ База данных инициализирована")
 
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")

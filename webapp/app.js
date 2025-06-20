@@ -139,9 +139,6 @@ class MishuraApp {
         if (paymentSuccess === 'true') {
             console.log('🎉 УСПЕШНАЯ ОПЛАТА ОБНАРУЖЕНА!');
             
-            // 🔔 Показать уведомление
-            this.showPaymentSuccessNotification();
-            
             // 🔄 Принудительное обновление баланса
             setTimeout(async () => {
                 await this.forceBalanceUpdate();

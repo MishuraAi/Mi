@@ -25,16 +25,16 @@ const FILE_CONFIG = {
 // ================================
 
 const PRICING_PLANS = {
-    test: {
-        name: "🧪 Тестовый пакет",
-        description: "Попробуйте нашего ИИ-стилиста",
+    mini: {
+        name: "🌱 Мини-пакет",
+        description: "Пробный тариф",
         consultations: 1,
         stcoins: 10,
         price: 20,
         discount: 0,
         popular: false,
         temporary: true,
-        color: "🟡",
+        color: "🌱",
         pricePerConsultation: 20.0
     },
     basic: {

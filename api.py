@@ -115,6 +115,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# 🔧 КРИТИЧЕСКИ ВАЖНО: Настройка статических файлов
+app.mount("/static", StaticFiles(directory="webapp"), name="static")
+
 # Тарифные планы
 PRICING_PLANS = {
     "mini": {
@@ -180,9 +183,17 @@ PRICING_PLANS = {
 @app.get("/")
 async def home():
     """Главная страница"""
-    with open("webapp/index.html", "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    html_path = os.path.join("webapp", "index.html")
+    
+    if not os.path.exists(html_path):
+        return HTMLResponse(content="❌ index.html не найден", status_code=404)
+    
+    try:
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+    except Exception as e:
+        return HTMLResponse(content=f"❌ Ошибка чтения файла: {e}", status_code=500)
 
 @app.head("/")
 async def head_root():

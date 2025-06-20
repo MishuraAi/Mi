@@ -1,8 +1,9 @@
-# 🔄 ПОЛНАЯ ЗАМЕНА api.py - критические исправления платежей
+# 🔄 ПОЛНАЯ ЗАМЕНА api.py - добавлены endpoints консультаций
 
 import os
 import uuid
 import logging
+import base64
 from datetime import datetime
 from typing import Optional
 
@@ -215,6 +216,20 @@ async def get_user_balance(telegram_id: int):
         logger.error(f"Ошибка получения баланса для {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/v1/users/{telegram_id}/balance/sync")
+async def sync_user_balance(telegram_id: int):
+    """Принудительная синхронизация баланса"""
+    try:
+        balance = db.get_user_balance(telegram_id)
+        return {
+            "telegram_id": telegram_id,
+            "balance": balance,
+            "synced_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Ошибка синхронизации баланса для {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/v1/pricing/plans")
 async def get_pricing_plans():
     """Получение тарифных планов"""
@@ -222,6 +237,144 @@ async def get_pricing_plans():
         "plans": PRICING_PLANS,
         "timestamp": datetime.now().isoformat()
     }
+
+# === КОНСУЛЬТАЦИИ ENDPOINTS ===
+
+@app.post("/api/v1/consultations/analyze")
+async def analyze_consultation(request: Request):
+    """Анализ одиночного образа"""
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        occasion = data.get('occasion', 'повседневный')
+        preferences = data.get('preferences', '')
+        image_data = data.get('image_data')
+        
+        logger.info(f"🎨 Запрос анализа от user_id: {user_id}, повод: {occasion}")
+        
+        if not image_data:
+            raise HTTPException(status_code=400, detail="Отсутствуют данные изображения")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Отсутствует user_id")
+        
+        # Проверяем баланс ДО анализа
+        current_balance = db.get_user_balance(user_id)
+        if current_balance < 10:
+            raise HTTPException(status_code=400, detail="Недостаточно STcoins для консультации")
+        
+        # Декодируем base64
+        try:
+            image_bytes = base64.b64decode(image_data)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Некорректные данные изображения")
+        
+        # Анализируем через Gemini AI
+        analysis = await gemini_ai.analyze_clothing_image(
+            image_data=image_bytes,
+            occasion=occasion,
+            preferences=preferences
+        )
+        
+        # Списываем баланс (10 STcoins)
+        new_balance = db.update_user_balance(user_id, -10, "consultation")
+        
+        # Сохраняем консультацию
+        consultation_id = db.save_consultation(
+            user_id=user_id,
+            occasion=occasion,
+            preferences=preferences,
+            image_path=None,
+            advice=analysis
+        )
+        
+        logger.info(f"✅ Анализ завершен: consultation_id={consultation_id}, новый баланс={new_balance}")
+        
+        return {
+            "consultation_id": consultation_id,
+            "analysis": analysis,
+            "balance": new_balance,
+            "cost": 10,
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка анализа: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
+
+@app.post("/api/v1/consultations/compare")
+async def compare_consultation(request: Request):
+    """Сравнение нескольких образов"""
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        occasion = data.get('occasion', 'повседневный')
+        preferences = data.get('preferences', '')
+        images_data = data.get('images_data', [])
+        
+        logger.info(f"⚖️ Запрос сравнения от user_id: {user_id}, изображений: {len(images_data)}")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Отсутствует user_id")
+        
+        if len(images_data) < 2:
+            raise HTTPException(status_code=400, detail="Нужно минимум 2 изображения для сравнения")
+        
+        if len(images_data) > 4:
+            raise HTTPException(status_code=400, detail="Максимум 4 изображения для сравнения")
+        
+        # Проверяем баланс ДО сравнения
+        current_balance = db.get_user_balance(user_id)
+        if current_balance < 15:
+            raise HTTPException(status_code=400, detail="Недостаточно STcoins для сравнения")
+        
+        # Декодируем base64
+        decoded_images = []
+        try:
+            for i, img_data in enumerate(images_data):
+                image_bytes = base64.b64decode(img_data)
+                decoded_images.append(image_bytes)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Некорректные данные изображения #{i+1}")
+        
+        # Сравниваем через Gemini AI
+        comparison = await gemini_ai.compare_clothing_images(
+            image_data_list=decoded_images,
+            occasion=occasion,
+            preferences=preferences
+        )
+        
+        # Списываем баланс (15 STcoins за сравнение)
+        new_balance = db.update_user_balance(user_id, -15, "comparison")
+        
+        # Сохраняем консультацию
+        consultation_id = db.save_consultation(
+            user_id=user_id,
+            occasion=occasion,
+            preferences=preferences,
+            image_path=None,
+            advice=comparison
+        )
+        
+        logger.info(f"✅ Сравнение завершено: consultation_id={consultation_id}, новый баланс={new_balance}")
+        
+        return {
+            "consultation_id": consultation_id,
+            "comparison": comparison,
+            "balance": new_balance,
+            "cost": 15,
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка сравнения: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка сравнения: {str(e)}")
+
+# === ПЛАТЕЖИ ENDPOINTS ===
 
 @app.post("/api/v1/payments/create")
 async def create_payment_endpoint(request: PaymentRequest):

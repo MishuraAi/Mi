@@ -288,11 +288,11 @@ async def analyze_consultation(request: Request):
             advice=analysis
         )
         
-        logger.info(f"✅ Анализ завершен: consultation_id={consultation_id}, новый баланс={new_balance}")
+        logger.info(f"✅ Анализ завершен для user_id: {user_id}. Стоимость: 10. Новый баланс: {new_balance}")
         
         return {
             "consultation_id": consultation_id,
-            "analysis": analysis,
+            "advice": analysis,
             "balance": new_balance,
             "cost": 10,
             "status": "success"
@@ -301,7 +301,7 @@ async def analyze_consultation(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Ошибка анализа: {e}", exc_info=True)
+        logger.error(f"Ошибка в /analyze: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
 
 @app.post("/api/v1/consultations/compare")
@@ -358,11 +358,11 @@ async def compare_consultation(request: Request):
             advice=comparison
         )
         
-        logger.info(f"✅ Сравнение завершено: consultation_id={consultation_id}, новый баланс={new_balance}")
+        logger.info(f"✅ Сравнение завершено для user_id: {user_id}. Стоимость: 15. Новый баланс: {new_balance}")
         
         return {
             "consultation_id": consultation_id,
-            "comparison": comparison,
+            "advice": comparison,
             "balance": new_balance,
             "cost": 15,
             "status": "success"

@@ -109,9 +109,23 @@ app.mount("/static", StaticFiles(directory="webapp"), name="static")
 
 # Тарифные планы
 PRICING_PLANS = {
+    "mini": {
+        "name": "🌱 Мини",
+        "description": "Пробный тариф",
+        "consultations": 1,
+        "stcoins": 10,
+        "coins": 10,
+        "price": 20.0,
+        "price_rub": 20,
+        "price_kop": 2000,
+        "discount": 0,
+        "popular": False,
+        "temporary": False,
+        "color": "🟢"
+    },
     "basic": {
         "name": "🌟 Базовый",
-        "description": "Отличный старт для регулярных консультаций",
+        "description": "Стартовый план",
         "consultations": 10,
         "stcoins": 100,
         "coins": 100,
@@ -123,30 +137,30 @@ PRICING_PLANS = {
         "temporary": False,
         "color": "🔵"
     },
-    "premium": {
-        "name": "💎 Премиум",
-        "description": "Для настоящих ценителей стиля",
-        "consultations": 25,
-        "stcoins": 250,
-        "coins": 250,
+    "standard": {
+        "name": "⭐ Стандарт",
+        "description": "Популярный (ПОПУЛЯРНЫЙ)",
+        "consultations": 30,
+        "stcoins": 300,
+        "coins": 300,
         "price": 300.0,
         "price_rub": 300,
         "price_kop": 30000,
-        "discount": 40,
+        "discount": 33,
         "popular": True,
         "temporary": False,
         "color": "🟣"
     },
-    "vip": {
-        "name": "👑 VIP",
-        "description": "Максимум возможностей для идеального стиля",
-        "consultations": 50,
-        "stcoins": 500,
-        "coins": 500,
-        "price": 500.0,
-        "price_rub": 500,
-        "price_kop": 50000,
-        "discount": 50,
+    "premium": {
+        "name": "💎 Премиум",
+        "description": "Выгодный план",
+        "consultations": 100,
+        "stcoins": 1000,
+        "coins": 1000,
+        "price": 800.0,
+        "price_rub": 800,
+        "price_kop": 80000,
+        "discount": 60,
         "popular": False,
         "temporary": False,
         "color": "🟡"

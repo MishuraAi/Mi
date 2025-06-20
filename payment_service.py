@@ -36,69 +36,62 @@ class PaymentService:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            # Создаем таблицу если не существует
+            # Проверяем существование таблицы payments
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS payments (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    payment_id TEXT UNIQUE NOT NULL,
-                    yookassa_payment_id TEXT UNIQUE,
-                    user_id INTEGER NOT NULL,
-                    telegram_id INTEGER NOT NULL,
-                    plan_id TEXT NOT NULL,
-                    amount REAL NOT NULL,
-                    currency TEXT DEFAULT 'RUB',
-                    status TEXT DEFAULT 'pending',
-                    stcoins_amount INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    processed_at TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (id)
-                )
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='payments'
             """)
+            
+            if not cursor.fetchone():
+                logger.info("Таблица payments не существует, будет создана через schema.sql")
+                return
             
             # Проверяем существующие колонки
             cursor.execute("PRAGMA table_info(payments)")
             columns = [row[1] for row in cursor.fetchall()]
+            logger.info(f"Существующие колонки в payments: {columns}")
             
-            # Добавляем отсутствующие колонки
+            # Добавляем отсутствующие колонки (без UNIQUE для существующих таблиц)
             required_columns = {
-                'yookassa_payment_id': 'TEXT UNIQUE',
+                'yookassa_payment_id': 'TEXT',
                 'processed_at': 'TIMESTAMP',
-                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'user_id': 'INTEGER',
+                'plan_id': 'TEXT',
+                'stcoins_amount': 'INTEGER DEFAULT 0'
             }
             
             for column, column_type in required_columns.items():
                 if column not in columns:
-                    cursor.execute(f"ALTER TABLE payments ADD COLUMN {column} {column_type}")
-                    logger.info(f"✅ Добавлена колонка {column} в таблицу payments")
+                    try:
+                        cursor.execute(f"ALTER TABLE payments ADD COLUMN {column} {column_type}")
+                        logger.info(f"✅ Добавлена колонка {column} в таблицу payments")
+                    except Exception as col_error:
+                        logger.warning(f"⚠️ Не удалось добавить колонку {column}: {col_error}")
             
-            # Создаем индексы для быстрого поиска
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_payments_yookassa_id 
-                ON payments(yookassa_payment_id)
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_payments_telegram_id 
-                ON payments(telegram_id)
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_payments_status 
-                ON payments(status)
-            """)
+            # Создаем индексы если их нет
+            index_queries = [
+                "CREATE INDEX IF NOT EXISTS idx_payments_yookassa_id ON payments(yookassa_payment_id)",
+                "CREATE INDEX IF NOT EXISTS idx_payments_telegram_id ON payments(telegram_id)",
+                "CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)"
+            ]
+            
+            for index_query in index_queries:
+                try:
+                    cursor.execute(index_query)
+                except Exception as idx_error:
+                    logger.warning(f"⚠️ Ошибка создания индекса: {idx_error}")
             
             conn.commit()
-            logger.info("✅ Таблица payments уже содержит все необходимые поля")
+            logger.info("✅ Таблица payments проверена и обновлена")
             
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации таблицы payments: {e}")
             if conn:
                 conn.rollback()
-            raise
         finally:
             if conn:
                 conn.close()
-        
-        logger.info("Payment schema migration completed")
     
     def create_payment(self, payment_id: str, amount: float, description: str, 
                       return_url: str, user_id: int, telegram_id: int, 

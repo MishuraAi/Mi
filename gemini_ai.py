@@ -361,6 +361,78 @@ async def compare_clothing_images(image_data_list: List[bytes], occasion: str, p
 # Версия модуля
 __version__ = "0.4.0"
 
+class MishuraGeminiAI:
+    """
+    Основной класс для работы с Gemini AI в проекте МИШУРА.
+    Обеспечивает совместимость с api.py и другими модулями.
+    """
+    
+    def __init__(self):
+        """Инициализация класса MishuraGeminiAI"""
+        self.cache_manager = cache_manager
+        self.model_name = VISION_MODEL
+        self.api_configured = API_CONFIGURED_SUCCESSFULLY
+        
+        if not self.api_configured:
+            logger.error("❌ Gemini API не сконфигурирован при инициализации класса")
+            raise RuntimeError("Gemini API не сконфигурирован")
+        
+        logger.info(f"✅ MishuraGeminiAI инициализирован с моделью: {self.model_name}")
+    
+    async def test_gemini_connection(self) -> bool:
+        """
+        Тестирует соединение с Gemini API.
+        
+        Returns:
+            bool: True если соединение успешно, False в случае ошибки
+        """
+        return await test_gemini_connection()
+    
+    async def analyze_clothing_image(self, image_data: bytes, occasion: str, 
+                                   preferences: Optional[str] = None) -> str:
+        """
+        Анализирует одежду на изображении с помощью Gemini AI.
+        
+        Args:
+            image_data: Бинарные данные изображения
+            occasion: Повод для консультации
+            preferences: Предпочтения пользователя
+            
+        Returns:
+            str: Анализ и рекомендации
+        """
+        return await analyze_clothing_image(image_data, occasion, preferences)
+    
+    async def compare_clothing_images(self, image_data_list: List[bytes], occasion: str, 
+                                    preferences: Optional[str] = None) -> str:
+        """
+        Сравнивает несколько образов одежды.
+        
+        Args:
+            image_data_list: Список бинарных данных изображений
+            occasion: Повод для консультации
+            preferences: Предпочтения пользователя
+            
+        Returns:
+            str: Сравнительный анализ
+        """
+        return await compare_clothing_images(image_data_list, occasion, preferences)
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Возвращает информацию о текущей модели.
+        
+        Returns:
+            dict: Информация о модели и статусе API
+        """
+        return {
+            "model_name": self.model_name,
+            "api_configured": self.api_configured,
+            "version": __version__,
+            "max_retries": MAX_RETRIES,
+            "retry_delay": RETRY_DELAY
+        }
+
 # Тестирование при прямом запуске
 if __name__ == "__main__":
     async def test_module():

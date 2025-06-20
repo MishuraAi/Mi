@@ -1437,23 +1437,23 @@
         </div>
     </section>
 
-    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ В ПРАВИЛЬНОМ ПОРЯДКЕ -->
-    <script src="logger.js"></script>
-    <script src="mock-api.js"></script>
-    <script src="api.js"></script>
-    <script src="js/config.js"></script>
+    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ С ПРАВИЛЬНЫМИ ПУТЯМИ -->
+    <script src="/static/logger.js"></script>
+    <script src="/static/mock-api.js"></script>
+    <script src="/static/api.js"></script>
+    <script src="/static/js/config.js"></script>
 
-    <!-- СНАЧАЛА ЗАГРУЖАЕМ ВСЕ МОДУЛИ: -->
-    <script src="js/utils/logger.js"></script>
-    <script src="js/utils/ui-helpers.js"></script>
-    <script src="js/components/navigation.js"></script>
-    <script src="js/components/modals.js"></script>
-    <script src="js/components/image-upload.js"></script>
-    <script src="js/features/consultation.js"></script>
-    <script src="js/features/comparison.js"></script>
+    <!-- МОДУЛИ -->
+    <script src="/static/js/utils/logger.js"></script>
+    <script src="/static/js/utils/ui-helpers.js"></script>
+    <script src="/static/js/components/navigation.js"></script>
+    <script src="/static/js/components/modals.js"></script>
+    <script src="/static/js/components/image-upload.js"></script>
+    <script src="/static/js/features/consultation.js"></script>
+    <script src="/static/js/features/comparison.js"></script>
 
-    <!-- ТОЛЬКО ПОТОМ ЗАГРУЖАЕМ ОСНОВНОЕ ПРИЛОЖЕНИЕ: -->
-    <script src="app.js"></script>
+    <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
+    <script src="/static/app.js"></script>
 
     <!-- Остальные скрипты... -->
     <script>

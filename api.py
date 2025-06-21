@@ -450,6 +450,9 @@ async def create_payment_endpoint(request: PaymentRequest):
             )
             logger.info(f"✅ Создан новый пользователь: user_id={user_id}, telegram_id={request.telegram_id}")
             
+            # 🚨 Устанавливаем начальный баланс 0 для нового пользователя
+            db.update_user_balance(request.telegram_id, 0, "initialization")
+            
             # Получаем созданного пользователя
             user = db.get_user_by_telegram_id(request.telegram_id)
         

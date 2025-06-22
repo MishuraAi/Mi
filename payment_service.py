@@ -4,6 +4,7 @@
 """
 🎭 МИШУРА - Payment Service
 Сервис для работы с платежами ЮKassa
+Версия 3.0.0 - Поддержка PostgreSQL
 """
 
 import os
@@ -31,59 +32,53 @@ class PaymentService:
         self._init_payments_db()
     
     def _init_payments_db(self):
-        """Инициализация/обновление таблицы платежей"""
+        """Универсальная инициализация таблицы платежей для SQLite и PostgreSQL"""
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            # Проверяем существование таблицы payments
-            cursor.execute("""
-                SELECT name FROM sqlite_master 
-                WHERE type='table' AND name='payments'
-            """)
+            # Универсальная проверка существования таблицы
+            db_config = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'})
+            db_type = db_config.get('type', 'sqlite')
             
-            if not cursor.fetchone():
-                logger.info("Таблица payments не существует, будет создана через schema.sql")
-                return
+            if db_type == 'postgresql':
+                # PostgreSQL: проверка через information_schema
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = 'payments'
+                    );
+                """)
+                table_exists = cursor.fetchone()[0]
+                
+                if table_exists:
+                    # Получаем колонки для PostgreSQL
+                    cursor.execute("""
+                        SELECT column_name FROM information_schema.columns 
+                        WHERE table_name = 'payments'
+                        ORDER BY ordinal_position
+                    """)
+                    columns = [row[0] for row in cursor.fetchall()]
+                    logger.info(f"PostgreSQL: Существующие колонки в payments: {columns}")
+                else:
+                    logger.info("PostgreSQL: Таблица payments будет создана через schema")
+                    
+            else:
+                # SQLite: оригинальная логика
+                cursor.execute("""
+                    SELECT name FROM sqlite_master 
+                    WHERE type='table' AND name='payments'
+                """)
+                table_exists = cursor.fetchone() is not None
+                
+                if table_exists:
+                    cursor.execute("PRAGMA table_info(payments)")
+                    columns = [row[1] for row in cursor.fetchall()]
+                    logger.info(f"SQLite: Существующие колонки в payments: {columns}")
+                else:
+                    logger.info("SQLite: Таблица payments будет создана через schema")
             
-            # Проверяем существующие колонки
-            cursor.execute("PRAGMA table_info(payments)")
-            columns = [row[1] for row in cursor.fetchall()]
-            logger.info(f"Существующие колонки в payments: {columns}")
-            
-            # Добавляем отсутствующие колонки (без UNIQUE для существующих таблиц)
-            required_columns = {
-                'yookassa_payment_id': 'TEXT',
-                'processed_at': 'TIMESTAMP',
-                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
-                'user_id': 'INTEGER',
-                'plan_id': 'TEXT',
-                'stcoins_amount': 'INTEGER DEFAULT 0'
-            }
-            
-            for column, column_type in required_columns.items():
-                if column not in columns:
-                    try:
-                        cursor.execute(f"ALTER TABLE payments ADD COLUMN {column} {column_type}")
-                        logger.info(f"✅ Добавлена колонка {column} в таблицу payments")
-                    except Exception as col_error:
-                        logger.warning(f"⚠️ Не удалось добавить колонку {column}: {col_error}")
-            
-            # Создаем индексы если их нет
-            index_queries = [
-                "CREATE INDEX IF NOT EXISTS idx_payments_yookassa_id ON payments(yookassa_payment_id)",
-                "CREATE INDEX IF NOT EXISTS idx_payments_telegram_id ON payments(telegram_id)",
-                "CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)"
-            ]
-            
-            for index_query in index_queries:
-                try:
-                    cursor.execute(index_query)
-                except Exception as idx_error:
-                    logger.warning(f"⚠️ Ошибка создания индекса: {idx_error}")
-            
-            conn.commit()
-            logger.info("✅ Таблица payments проверена и обновлена")
+            logger.info("✅ Таблица payments проверена")
             
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации таблицы payments: {e}")
@@ -92,6 +87,49 @@ class PaymentService:
         finally:
             if conn:
                 conn.close()
+    
+    def _execute_payment_query(self, query: str, params=None, fetch_one=False, fetch_all=False):
+        """Универсальный метод выполнения запросов для платежей"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            
+            # Адаптируем параметры для PostgreSQL
+            db_config = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'})
+            if db_config.get('type') == 'postgresql' and params:
+                # PostgreSQL использует %s вместо ?
+                query = query.replace('?', '%s')
+            
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            
+            result = None
+            if fetch_one:
+                result = cursor.fetchone()
+            elif fetch_all:
+                result = cursor.fetchall()
+            
+            if query.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
+                conn.commit()
+                if query.strip().upper().startswith('INSERT'):
+                    # Получаем ID последней вставленной записи
+                    if db_config.get('type') == 'postgresql':
+                        cursor.execute("SELECT LASTVAL()")
+                        result = cursor.fetchone()[0]
+                    else:
+                        result = cursor.lastrowid
+            
+            conn.close()
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка выполнения платежного запроса: {e}")
+            if 'conn' in locals():
+                conn.rollback()
+                conn.close()
+            raise
     
     def create_payment(self, payment_id: str, amount: float, description: str, 
                       return_url: str, user_id: int, telegram_id: int, 
@@ -169,47 +207,55 @@ class PaymentService:
         """Сохранение платежа в базу данных"""
         
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
+            db_config = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'})
             
-            cursor.execute("""
-                INSERT INTO payments (
-                    payment_id, yookassa_payment_id, user_id, telegram_id, 
-                    plan_id, amount, stcoins_amount, status, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-            """, (
-                payment_id, yookassa_payment_id, user_id, telegram_id,
-                plan_id, amount, stcoins_amount, datetime.now()
-            ))
-            
-            conn.commit()
+            if db_config.get('type') == 'postgresql':
+                query = """
+                    INSERT INTO payments (
+                        payment_id, yookassa_payment_id, user_id, telegram_id, 
+                        plan_id, amount, stcoins_amount, status, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s)
+                    RETURNING id
+                """
+                conn = self.db.get_connection()
+                cursor = conn.cursor()
+                cursor.execute(query, (
+                    payment_id, yookassa_payment_id, user_id, telegram_id,
+                    plan_id, amount, stcoins_amount, datetime.now()
+                ))
+                payment_db_id = cursor.fetchone()[0]
+                conn.commit()
+                conn.close()
+            else:
+                query = """
+                    INSERT INTO payments (
+                        payment_id, yookassa_payment_id, user_id, telegram_id, 
+                        plan_id, amount, stcoins_amount, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                """
+                payment_db_id = self._execute_payment_query(query, (
+                    payment_id, yookassa_payment_id, user_id, telegram_id,
+                    plan_id, amount, stcoins_amount, datetime.now()
+                ))
             
             logger.info(f"Payment saved: {payment_id} for user {telegram_id}, plan {plan_id}, amount {amount}, stcoins {stcoins_amount}")
             
         except Exception as e:
             logger.error(f"❌ Ошибка сохранения платежа: {e}")
-            if conn:
-                conn.rollback()
             raise
-        finally:
-            if conn:
-                conn.close()
     
     def process_successful_payment(self, yookassa_payment_id: str) -> bool:
         """🚨 КРИТИЧЕСКИ ВАЖНЫЙ МЕТОД: Обработка успешного платежа"""
         
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            
             # Ищем платеж по yookassa_payment_id
-            cursor.execute("""
+            find_query = """
                 SELECT payment_id, user_id, telegram_id, plan_id, amount, stcoins_amount, status
                 FROM payments 
                 WHERE yookassa_payment_id = ?
-            """, (yookassa_payment_id,))
+            """
             
-            payment = cursor.fetchone()
+            payment = self._execute_payment_query(find_query, (yookassa_payment_id,), fetch_one=True)
             
             if not payment:
                 logger.error(f"Payment {yookassa_payment_id} not found in database")
@@ -225,11 +271,13 @@ class PaymentService:
             logger.info(f"💰 Обработка платежа: payment_id={payment_id}, stcoins={stcoins_amount}")
             
             # Обновляем статус платежа
-            cursor.execute("""
+            update_payment_query = """
                 UPDATE payments 
                 SET status = 'succeeded', processed_at = ?, updated_at = ?
                 WHERE yookassa_payment_id = ?
-            """, (datetime.now(), datetime.now(), yookassa_payment_id))
+            """
+            
+            self._execute_payment_query(update_payment_query, (datetime.now(), datetime.now(), yookassa_payment_id))
             
             # 💰 КРИТИЧЕСКИ ВАЖНО: Пополняем баланс пользователя
             current_balance = self.db.get_user_balance(telegram_id)
@@ -237,14 +285,8 @@ class PaymentService:
             
             logger.info(f"💰 Пополнение баланса: {current_balance} + {stcoins_amount} = {new_balance}")
             
-            # Обновляем баланс напрямую в БД
-            cursor.execute("""
-                UPDATE users 
-                SET balance = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE telegram_id = ?
-            """, (new_balance, telegram_id))
-            
-            conn.commit()
+            # Обновляем баланс через универсальный метод БД
+            self.db.update_user_balance(telegram_id, stcoins_amount, "payment_processed")
             
             logger.info(f"✅ Платеж {payment_id} успешно обработан, баланс пользователя {telegram_id} обновлен: {new_balance}")
             
@@ -252,28 +294,20 @@ class PaymentService:
             
         except Exception as e:
             logger.error(f"❌ Ошибка обработки платежа {yookassa_payment_id}: {e}", exc_info=True)
-            if conn:
-                conn.rollback()
             return False
-        finally:
-            if conn:
-                conn.close()
     
     def get_payment_status(self, payment_id: str, telegram_id: int) -> dict:
         """Получение статуса платежа"""
         
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute("""
+            query = """
                 SELECT payment_id, yookassa_payment_id, plan_id, amount, 
                        stcoins_amount, status, created_at, processed_at
                 FROM payments 
                 WHERE payment_id = ? AND telegram_id = ?
-            """, (payment_id, telegram_id))
+            """
             
-            payment = cursor.fetchone()
+            payment = self._execute_payment_query(query, (payment_id, telegram_id), fetch_one=True)
             
             if not payment:
                 return None
@@ -305,28 +339,24 @@ class PaymentService:
         except Exception as e:
             logger.error(f"Ошибка получения статуса платежа {payment_id}: {e}")
             return None
-        finally:
-            if conn:
-                conn.close()
     
     def get_user_payments(self, telegram_id: int, limit: int = 10) -> list:
         """Получение списка платежей пользователя"""
         
         try:
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute("""
+            query = """
                 SELECT payment_id, plan_id, amount, stcoins_amount, 
                        status, created_at, processed_at
                 FROM payments 
                 WHERE telegram_id = ?
                 ORDER BY created_at DESC
                 LIMIT ?
-            """, (telegram_id, limit))
+            """
+            
+            payments_data = self._execute_payment_query(query, (telegram_id, limit), fetch_all=True)
             
             payments = []
-            for row in cursor.fetchall():
+            for row in payments_data:
                 payment_id, plan_id, amount, stcoins_amount, status, created_at, processed_at = row
                 payments.append({
                     "payment_id": payment_id,
@@ -343,6 +373,3 @@ class PaymentService:
         except Exception as e:
             logger.error(f"Ошибка получения платежей пользователя {telegram_id}: {e}")
             return []
-        finally:
-            if conn:
-                conn.close()

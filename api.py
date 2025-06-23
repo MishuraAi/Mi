@@ -5,14 +5,21 @@ import uuid
 import logging
 import base64
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from contextlib import asynccontextmanager
+import time
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 import uvicorn
 from pydantic import BaseModel
+import asyncio
+try:
+    import builtins
+    financial_service = getattr(builtins, 'GLOBAL_FINANCIAL_SERVICE', None)
+except:
+    financial_service = None
 
 # Импорты проекта
 from database import MishuraDB
@@ -30,6 +37,7 @@ logger = logging.getLogger(__name__)
 db: Optional[MishuraDB] = None
 gemini_ai: Optional[MishuraGeminiAI] = None
 payment_service: Optional[PaymentService] = None
+financial_service: Optional[Any] = None
 
 # Конфигурация
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
@@ -75,7 +83,7 @@ class PaymentWebhookData(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db, gemini_ai, payment_service
+    global db, gemini_ai, payment_service, financial_service
     # Startup
     logger.info("🚀 Запуск МИШУРА API Server...")
     try:
@@ -83,6 +91,44 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database инициализирована")
         db.init_db()
         logger.info("✅ Таблицы базы данных проверены/созданы")
+        
+        # 🔐 НОВОЕ: АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ФИНАНСОВОЙ БЕЗОПАСНОСТИ
+        try:
+            logger.info("🔐 Инициализация финансовой безопасности...")
+            
+            # Проверяем существование глобального financial_service
+            financial_service = getattr(__builtins__, 'GLOBAL_FINANCIAL_SERVICE', None)
+            if not financial_service:
+                # Создаем новый FinancialService
+                from financial_service import FinancialService
+                financial_service = FinancialService(db)
+                
+                # Инициализируем balance_locks для существующих пользователей
+                await _init_balance_locks_for_existing_users(db, financial_service)
+                
+                # Патчим database.py для backward compatibility
+                original_update_balance = db.update_user_balance
+                db.update_user_balance = financial_service.update_user_balance
+                db._original_update_user_balance = original_update_balance
+                
+                # Сохраняем глобально для других компонентов
+                try:
+                    import builtins
+                    builtins.GLOBAL_FINANCIAL_SERVICE = financial_service
+                except:
+                    __builtins__['GLOBAL_FINANCIAL_SERVICE'] = financial_service
+                
+                logger.info("✅ Финансовая безопасность инициализирована и установлена глобально")
+            else:
+                logger.info("✅ Финансовая безопасность уже загружена из глобальных")
+                
+            logger.info("✅ Financial service загружен")
+            
+        except Exception as e:
+            logger.error(f"❌ Критическая ошибка инициализации финансовой безопасности: {e}")
+            # НЕ останавливаем запуск - система может работать в fallback режиме
+            financial_service = None
+            logger.warning("⚠️ Система запущена БЕЗ финансовой безопасности (fallback режим)")
         
         gemini_ai = MishuraGeminiAI()
         logger.info("✅ Gemini AI инициализирован")
@@ -107,6 +153,50 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown (если нужно)
     logger.info("🛑 Сервер МИШУРА API остановлен.")
+
+# 🔐 НОВАЯ ФУНКЦИЯ: добавить ПОСЛЕ lifespan
+async def _init_balance_locks_for_existing_users(db, financial_service):
+    """Асинхронная инициализация balance_locks для существующих пользователей"""
+    
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        
+        # Получаем всех существующих пользователей
+        cursor.execute("SELECT telegram_id FROM users")
+        users = cursor.fetchall()
+        
+        initialized_count = 0
+        
+        for user in users:
+            telegram_id = user[0]
+            try:
+                if db.DB_CONFIG['type'] == 'postgresql':
+                    cursor.execute("""
+                        INSERT INTO balance_locks (telegram_id, version_number, last_updated)
+                        VALUES (%s, 1, CURRENT_TIMESTAMP)
+                        ON CONFLICT (telegram_id) DO NOTHING
+                    """, (telegram_id,))
+                else:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO balance_locks (telegram_id, version_number)
+                        VALUES (?, 1)
+                    """, (telegram_id,))
+                
+                if cursor.rowcount > 0:
+                    initialized_count += 1
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось инициализировать balance_lock для {telegram_id}: {e}")
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Balance locks инициализированы для {initialized_count} новых пользователей из {len(users)}")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка инициализации balance_locks: {e}")
+        # НЕ бросаем исключение - это не критично для запуска
 
 # Инициализация FastAPI
 app = FastAPI(
@@ -241,13 +331,31 @@ async def health_check():
 
 @app.get("/api/v1/users/{telegram_id}/balance")
 async def get_user_balance(telegram_id: int):
-    """Получение баланса пользователя"""
+    """Получение баланса пользователя с дополнительной информацией"""
     try:
         balance = db.get_user_balance(telegram_id)
+        
+        # Дополнительная информация если доступен financial_service
+        additional_info = {}
+        if financial_service:
+            try:
+                recent_transactions = financial_service.get_transaction_history(telegram_id, 5)
+                additional_info['recent_transactions_count'] = len(recent_transactions)
+                
+                if recent_transactions:
+                    additional_info['last_transaction'] = {
+                        'type': recent_transactions[0]['transaction_type'],
+                        'amount': recent_transactions[0]['amount'],
+                        'date': recent_transactions[0]['created_at']
+                    }
+            except Exception as e:
+                logger.warning(f"Could not get additional balance info: {e}")
+        
         return {
             "telegram_id": telegram_id,
             "balance": balance,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            **additional_info
         }
     except Exception as e:
         logger.error(f"Ошибка получения баланса для {telegram_id}: {e}")
@@ -279,7 +387,11 @@ async def get_pricing_plans():
 
 @app.post("/api/v1/consultations/analyze")
 async def analyze_consultation(request: Request):
-    """Анализ одиночного образа"""
+    """🔐 ЗАЩИЩЕННЫЙ анализ с финансовой безопасностью"""
+    
+    correlation_id = str(uuid.uuid4())
+    start_time = time.time()
+    
     try:
         data = await request.json()
         user_id = data.get('user_id')
@@ -287,63 +399,138 @@ async def analyze_consultation(request: Request):
         preferences = data.get('preferences', '')
         image_data = data.get('image_data')
         
-        logger.info(f"🎨 Запрос анализа от user_id: {user_id}, повод: {occasion}")
+        logger.info(f"🎨 [{correlation_id}] Запрос анализа от user_id: {user_id}")
         
-        if not image_data:
-            raise HTTPException(status_code=400, detail="Отсутствуют данные изображения")
+        if not image_data or not user_id:
+            raise HTTPException(status_code=400, detail="Отсутствуют обязательные данные")
         
-        if not user_id:
-            raise HTTPException(status_code=400, detail="Отсутствует user_id")
+        # 🔐 БЕЗОПАСНОЕ СПИСАНИЕ через financial_service
+        if financial_service:
+            operation_result = financial_service.safe_balance_operation(
+                telegram_id=user_id,
+                amount_change=-10,
+                operation_type="consultation_analysis",
+                correlation_id=correlation_id,
+                metadata={
+                    "occasion": occasion,
+                    "service": "single_analysis",
+                    "endpoint": "/consultations/analyze"
+                }
+            )
+            
+            if not operation_result['success']:
+                error_detail = operation_result.get('error', 'unknown_error')
+                
+                if error_detail == 'insufficient_balance':
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Недостаточно STcoins. Требуется: {operation_result.get('required', 10)}, доступно: {operation_result.get('available', 0)}"
+                    )
+                else:
+                    logger.error(f"[{correlation_id}] Financial operation failed: {operation_result}")
+                    raise HTTPException(status_code=500, detail="Ошибка обработки платежа")
+        else:
+            # Fallback на старую систему
+            current_balance = db.get_user_balance(user_id)
+            if current_balance < 10:
+                raise HTTPException(status_code=400, detail="Недостаточно STcoins для консультации")
         
-        # Проверяем баланс ДО анализа
-        current_balance = db.get_user_balance(user_id)
-        if current_balance < 10:
-            raise HTTPException(status_code=400, detail="Недостаточно STcoins для консультации")
-        
-        # Декодируем base64
+        # Декодируем base64 изображение
         try:
             image_bytes = base64.b64decode(image_data)
         except Exception as e:
+            # 🚨 КОМПЕНСАЦИЯ: возвращаем средства если изображение некорректно
+            if financial_service:
+                financial_service.safe_balance_operation(
+                    telegram_id=user_id,
+                    amount_change=10,
+                    operation_type="consultation_refund",
+                    correlation_id=correlation_id,
+                    metadata={"reason": "invalid_image"}
+                )
             raise HTTPException(status_code=400, detail="Некорректные данные изображения")
         
-        # Анализируем через Gemini AI
-        analysis = await gemini_ai.analyze_clothing_image(
-            image_data=image_bytes,
-            occasion=occasion,
-            preferences=preferences
-        )
+        # 🤖 АНАЛИЗ ЧЕРЕЗ GEMINI AI (с timeout и retry)
+        try:
+            analysis = await asyncio.wait_for(
+                gemini_ai.analyze_clothing_image(
+                    image_data=image_bytes,
+                    occasion=occasion,
+                    preferences=preferences
+                ),
+                timeout=60.0  # 60 секунд timeout
+            )
+        except asyncio.TimeoutError:
+            # 🚨 КОМПЕНСАЦИЯ: возвращаем средства при timeout
+            if financial_service:
+                financial_service.safe_balance_operation(
+                    telegram_id=user_id,
+                    amount_change=10,
+                    operation_type="consultation_refund",
+                    correlation_id=correlation_id,
+                    metadata={"reason": "gemini_timeout"}
+                )
+            raise HTTPException(status_code=504, detail="Анализ изображения занял слишком много времени")
         
-        # Списываем баланс (10 STcoins)
-        new_balance = db.update_user_balance(user_id, -10, "consultation")
+        except Exception as e:
+            # 🚨 КОМПЕНСАЦИЯ: возвращаем средства при ошибке Gemini
+            if financial_service:
+                financial_service.safe_balance_operation(
+                    telegram_id=user_id,
+                    amount_change=10,
+                    operation_type="consultation_refund",
+                    correlation_id=correlation_id,
+                    metadata={"reason": "gemini_error", "error": str(e)}
+                )
+            logger.error(f"[{correlation_id}] Gemini analysis failed: {e}")
+            raise HTTPException(status_code=500, detail="Сервис анализа временно недоступен")
         
-        # Сохраняем консультацию
-        consultation_id = db.save_consultation(
-            user_id=user_id,
-            occasion=occasion,
-            preferences=preferences,
-            image_path=None,
-            advice=analysis
-        )
+        # Списываем средства ТОЛЬКО если анализ успешен (в случае fallback)
+        if not financial_service:
+            new_balance = db.update_user_balance(user_id, -10, "consultation")
+        else:
+            new_balance = operation_result['new_balance']
         
-        logger.info(f"✅ Анализ завершен для user_id: {user_id}. Стоимость: 10. Новый баланс: {new_balance}")
+        # 📝 СОХРАНЯЕМ КОНСУЛЬТАЦИЮ
+        try:
+            consultation_id = db.save_consultation(
+                user_id=user_id,
+                occasion=occasion,
+                preferences=preferences,
+                image_path=None,
+                advice=analysis
+            )
+        except Exception as e:
+            logger.warning(f"[{correlation_id}] Failed to save consultation: {e}")
+            consultation_id = None
+        
+        processing_time = time.time() - start_time
+        
+        logger.info(f"✅ [{correlation_id}] Анализ завершен: user_id={user_id}, time={processing_time:.2f}s, balance={new_balance}")
         
         return {
             "consultation_id": consultation_id,
             "advice": analysis,
             "balance": new_balance,
             "cost": 10,
+            "correlation_id": correlation_id,
+            "processing_time": round(processing_time, 2),
             "status": "success"
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка в /analyze: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
+        logger.error(f"❌ [{correlation_id}] Критическая ошибка анализа: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 @app.post("/api/v1/consultations/compare")
 async def compare_consultation(request: Request):
-    """Сравнение нескольких образов"""
+    """🔐 ЗАЩИЩЕННОЕ сравнение с финансовой безопасностью"""
+    
+    correlation_id = str(uuid.uuid4())
+    start_time = time.time()
+    
     try:
         data = await request.json()
         user_id = data.get('user_id')
@@ -351,7 +538,7 @@ async def compare_consultation(request: Request):
         preferences = data.get('preferences', '')
         images_data = data.get('images_data', [])
         
-        logger.info(f"⚖️ Запрос сравнения от user_id: {user_id}, изображений: {len(images_data)}")
+        logger.info(f"⚖️ [{correlation_id}] Запрос сравнения от user_id: {user_id}, изображений: {len(images_data)}")
         
         if not user_id:
             raise HTTPException(status_code=400, detail="Отсутствует user_id")
@@ -362,54 +549,129 @@ async def compare_consultation(request: Request):
         if len(images_data) > 4:
             raise HTTPException(status_code=400, detail="Максимум 4 изображения для сравнения")
         
-        # Проверяем баланс ДО сравнения
-        current_balance = db.get_user_balance(user_id)
-        if current_balance < 15:
-            raise HTTPException(status_code=400, detail="Недостаточно STcoins для сравнения")
+        # 🔐 БЕЗОПАСНОЕ СПИСАНИЕ (15 STcoins за сравнение)
+        if financial_service:
+            operation_result = financial_service.safe_balance_operation(
+                telegram_id=user_id,
+                amount_change=-15,
+                operation_type="consultation_compare",
+                correlation_id=correlation_id,
+                metadata={
+                    "occasion": occasion,
+                    "service": "comparison",
+                    "images_count": len(images_data),
+                    "endpoint": "/consultations/compare"
+                }
+            )
+            
+            if not operation_result['success']:
+                error_detail = operation_result.get('error', 'unknown_error')
+                
+                if error_detail == 'insufficient_balance':
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Недостаточно STcoins для сравнения. Требуется: {operation_result.get('required', 15)}, доступно: {operation_result.get('available', 0)}"
+                    )
+                else:
+                    logger.error(f"[{correlation_id}] Financial operation failed: {operation_result}")
+                    raise HTTPException(status_code=500, detail="Ошибка обработки платежа")
+        else:
+            # Fallback на старую систему
+            current_balance = db.get_user_balance(user_id)
+            if current_balance < 15:
+                raise HTTPException(status_code=400, detail="Недостаточно STcoins для сравнения")
         
-        # Декодируем base64
+        # Декодируем base64 изображения
         decoded_images = []
         try:
             for i, img_data in enumerate(images_data):
                 image_bytes = base64.b64decode(img_data)
                 decoded_images.append(image_bytes)
         except Exception as e:
+            # 🚨 КОМПЕНСАЦИЯ: возвращаем средства если изображения некорректны
+            if financial_service:
+                financial_service.safe_balance_operation(
+                    telegram_id=user_id,
+                    amount_change=15,
+                    operation_type="consultation_refund",
+                    correlation_id=correlation_id,
+                    metadata={"reason": "invalid_images"}
+                )
             raise HTTPException(status_code=400, detail=f"Некорректные данные изображения #{i+1}")
         
-        # Сравниваем через Gemini AI
-        comparison = await gemini_ai.compare_clothing_images(
-            image_data_list=decoded_images,
-            occasion=occasion,
-            preferences=preferences
-        )
+        # 🤖 СРАВНЕНИЕ ЧЕРЕЗ GEMINI AI (с timeout)
+        try:
+            comparison = await asyncio.wait_for(
+                gemini_ai.compare_clothing_images(
+                    image_data_list=decoded_images,
+                    occasion=occasion,
+                    preferences=preferences
+                ),
+                timeout=90.0  # 90 секунд для сравнения
+            )
+        except asyncio.TimeoutError:
+            # 🚨 КОМПЕНСАЦИЯ: возвращаем средства при timeout
+            if financial_service:
+                financial_service.safe_balance_operation(
+                    telegram_id=user_id,
+                    amount_change=15,
+                    operation_type="consultation_refund",
+                    correlation_id=correlation_id,
+                    metadata={"reason": "gemini_timeout"}
+                )
+            raise HTTPException(status_code=504, detail="Сравнение изображений заняло слишком много времени")
         
-        # Списываем баланс (15 STcoins за сравнение)
-        new_balance = db.update_user_balance(user_id, -15, "comparison")
+        except Exception as e:
+            # 🚨 КОМПЕНСАЦИЯ: возвращаем средства при ошибке Gemini
+            if financial_service:
+                financial_service.safe_balance_operation(
+                    telegram_id=user_id,
+                    amount_change=15,
+                    operation_type="consultation_refund",
+                    correlation_id=correlation_id,
+                    metadata={"reason": "gemini_error", "error": str(e)}
+                )
+            logger.error(f"[{correlation_id}] Gemini comparison failed: {e}")
+            raise HTTPException(status_code=500, detail="Сервис сравнения временно недоступен")
         
-        # Сохраняем консультацию
-        consultation_id = db.save_consultation(
-            user_id=user_id,
-            occasion=occasion,
-            preferences=preferences,
-            image_path=None,
-            advice=comparison
-        )
+        # Списываем средства ТОЛЬКО если сравнение успешно (в случае fallback)
+        if not financial_service:
+            new_balance = db.update_user_balance(user_id, -15, "comparison")
+        else:
+            new_balance = operation_result['new_balance']
         
-        logger.info(f"✅ Сравнение завершено для user_id: {user_id}. Стоимость: 15. Новый баланс: {new_balance}")
+        # 📝 СОХРАНЯЕМ КОНСУЛЬТАЦИЮ
+        try:
+            consultation_id = db.save_consultation(
+                user_id=user_id,
+                occasion=occasion,
+                preferences=preferences,
+                image_path=None,
+                advice=comparison
+            )
+        except Exception as e:
+            logger.warning(f"[{correlation_id}] Failed to save consultation: {e}")
+            consultation_id = None
+        
+        processing_time = time.time() - start_time
+        
+        logger.info(f"✅ [{correlation_id}] Сравнение завершено: user_id={user_id}, time={processing_time:.2f}s, balance={new_balance}")
         
         return {
             "consultation_id": consultation_id,
             "advice": comparison,
             "balance": new_balance,
             "cost": 15,
+            "correlation_id": correlation_id,
+            "processing_time": round(processing_time, 2),
             "status": "success"
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Ошибка сравнения: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Ошибка сравнения: {str(e)}")
+        logger.error(f"❌ [{correlation_id}] Критическая ошибка сравнения: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 # === ПЛАТЕЖИ ENDPOINTS ===
 
@@ -578,6 +840,74 @@ async def get_payment_status(payment_id: str, telegram_id: int):
         raise
     except Exception as e:
         logger.error(f"Ошибка получения статуса платежа {payment_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/health/financial")
+async def financial_health_check():
+    """🔐 Real-time финансовый мониторинг"""
+    
+    try:
+        health = {
+            'timestamp': datetime.now().isoformat(),
+            'status': 'healthy',
+            'financial_service': 'available' if financial_service else 'unavailable',
+            'metrics': {},
+            'alerts': []
+        }
+        
+        if not financial_service:
+            health['status'] = 'degraded'
+            health['alerts'].append({
+                'level': 'warning',
+                'message': 'Financial service not available - using fallback'
+            })
+        else:
+            try:
+                stats = financial_service.get_financial_stats()
+                health['metrics'] = stats
+                
+                # Алерты на основе метрик
+                if stats.get('zero_balance_users', 0) > stats.get('total_users', 1) * 0.5:
+                    health['alerts'].append({
+                        'level': 'warning',
+                        'message': f"High number of zero balance users: {stats['zero_balance_users']}"
+                    })
+                
+            except Exception as e:
+                health['status'] = 'degraded'
+                health['alerts'].append({
+                    'level': 'error',
+                    'message': f'Error getting financial stats: {str(e)}'
+                })
+        
+        return health
+        
+    except Exception as e:
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'status': 'unhealthy',
+            'error': str(e)
+        }
+
+@app.get("/api/v1/users/{telegram_id}/transactions")
+async def get_user_transactions(telegram_id: int, limit: int = 20):
+    """Получение истории транзакций пользователя"""
+    
+    try:
+        if not financial_service:
+            raise HTTPException(status_code=503, detail="Financial service unavailable")
+        
+        transactions = financial_service.get_transaction_history(telegram_id, limit)
+        
+        return {
+            "telegram_id": telegram_id,
+            "transactions": transactions,
+            "count": len(transactions),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting transactions for {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

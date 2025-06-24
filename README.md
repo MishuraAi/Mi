@@ -48,7 +48,7 @@
 pip install -r requirements_minimal.txt
 
 # Установка переменной окружения
-export TELEGRAM_BOT_TOKEN='ваш_токен_бота'
+export TELEGRAM_TOKEN='ваш_токен_бота'
 
 # Запуск
 python minimal_bot.py
@@ -147,7 +147,7 @@ aiofiles==23.2.1
 
 ```env
 # Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+TELEGRAM_TOKEN=your_telegram_bot_token_here
 
 # Gemini AI Configuration  
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -315,10 +315,10 @@ python -c "import database; print(database.get_stats())"
 
 ### Распространенные проблемы:
 
-#### 1. Ошибка "TELEGRAM_BOT_TOKEN не найден"
+#### 1. Ошибка "TELEGRAM_TOKEN не найден"
 ```bash
 # Решение: Проверьте файл .env
-cat .env | grep TELEGRAM_BOT_TOKEN
+cat .env | grep TELEGRAM_TOKEN
 ```
 
 #### 2. Ошибка "GEMINI_API_KEY не найден"

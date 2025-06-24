@@ -28,7 +28,7 @@ def check_environment_variables():
     """Проверка обязательных переменных окружения"""
     
     required_vars = {
-        'TELEGRAM_BOT_TOKEN': 'Токен Telegram бота',
+        'TELEGRAM_TOKEN': 'Токен Telegram бота',
         'GEMINI_API_KEY': 'API ключ Google Gemini',
         'YOOKASSA_SHOP_ID': 'ID магазина ЮКассы',
         'YOOKASSA_SECRET_KEY': 'Секретный ключ ЮКассы'

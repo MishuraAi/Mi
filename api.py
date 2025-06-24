@@ -39,29 +39,32 @@ gemini_ai: Optional[MishuraGeminiAI] = None
 payment_service: Optional[PaymentService] = None
 financial_service: Optional[Any] = None
 
-# Конфигурация
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
-DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
-TEST_MODE = os.getenv('TEST_MODE', 'false').lower() == 'true'
-PORT = int(os.getenv('PORT', 8001))
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+# Переменные окружения
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID')
 YOOKASSA_SECRET_KEY = os.getenv('YOOKASSA_SECRET_KEY')
+WEBAPP_URL = os.getenv('WEBAPP_URL', 'https://style-ai-bot.onrender.com')
+PORT = int(os.getenv('PORT', 8001))
+DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+TEST_MODE = os.getenv('TEST_MODE', 'false').lower() == 'true'
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
 
-logger.info("🔧 Конфигурация:")
+# Логирование конфигурации
+logger.info("🔧 Конфигурация МИШУРА API:")
 logger.info(f"   ENVIRONMENT: {ENVIRONMENT}")
 logger.info(f"   DEBUG: {DEBUG}")
 logger.info(f"   TEST_MODE: {TEST_MODE}")
 logger.info(f"   PORT: {PORT}")
-logger.info(f"   TELEGRAM_TOKEN: {'установлен' if TELEGRAM_TOKEN else '❌ НЕ УСТАНОВЛЕН'}")
+logger.info(f"   WEBAPP_URL: {WEBAPP_URL}")
+logger.info(f"   TELEGRAM_BOT_TOKEN: {'установлен' if TELEGRAM_BOT_TOKEN else '❌ НЕ УСТАНОВЛЕН'}")
 logger.info(f"   GEMINI_API_KEY: {'установлен' if GEMINI_API_KEY else '❌ НЕ УСТАНОВЛЕН'}")
 logger.info(f"   YOOKASSA: {'настроена' if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY else '❌ НЕ НАСТРОЕНА'}")
 
-# Проверка критических настроек
+# Проверка обязательных переменных в продакшн
 if ENVIRONMENT == 'production':
-    if not TELEGRAM_TOKEN:
-        raise ValueError("❌ TELEGRAM_TOKEN обязателен в продакшн режиме")
+    if not TELEGRAM_BOT_TOKEN:
+        raise ValueError("❌ TELEGRAM_BOT_TOKEN обязателен в продакшн режиме")
     if not GEMINI_API_KEY:
         raise ValueError("❌ GEMINI_API_KEY обязателен в продакшн режиме")
     if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:

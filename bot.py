@@ -21,11 +21,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Переменные окружения
-TOKEN = os.getenv('TELEGRAM_TOKEN')
+TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 WEBAPP_URL = os.getenv('WEBAPP_URL', 'https://style-ai-bot.onrender.com')
 
 if not TOKEN:
-    raise ValueError("TELEGRAM_TOKEN не найден в переменных окружения")
+    raise ValueError("TELEGRAM_BOT_TOKEN не найден в переменных окружения")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Единственная команда - запуск веб-приложения"""

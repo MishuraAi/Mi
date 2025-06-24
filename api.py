@@ -910,6 +910,106 @@ async def get_user_transactions(telegram_id: int, limit: int = 20):
         logger.error(f"Error getting transactions for {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/v1/payments/recovery/process")
+async def recover_failed_payments():
+    """🔧 Восстановление платежей которые не были обработаны из-за ошибок"""
+    
+    if not payment_service:
+        raise HTTPException(status_code=503, detail="Payment service unavailable")
+    
+    try:
+        logger.info("🔧 Запуск восстановления неудачных платежей...")
+        
+        # 🔧 ИСПРАВЛЕНО: Используем правильный API database.py
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        
+        # Получаем платежи со статусом pending за последние 24 часа
+        if db.DB_CONFIG['type'] == 'postgresql':
+            recovery_query = """
+                SELECT yookassa_payment_id, telegram_id, stcoins_amount, created_at
+                FROM payments 
+                WHERE status = 'pending' 
+                AND created_at >= NOW() - INTERVAL '24 hours'
+                ORDER BY created_at DESC
+            """
+            cursor.execute(recovery_query)
+        else:
+            recovery_query = """
+                SELECT yookassa_payment_id, telegram_id, stcoins_amount, created_at
+                FROM payments 
+                WHERE status = 'pending' 
+                AND datetime(created_at) >= datetime('now', '-24 hours')
+                ORDER BY created_at DESC
+            """
+            cursor.execute(recovery_query)
+        
+        pending_payments = cursor.fetchall()
+        conn.close()
+        
+        recovered_count = 0
+        recovery_details = []
+        
+        for payment in pending_payments:
+            yookassa_payment_id = payment[0]
+            telegram_id = payment[1] 
+            stcoins_amount = payment[2]
+            created_at = payment[3]
+            
+            try:
+                # Проверяем статус в ЮKassa
+                from yookassa import Payment
+                yookassa_payment = Payment.find_one(yookassa_payment_id)
+                
+                if yookassa_payment and yookassa_payment.status == 'succeeded':
+                    logger.info(f"🔧 Восстанавливаем платеж: {yookassa_payment_id} для user {telegram_id}")
+                    
+                    # Обрабатываем платеж
+                    success = payment_service.process_successful_payment(yookassa_payment_id)
+                    
+                    if success:
+                        recovered_count += 1
+                        recovery_details.append({
+                            "yookassa_payment_id": yookassa_payment_id,
+                            "telegram_id": telegram_id,
+                            "stcoins_amount": stcoins_amount,
+                            "status": "recovered",
+                            "created_at": str(created_at)
+                        })
+                        logger.info(f"✅ Платеж {yookassa_payment_id} восстановлен")
+                    else:
+                        recovery_details.append({
+                            "yookassa_payment_id": yookassa_payment_id,
+                            "telegram_id": telegram_id,
+                            "stcoins_amount": stcoins_amount,
+                            "status": "failed_to_recover",
+                            "created_at": str(created_at)
+                        })
+                        
+            except Exception as e:
+                logger.error(f"❌ Ошибка восстановления платежа {yookassa_payment_id}: {e}")
+                recovery_details.append({
+                    "yookassa_payment_id": yookassa_payment_id,
+                    "telegram_id": telegram_id,
+                    "stcoins_amount": stcoins_amount,
+                    "status": "error",
+                    "error": str(e),
+                    "created_at": str(created_at)
+                })
+        
+        logger.info(f"🎉 Восстановление завершено: {recovered_count} платежей из {len(pending_payments)}")
+        
+        return {
+            "recovered_count": recovered_count,
+            "total_checked": len(pending_payments),
+            "recovery_details": recovery_details,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка восстановления платежей: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")
     

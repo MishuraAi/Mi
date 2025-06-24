@@ -275,7 +275,12 @@ class FinancialService:
             cursor = conn.cursor()
             
             # НАЧИНАЕМ БЫСТРУЮ ТРАНЗАКЦИЮ
-            conn.execute("BEGIN" if self.db.DB_CONFIG['type'] == 'sqlite' else "BEGIN")
+            if self.db.DB_CONFIG['type'] == 'postgresql':
+                # PostgreSQL: транзакции автоматически начинаются, ничего не делаем
+                pass
+            else:
+                # SQLite: используем conn.execute() как раньше
+                conn.execute("BEGIN")
             
             # 1. Получаем текущий баланс и версию (optimistic lock)
             user_data = self._get_user_with_version(conn, cursor, telegram_id)

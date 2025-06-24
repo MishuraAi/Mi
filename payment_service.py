@@ -284,11 +284,20 @@ class PaymentService:
             
             logger.info(f"[{correlation_id}] Payment data: user={payment_data['telegram_id']}, amount={payment_data['stcoins_amount']} STcoins")
             
-            # 🔐 БЕЗОПАСНОЕ ПОПОЛНЕНИЕ через FinancialService или fallback
+            # 🔐 БЕЗОПАСНОЕ ПОПОЛНЕНИЕ с автоматическим fallback
+            operation_result = False
+            
             if self.financial_service:
-                operation_result = self._safe_credit_balance(payment_data, correlation_id)
-            else:
-                logger.warning(f"[{correlation_id}] Using legacy payment processing")
+                try:
+                    logger.info(f"[{correlation_id}] Attempting safe credit via FinancialService")
+                    operation_result = self._safe_credit_balance(payment_data, correlation_id)
+                except Exception as e:
+                    logger.warning(f"[{correlation_id}] FinancialService failed: {e}, using legacy fallback")
+                    operation_result = False
+            
+            # 🔄 АВТОМАТИЧЕСКИЙ FALLBACK на legacy систему
+            if not operation_result:
+                logger.info(f"[{correlation_id}] Using legacy payment processing")
                 operation_result = self._legacy_credit_balance(payment_data)
             
             if operation_result:

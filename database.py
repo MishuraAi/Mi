@@ -2,10 +2,10 @@
 ==========================================================================================
 ПРОЕКТ: МИШУРА - Ваш персональный ИИ-Стилист
 КОМПОНЕНТ: Модуль Базы Данных (database.py)
-ВЕРСИЯ: 3.0.0 - POSTGRESQL SUPPORT
-ДАТА ОБНОВЛЕНИЯ: 2025-06-22
+ВЕРСИЯ: 3.1.0 - POSTGRESQL SUPPORT + PAYMENT METHODS
+ДАТА ОБНОВЛЕНИЯ: 2025-06-25
 
-НОВОЕ: Поддержка PostgreSQL для продакшена + SQLite для разработки
+НОВОЕ: Поддержка PostgreSQL для продакшена + SQLite для разработки + методы для платежей
 ==========================================================================================
 """
 import sqlite3
@@ -157,6 +157,7 @@ class MishuraDB:
             currency TEXT DEFAULT 'RUB',
             status TEXT DEFAULT 'pending',
             stcoins_amount INTEGER NOT NULL,
+            error_message TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             processed_at TIMESTAMP,
@@ -180,6 +181,7 @@ class MishuraDB:
         CREATE INDEX IF NOT EXISTS idx_consultations_user_id ON consultations(user_id);
         CREATE INDEX IF NOT EXISTS idx_payments_telegram_id ON payments(telegram_id);
         CREATE INDEX IF NOT EXISTS idx_payments_payment_id ON payments(payment_id);
+        CREATE INDEX IF NOT EXISTS idx_payments_yookassa_id ON payments(yookassa_payment_id);
         CREATE INDEX IF NOT EXISTS idx_wardrobe_user_id ON wardrobe(user_id);
         """
         
@@ -527,6 +529,203 @@ class MishuraDB:
             self.logger.error(f"❌ Ошибка получения консультаций для пользователя {user_id}: {e}")
             return []
 
+    # === ФУНКЦИИ ДЛЯ РАБОТЫ С ПЛАТЕЖАМИ ===
+
+    def save_payment(self, payment_id: str, user_id: int, telegram_id: int, 
+                    plan_id: str, amount: float, stcoins_amount: int, 
+                    status: str = 'pending') -> bool:
+        """Сохранить платеж в базу данных"""
+        try:
+            query = """
+                INSERT INTO payments (
+                    payment_id, user_id, telegram_id, plan_id, 
+                    amount, stcoins_amount, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """
+            
+            self._execute_query(query, (
+                payment_id, user_id, telegram_id, plan_id,
+                amount, stcoins_amount, status
+            ))
+            
+            self.logger.info(f"💾 Платеж сохранен: {payment_id}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка сохранения платежа {payment_id}: {e}")
+            return False
+
+    def update_payment_yookassa_id(self, payment_id: str, yookassa_payment_id: str) -> bool:
+        """Обновить ID платежа от ЮKassa"""
+        try:
+            query = """
+                UPDATE payments 
+                SET yookassa_payment_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE payment_id = ?
+            """
+            
+            self._execute_query(query, (yookassa_payment_id, payment_id))
+            
+            self.logger.info(f"🔄 Обновлен YooKassa ID: {payment_id} -> {yookassa_payment_id}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка обновления YooKassa ID {payment_id}: {e}")
+            return False
+
+    def update_payment_status(self, payment_id: str, status: str, 
+                             error_message: str = None) -> bool:
+        """Обновить статус платежа"""
+        try:
+            if error_message:
+                query = """
+                    UPDATE payments 
+                    SET status = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE payment_id = ?
+                """
+                params = (status, error_message, payment_id)
+            else:
+                query = """
+                    UPDATE payments 
+                    SET status = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE payment_id = ?
+                """
+                params = (status, payment_id)
+            
+            self._execute_query(query, params)
+            
+            if error_message:
+                self.logger.error(f"💳 Статус платежа {payment_id}: {status} - {error_message}")
+            else:
+                self.logger.info(f"💳 Статус платежа {payment_id}: {status}")
+                
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка обновления статуса платежа {payment_id}: {e}")
+            return False
+
+    def get_payment_by_yookassa_id(self, yookassa_payment_id: str) -> Optional[Dict[str, Any]]:
+        """Получить платеж по ID ЮKassa"""
+        try:
+            query = """
+                SELECT payment_id, user_id, telegram_id, plan_id, amount, 
+                       stcoins_amount, status, yookassa_payment_id, 
+                       created_at, updated_at, processed_at
+                FROM payments 
+                WHERE yookassa_payment_id = ?
+            """
+            
+            payment_row = self._execute_query(query, (yookassa_payment_id,), fetch_one=True)
+            
+            if payment_row:
+                return {
+                    'payment_id': payment_row[0],
+                    'user_id': payment_row[1],
+                    'telegram_id': payment_row[2],
+                    'plan_id': payment_row[3],
+                    'amount': payment_row[4],
+                    'stcoins_amount': payment_row[5],
+                    'status': payment_row[6],
+                    'yookassa_payment_id': payment_row[7],
+                    'created_at': payment_row[8],
+                    'updated_at': payment_row[9],
+                    'processed_at': payment_row[10]
+                }
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения платежа по YooKassa ID {yookassa_payment_id}: {e}")
+            return None
+
+    def get_payment_status(self, payment_id: str, telegram_id: int = None) -> Optional[Dict[str, Any]]:
+        """Получить статус платежа"""
+        try:
+            if telegram_id:
+                query = """
+                    SELECT payment_id, yookassa_payment_id, status, amount, 
+                           stcoins_amount, created_at, processed_at, error_message
+                    FROM payments 
+                    WHERE payment_id = ? AND telegram_id = ?
+                """
+                params = (payment_id, telegram_id)
+            else:
+                query = """
+                    SELECT payment_id, yookassa_payment_id, status, amount, 
+                           stcoins_amount, created_at, processed_at, error_message
+                    FROM payments 
+                    WHERE payment_id = ?
+                """
+                params = (payment_id,)
+            
+            payment_row = self._execute_query(query, params, fetch_one=True)
+            
+            if payment_row:
+                return {
+                    'payment_id': payment_row[0],
+                    'yookassa_payment_id': payment_row[1],
+                    'status': payment_row[2],
+                    'amount': payment_row[3],
+                    'stcoins_amount': payment_row[4],
+                    'created_at': payment_row[5],
+                    'processed_at': payment_row[6],
+                    'error_message': payment_row[7]
+                }
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения статуса платежа {payment_id}: {e}")
+            return None
+
+    def mark_payment_processed(self, payment_id: str) -> bool:
+        """Отметить платеж как обработанный"""
+        try:
+            query = """
+                UPDATE payments 
+                SET status = 'succeeded', processed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE payment_id = ?
+            """
+            
+            self._execute_query(query, (payment_id,))
+            
+            self.logger.info(f"✅ Платеж отмечен как обработанный: {payment_id}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка отметки платежа как обработанного {payment_id}: {e}")
+            return False
+
+    def get_pending_payments(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Получить ожидающие платежи для recovery"""
+        try:
+            query = """
+                SELECT payment_id, yookassa_payment_id, telegram_id, stcoins_amount, created_at
+                FROM payments 
+                WHERE status = 'pending' 
+                AND yookassa_payment_id IS NOT NULL
+                ORDER BY created_at DESC 
+                LIMIT ?
+            """
+            
+            payments = self._execute_query(query, (limit,), fetch_all=True)
+            
+            result = []
+            for payment in payments:
+                result.append({
+                    'payment_id': payment[0],
+                    'yookassa_payment_id': payment[1],
+                    'telegram_id': payment[2],
+                    'stcoins_amount': payment[3],
+                    'created_at': payment[4]
+                })
+            
+            self.logger.info(f"📋 Получено {len(result)} ожидающих платежей")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения ожидающих платежей: {e}")
+            return []
+
     def get_stats(self) -> Dict[str, int]:
         """Получает общую статистику сервиса МИШУРА"""
         self.logger.debug("Запрос общей статистики сервиса.")
@@ -546,6 +745,14 @@ class MishuraDB:
                 daily_query = "SELECT COUNT(*) FROM consultations WHERE created_at >= datetime('now', '-1 day')"
             
             stats['daily_consultations'] = self._execute_query(daily_query, fetch_one=True)[0]
+            
+            # Добавляем статистику платежей
+            try:
+                stats['total_payments_completed'] = self._execute_query(
+                    "SELECT COUNT(*) FROM payments WHERE status = 'succeeded'", fetch_one=True
+                )[0]
+            except:
+                stats['total_payments_completed'] = 0
             
             self.logger.info(f"Статистика сервиса МИШУРА получена: {stats}")
         except Exception as e:

@@ -1983,46 +1983,49 @@ class MishuraApp {
     getFeedbackModalHTML() {
         return `
             <div class="feedback-modal-content">
+                <!-- ИСПРАВЛЕНО: Компактный заголовок -->
                 <div class="feedback-header">
                     <div class="feedback-icon">💭</div>
-                    <h3 class="feedback-title">Поделитесь впечатлениями</h3>
+                    <h3 class="feedback-title">Ваше мнение важно!</h3>
                     <p class="feedback-description">
-                        Ваше мнение важно для нас!<br>
-                        <strong class="feedback-highlight">За подробный отзыв вы получите +1 консультацию</strong>
+                        <strong class="feedback-highlight">За отзыв 150+ символов = +10 STcoin</strong>
                     </p>
                 </div>
                 
-                <!-- Секция рейтинга -->
+                <!-- ИСПРАВЛЕНО: Компактная секция рейтинга -->
                 <div class="rating-section">
-                    <div class="rating-label">Как оцениваете консультацию?</div>
+                    <div class="rating-label">Оцените консультацию:</div>
                     <div class="rating-buttons">
                         <button class="rating-btn" data-rating="positive">
                             <span class="rating-icon">👍</span>
-                            <span class="rating-text">Понравилось</span>
+                            <span class="rating-text">Отлично</span>
                         </button>
                         <button class="rating-btn" data-rating="negative">
                             <span class="rating-icon">👎</span>
-                            <span class="rating-text">Не очень</span>
+                            <span class="rating-text">Плохо</span>
                         </button>
                     </div>
                 </div>
                 
+                <!-- ИСПРАВЛЕНО: Компактная форма -->
                 <div class="feedback-form">
                     <textarea 
                         id="feedback-textarea" 
                         class="feedback-textarea"
-                        placeholder="Расскажите, что вам понравилось или чего не хватило в консультации. Мы ценим честную обратную связь!"
+                        placeholder="Что понравилось? Что можно улучшить?"
                         maxlength="1000"
                     ></textarea>
+                    <!-- ИСПРАВЛЕНО: Выделенная метаинформация -->
                     <div class="feedback-meta">
                         <span id="feedback-char-count" class="char-count">0 символов</span>
-                        <span class="reward-hint">Минимум 150 для награды</span>
+                        <span class="reward-hint">Мин. 150 = бонус</span>
                     </div>
                 </div>
                 
+                <!-- ИСПРАВЛЕНО: Компактные кнопки -->
                 <div class="feedback-actions">
                     <button id="feedback-skip" class="btn-feedback btn-ghost">Позже</button>
-                    <button id="feedback-submit" class="btn-feedback btn-primary" disabled>Отправить отзыв</button>
+                    <button id="feedback-submit" class="btn-feedback btn-primary" disabled>Отправить</button>
                 </div>
             </div>
         `;
@@ -2059,14 +2062,21 @@ class MishuraApp {
             const length = textarea.value.length;
             charCount.textContent = `${length} символов`;
             
+            // ИСПРАВЛЕНО: Улучшенная видимость счетчика
             if (length >= this.feedbackSystem.minCharacters) {
                 charCount.classList.add('valid');
                 charCount.classList.remove('warning');
+                charCount.style.color = '#4CAF50';
+                charCount.style.fontWeight = '700';
             } else if (length >= 100) {
                 charCount.classList.add('warning');
                 charCount.classList.remove('valid');
+                charCount.style.color = '#ff9800';
+                charCount.style.fontWeight = '600';
             } else {
                 charCount.classList.remove('valid', 'warning');
+                charCount.style.color = '#ffffff';
+                charCount.style.fontWeight = '600';
             }
             
             this.updateFeedbackSubmitButton(textarea, submitBtn);

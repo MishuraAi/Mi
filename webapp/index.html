@@ -2,7 +2,11 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
     <title>✨ МИШУРА - Твой Стилист</title>
     <style>
         :root {
@@ -1222,6 +1226,8 @@
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s ease;
+            overflow: hidden;
+            padding: 10px;
         }
 
         .feedback-modal-overlay.active {
@@ -1235,13 +1241,15 @@
             border: 2px solid var(--border-gold);
             border-radius: 24px;
             padding: 32px;
-            max-width: 480px;
-            width: 90%;
+            max-width: min(420px, 95vw);
+            width: 100%;
             position: relative;
             animation: slideInUp 0.5s ease-out;
             box-shadow: var(--shadow-gold);
             transform: translateY(30px) scale(0.95);
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .feedback-modal-overlay.active .feedback-modal-content {
@@ -1250,7 +1258,7 @@
 
         .feedback-header {
             text-align: center;
-            margin-bottom: 28px;
+            margin-bottom: 20px;
         }
 
         .feedback-icon {
@@ -1266,15 +1274,15 @@
 
         .feedback-title {
             color: var(--text-gold);
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .feedback-description {
             color: var(--text-muted);
-            font-size: 1rem;
-            line-height: 1.5;
+            font-size: 0.9rem;
+            line-height: 1.4;
         }
 
         .feedback-highlight {
@@ -1284,8 +1292,8 @@
 
         /* Секция рейтинга */
         .rating-section {
-            margin-bottom: 24px;
-            padding: 20px;
+            margin-bottom: 16px;
+            padding: 16px;
             background: rgba(42, 42, 42, 0.6);
             border-radius: 16px;
             border: 1px solid var(--border-light);
@@ -1294,8 +1302,8 @@
         .rating-label {
             color: var(--text-light);
             font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 16px;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
             text-align: center;
         }
 
@@ -1307,8 +1315,8 @@
 
         .rating-btn {
             flex: 1;
-            max-width: 140px;
-            padding: 16px 20px;
+            max-width: 120px;
+            padding: 12px 16px;
             border: 2px solid var(--border-light);
             border-radius: 16px;
             background: transparent;
@@ -1316,11 +1324,11 @@
             cursor: pointer;
             transition: var(--transition);
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 0.85rem;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             position: relative;
             overflow: hidden;
         }
@@ -1369,19 +1377,19 @@
         }
 
         .rating-icon {
-            font-size: 2rem;
+            font-size: 1.5rem;
             transition: var(--transition);
         }
 
         .rating-text {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         /* Форма отзыва */
         .feedback-form {
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
 
         .feedback-textarea {
@@ -1391,8 +1399,8 @@
             border-radius: 16px;
             padding: 20px;
             color: var(--text-light);
-            font-size: 1rem;
-            min-height: 120px;
+            font-size: 0.9rem;
+            min-height: 100px;
             resize: vertical;
             transition: var(--transition);
             font-family: inherit;
@@ -1414,13 +1422,17 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin: 12px 0 24px 0;
-            font-size: 0.85rem;
+            margin: 8px 0 16px 0;
+            font-size: 0.8rem;
+            background: rgba(42, 42, 42, 0.8);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
         }
 
         .char-count {
-            color: var(--text-muted);
-            transition: var(--transition);
+            color: var(--text-light);
+            font-weight: 600;
         }
 
         .char-count.valid {
@@ -1444,7 +1456,7 @@
         }
 
         .btn-feedback {
-            padding: 14px 24px;
+            padding: 12px 20px;
             border-radius: 12px;
             font-weight: 700;
             cursor: pointer;
@@ -1453,7 +1465,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             flex: 1;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             position: relative;
             overflow: hidden;
         }
@@ -1534,36 +1546,139 @@
         /* Мобильная адаптация */
         @media (max-width: 480px) {
             .feedback-modal-content {
-                padding: 24px 20px;
-                margin: 10px;
-                width: calc(100% - 20px);
+                padding: 16px;
+                margin: 5px;
+                max-width: calc(100vw - 10px);
+                max-height: calc(100vh - 10px);
+                border-radius: 16px;
+            }
+            
+            .feedback-header {
+                margin-bottom: 16px;
+            }
+            
+            .feedback-icon {
+                font-size: 2rem;
+                margin-bottom: 8px;
+            }
+            
+            .feedback-title {
+                font-size: 1.1rem;
+            }
+            
+            .feedback-description {
+                font-size: 0.85rem;
+            }
+            
+            .rating-section {
+                padding: 12px;
+                margin-bottom: 12px;
             }
             
             .rating-buttons {
                 flex-direction: column;
-                gap: 12px;
+                gap: 8px;
             }
             
             .rating-btn {
                 max-width: none;
                 flex-direction: row;
                 justify-content: center;
-                padding: 12px 20px;
+                padding: 10px 16px;
             }
             
             .rating-icon {
-                font-size: 1.5rem;
+                font-size: 1.2rem;
             }
             
             .feedback-actions {
                 flex-direction: column;
-                gap: 12px;
+                gap: 8px;
             }
             
             .feedback-textarea {
-                min-height: 100px;
-                padding: 16px;
+                min-height: 80px;
+                padding: 12px;
+                font-size: 0.9rem;
             }
+            
+            .feedback-meta {
+                font-size: 0.75rem;
+                padding: 6px 10px;
+            }
+        }
+
+        /* ИСПРАВЛЕНИЕ: Очень узкие экраны */
+        @media (max-width: 360px) {
+            .feedback-modal-content {
+                padding: 12px;
+                font-size: 0.85rem;
+            }
+            
+            .feedback-textarea {
+                min-height: 70px;
+                padding: 10px;
+                font-size: 0.85rem;
+            }
+            
+            .btn-feedback {
+                padding: 10px 16px;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* ИСПРАВЛЕНИЕ: Landscape ориентация на мобильных */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .feedback-modal-content {
+                max-height: calc(100vh - 20px);
+                padding: 12px;
+            }
+            
+            .feedback-header {
+                margin-bottom: 10px;
+            }
+            
+            .feedback-icon {
+                font-size: 1.5rem;
+                margin-bottom: 4px;
+            }
+            
+            .rating-section {
+                padding: 8px;
+                margin-bottom: 8px;
+            }
+            
+            .feedback-textarea {
+                min-height: 60px;
+            }
+        }
+
+        /* КРИТИЧЕСКИ ВАЖНО: Инлайн стили против мерцания iOS */
+        html, body {
+            background-color: #000000 !important;
+            -webkit-tap-highlight-color: transparent !important;
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            user-select: none !important;
+        }
+
+        /* Предотвращаем мерцание при трансформациях */
+        *, *::before, *::after {
+            -webkit-backface-visibility: hidden !important;
+            -webkit-transform: translateZ(0) !important;
+            transform: translateZ(0) !important;
+            -webkit-perspective: 1000 !important;
+            perspective: 1000 !important;
+            -webkit-transform-style: preserve-3d !important;
+            transform-style: preserve-3d !important;
+        }
+
+        /* Предотвращаем белые вспышки при загрузке */
+        .loading-placeholder {
+            background-color: #000000 !important;
+            color: #d4af37 !important;
         }
     </style>
 </head>

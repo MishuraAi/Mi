@@ -110,6 +110,9 @@ class MishuraApp {
             this.setupBasicEventHandlers();
             this.loadUserData();
             
+            // 🆕 ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ОТЗЫВОВ
+            this.initFeedbackSystem();
+            
             // 🆕 ЗАПУСК СИНХРОНИЗАЦИИ БАЛАНСА
             this.startBalanceSync();
             
@@ -122,6 +125,8 @@ class MishuraApp {
         } catch (error) {
             console.error('❌ Ошибка инициализации:', error);
         }
+
+        this.lastConsultationId = null; // Для отслеживания текущей консультации
     }
 
     // 🚨 ИСПРАВЛЕНИЕ 1: Правильная проверка успешной оплаты
@@ -838,10 +843,75 @@ class MishuraApp {
     }
 
     closeModal() {
-        const overlay = document.getElementById('consultation-overlay');
-        if (overlay) {
-            overlay.classList.remove('active');
+        console.log('📤 Закрытие модального окна...');
+        
+        // Получаем все модальные окна
+        const modals = document.querySelectorAll('.modal-overlay');
+        const resultSection = document.getElementById('result');
+        
+        // 🎯 КРИТИЧЕСКИ ВАЖНО: Проверяем если закрываем окно с результатом консультации
+        const isResultVisible = resultSection && resultSection.classList.contains('active');
+        
+        console.log('🔍 Проверка результата:', {
+            resultSection: !!resultSection,
+            isResultVisible: isResultVisible,
+            hasLastConsultationId: !!this.lastConsultationId
+        });
+        
+        if (isResultVisible && this.lastConsultationId) {
+            console.log('🎯 Закрывается окно результата консультации - запускаем отзыв');
+            
+            // Сохраняем ID консультации для отзыва
+            const consultationIdForFeedback = this.lastConsultationId;
+            
+            // СНАЧАЛА закрываем модальное окно
+            modals.forEach(modal => {
+                modal.classList.remove('active');
+            });
+            
+            // Очищаем классы активности у секций
+            const sections = ['loading', 'consultation-form', 'result'];
+            sections.forEach(sectionId => {
+                const element = document.getElementById(sectionId);
+                if (element) {
+                    element.classList.remove('active');
+                }
+            });
+            
+            // Очищаем body класс
+            document.body.classList.remove('modal-open');
+            
+            // ✨ ПОКАЗЫВАЕМ ФОРМУ ОТЗЫВА ЧЕРЕЗ 500ms для плавного перехода
+            setTimeout(() => {
+                console.log('✨ Показываем форму отзыва после закрытия результата, consultation_id:', consultationIdForFeedback);
+                this.showFeedbackModal(consultationIdForFeedback);
+            }, 500);
+            
+            // Очищаем lastConsultationId чтобы не показывать повторно
+            this.lastConsultationId = null;
+            
+        } else {
+            // Обычное закрытие других модальных окон
+            console.log('📤 Обычное закрытие модального окна');
+            
+            modals.forEach(modal => {
+                modal.classList.remove('active');
+            });
+            
+            // Очищаем классы активности
+            const sections = ['loading', 'consultation-form', 'result'];
+            sections.forEach(sectionId => {
+                const element = document.getElementById(sectionId);
+                if (element) {
+                    element.classList.remove('active');
+                }
+            });
+            
+            // Очищаем body класс для восстановления прокрутки
+            document.body.classList.remove('modal-open');
         }
+        
+        // Очищаем форму и изображения
         this.clearForm();
         this.clearImages();
     }
@@ -932,6 +1002,11 @@ class MishuraApp {
     }
 
     showResult(result) {
+        // 🆕 ДОБАВИТЬ В САМОЕ НАЧАЛО МЕТОДА:
+        // Сохраняем ID консультации для системы отзывов
+        this.lastConsultationId = result.consultation_id || Date.now();
+        console.log('💾 Сохранен ID консультации для отзыва:', this.lastConsultationId);
+        // ... остальной код метода ...
         this.isLoading = false;
         
         const sections = {
@@ -1005,6 +1080,26 @@ class MishuraApp {
                 this.showNotification(`⚠️ Осталось ${consultationsRemaining} консультаций`, 'warning', 4000);
             }, 2000);
         }
+        
+        // 🆕 ЗАПУСК ПРОВЕРКИ ОТЗЫВА ЧЕРЕЗ 1-3 МИНУТЫ ПОСЛЕ ПОКАЗА РЕЗУЛЬТАТА
+        if (consultation && consultation.id) {
+            setTimeout(() => {
+                this.checkAndShowFeedbackPrompt(consultation.id);
+            }, Math.random() * 120000 + 60000); // 1-3 минуты
+        } else {
+            // Если нет ID консультации, используем timestamp как ID
+            const mockConsultationId = Date.now();
+            setTimeout(() => {
+                this.checkAndShowFeedbackPrompt(mockConsultationId);
+            }, Math.random() * 120000 + 60000);
+        }
+        
+        // Запускаем проверку отзыва через 2 минуты после показа результата
+        setTimeout(() => {
+            const mockConsultationId = Date.now();
+            console.log('⏰ Автоматический запуск проверки отзыва через 2 минуты');
+            this.checkAndShowFeedbackPrompt(mockConsultationId);
+        }, 120000); // 2 минуты для тестирования
     }
 
     normalizeAPIResponse(response) {
@@ -1802,6 +1897,341 @@ class MishuraApp {
         if (window.MishuraApp?.components?.navigation) {
             console.log('🔧 Инициализация модульной навигации');
             window.MishuraApp.components.navigation.init();
+        }
+    }
+
+    // === СИСТЕМА ОТЗЫВОВ ===
+
+    initFeedbackSystem() {
+        this.feedbackSystem = {
+            cooldownDays: 10,
+            minCharacters: 150,
+            maxCharacters: 1000,
+            isShowing: false,
+            currentConsultationId: null,
+            selectedRating: null
+        };
+        
+        console.log('📝 Система отзывов инициализирована');
+    }
+
+    async checkAndShowFeedbackPrompt(consultationId) {
+        if (this.feedbackSystem.isShowing) return;
+        
+        console.log('🔍 Проверка возможности показа формы отзыва для консультации:', consultationId);
+        
+        try {
+            const userId = this.getUserId();
+            const response = await fetch(`${API_BASE_URL}/api/v1/feedback/can-prompt/${userId}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.can_show_prompt) {
+                // Показываем форму с задержкой 1-3 минуты
+                const delay = Math.random() * 120000 + 60000; // 1-3 минуты
+                
+                console.log(`⏰ Форма отзыва будет показана через ${Math.round(delay/1000)} секунд`);
+                
+                setTimeout(() => {
+                    this.showFeedbackModal(consultationId);
+                }, delay);
+                
+                // Логируем что показали форму
+                await this.logFeedbackPromptAction(consultationId, 'shown');
+            } else {
+                console.log('❌ Форма отзыва не может быть показана (кулдаун)');
+            }
+            
+        } catch (error) {
+            console.error('❌ Ошибка проверки возможности показа отзыва:', error);
+        }
+    }
+
+    showFeedbackModal(consultationId) {
+        if (this.feedbackSystem.isShowing) return;
+        
+        this.feedbackSystem.isShowing = true;
+        this.feedbackSystem.currentConsultationId = consultationId;
+        this.feedbackSystem.selectedRating = null;
+        
+        console.log('📝 Показ модального окна отзыва');
+        
+        // Удаляем предыдущие модальные окна отзывов
+        document.querySelectorAll('.feedback-modal-overlay').forEach(el => el.remove());
+        
+        const modal = document.createElement('div');
+        modal.className = 'feedback-modal-overlay';
+        modal.innerHTML = this.getFeedbackModalHTML();
+        
+        document.body.appendChild(modal);
+        
+        // Анимация появления
+        setTimeout(() => {
+            modal.classList.add('active');
+        }, 100);
+        
+        // Настройка обработчиков
+        this.setupFeedbackModalHandlers(modal);
+        
+        this.triggerHapticFeedback('light');
+    }
+
+    getFeedbackModalHTML() {
+        return `
+            <div class="feedback-modal-content">
+                <div class="feedback-header">
+                    <div class="feedback-icon">💭</div>
+                    <h3 class="feedback-title">Поделитесь впечатлениями</h3>
+                    <p class="feedback-description">
+                        Ваше мнение важно для нас!<br>
+                        <strong class="feedback-highlight">За подробный отзыв вы получите +1 консультацию</strong>
+                    </p>
+                </div>
+                
+                <!-- Секция рейтинга -->
+                <div class="rating-section">
+                    <div class="rating-label">Как оцениваете консультацию?</div>
+                    <div class="rating-buttons">
+                        <button class="rating-btn" data-rating="positive">
+                            <span class="rating-icon">👍</span>
+                            <span class="rating-text">Понравилось</span>
+                        </button>
+                        <button class="rating-btn" data-rating="negative">
+                            <span class="rating-icon">👎</span>
+                            <span class="rating-text">Не очень</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="feedback-form">
+                    <textarea 
+                        id="feedback-textarea" 
+                        class="feedback-textarea"
+                        placeholder="Расскажите, что вам понравилось или чего не хватило в консультации. Мы ценим честную обратную связь!"
+                        maxlength="1000"
+                    ></textarea>
+                    <div class="feedback-meta">
+                        <span id="feedback-char-count" class="char-count">0 символов</span>
+                        <span class="reward-hint">Минимум 150 для награды</span>
+                    </div>
+                </div>
+                
+                <div class="feedback-actions">
+                    <button id="feedback-skip" class="btn-feedback btn-ghost">Позже</button>
+                    <button id="feedback-submit" class="btn-feedback btn-primary" disabled>Отправить отзыв</button>
+                </div>
+            </div>
+        `;
+    }
+
+    setupFeedbackModalHandlers(modal) {
+        const textarea = modal.querySelector('#feedback-textarea');
+        const charCount = modal.querySelector('#feedback-char-count');
+        const submitBtn = modal.querySelector('#feedback-submit');
+        const skipBtn = modal.querySelector('#feedback-skip');
+        const ratingBtns = modal.querySelectorAll('.rating-btn');
+        
+        // Обработка выбора рейтинга
+        ratingBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Убираем выделение с всех кнопок
+                ratingBtns.forEach(b => {
+                    b.classList.remove('selected', 'positive', 'negative');
+                });
+                
+                // Выделяем выбранную кнопку
+                const rating = btn.dataset.rating;
+                btn.classList.add('selected', rating);
+                
+                this.feedbackSystem.selectedRating = rating;
+                this.updateFeedbackSubmitButton(textarea, submitBtn);
+                
+                console.log('Выбран рейтинг:', rating);
+            });
+        });
+        
+        // Обработка ввода текста
+        textarea.addEventListener('input', () => {
+            const length = textarea.value.length;
+            charCount.textContent = `${length} символов`;
+            
+            if (length >= this.feedbackSystem.minCharacters) {
+                charCount.classList.add('valid');
+                charCount.classList.remove('warning');
+            } else if (length >= 100) {
+                charCount.classList.add('warning');
+                charCount.classList.remove('valid');
+            } else {
+                charCount.classList.remove('valid', 'warning');
+            }
+            
+            this.updateFeedbackSubmitButton(textarea, submitBtn);
+        });
+        
+        // Кнопка отправки
+        submitBtn.addEventListener('click', () => {
+            this.submitFeedback(textarea.value);
+        });
+        
+        // Кнопка пропустить
+        skipBtn.addEventListener('click', () => {
+            this.closeFeedbackModal('dismissed', 'user_skipped');
+        });
+        
+        // Закрытие по клику вне модала
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeFeedbackModal('dismissed', 'clicked_outside');
+            }
+        });
+    }
+
+    updateFeedbackSubmitButton(textarea, submitBtn) {
+        const length = textarea.value.length;
+        const hasRating = this.feedbackSystem.selectedRating !== null;
+        const hasEnoughText = length >= this.feedbackSystem.minCharacters;
+        
+        // Кнопка активна если есть рейтинг И текст >= 150 символов
+        const canSubmit = hasRating && hasEnoughText;
+        submitBtn.disabled = !canSubmit;
+    }
+
+    async submitFeedback(feedbackText) {
+        const trimmedText = feedbackText.trim();
+        
+        if (!this.feedbackSystem.selectedRating) {
+            this.showNotification('Пожалуйста, оцените консультацию 👍 или 👎', 'warning');
+            return;
+        }
+        
+        if (trimmedText.length < this.feedbackSystem.minCharacters) {
+            this.showNotification('Добавьте подробностей, пожалуйста!', 'warning');
+            return;
+        }
+        
+        try {
+            console.log('📤 Отправка отзыва...');
+            
+            const submitBtn = document.querySelector('#feedback-submit');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Отправляем...';
+            
+            const userId = this.getUserId();
+            const response = await fetch(`${API_BASE_URL}/api/v1/feedback/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    telegram_id: userId,
+                    feedback_text: trimmedText,
+                    feedback_rating: this.feedbackSystem.selectedRating,
+                    consultation_id: this.feedbackSystem.currentConsultationId
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.bonus_awarded) {
+                // Обновляем баланс
+                await this.forceBalanceUpdate();
+                
+                // Показываем успешное уведомление
+                const ratingText = this.feedbackSystem.selectedRating === 'positive' ? 'положительную' : 'отрицательную';
+                this.showNotification(
+                    `🎉 Спасибо за ${ratingText} оценку и подробный отзыв! Вы получили +1 консультацию!`, 
+                    'success', 
+                    6000
+                );
+                
+                this.animateBalanceChange();
+            } else {
+                this.showNotification('✅ Спасибо за отзыв!', 'success');
+            }
+            
+            this.closeFeedbackModal('completed');
+            this.triggerHapticFeedback('success');
+            
+            console.log('✅ Отзыв успешно отправлен:', result);
+            
+        } catch (error) {
+            console.error('❌ Ошибка отправки отзыва:', error);
+            
+            const submitBtn = document.querySelector('#feedback-submit');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Отправить отзыв';
+            }
+            
+            let errorMessage = 'Ошибка отправки отзыва';
+            if (error.message.includes('слишком короткий')) {
+                errorMessage = 'Добавьте подробностей, пожалуйста!';
+            } else if (error.message.includes('спам')) {
+                errorMessage = 'Пожалуйста, напишите осмысленный отзыв';
+            } else if (error.message.includes('рейтинг')) {
+                errorMessage = 'Пожалуйста, оцените консультацию';
+            }
+            
+            this.showNotification(errorMessage, 'error');
+            this.triggerHapticFeedback('error');
+        }
+    }
+
+    async closeFeedbackModal(action = 'dismissed', reason = null) {
+        const modal = document.querySelector('.feedback-modal-overlay');
+        if (!modal) return;
+        
+        this.feedbackSystem.isShowing = false;
+        
+        // Логируем действие
+        if (action !== 'completed') {
+            await this.logFeedbackPromptAction(
+                this.feedbackSystem.currentConsultationId || 0, 
+                action, 
+                reason
+            );
+        }
+        
+        // Анимация исчезновения
+        modal.classList.remove('active');
+        setTimeout(() => {
+            modal.remove();
+        }, 300);
+        
+        this.feedbackSystem.currentConsultationId = null;
+        this.feedbackSystem.selectedRating = null;
+    }
+
+    async logFeedbackPromptAction(consultationId, action, dismissalReason = null) {
+        try {
+            const userId = this.getUserId();
+            
+            await fetch(`${API_BASE_URL}/api/v1/feedback/prompt-action`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    telegram_id: userId,
+                    consultation_id: consultationId,
+                    action: action,
+                    dismissal_reason: dismissalReason
+                })
+            });
+            
+            console.log(`📊 Зафиксировано действие с формой отзыва: ${action}`);
+            
+        } catch (error) {
+            console.error('❌ Ошибка логирования действия с формой:', error);
         }
     }
 }

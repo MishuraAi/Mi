@@ -93,6 +93,9 @@ class MishuraDB:
             else:
                 self.logger.info(f"✅ SQLite БД существует: {self.db_path}")
         
+        # 🆕 СОЗДАНИЕ ТАБЛИЦ ОТЗЫВОВ
+        self.create_feedback_tables()
+        
         self.logger.info(f"✅ MishuraDB инициализирована")
     
     def get_connection(self):
@@ -305,16 +308,14 @@ class MishuraDB:
                         updated_at = CURRENT_TIMESTAMP
                     WHERE telegram_id = ?
                 """
-                
                 self._execute_query(update_query, (username, first_name, last_name, telegram_id))
-                
                 self.logger.info(f"Пользователь обновлен: ID={user_id}, telegram_id={telegram_id}, баланс={current_balance}")
                 return user_id
             else:
                 # Создаем нового пользователя с начальным балансом
                 if DB_CONFIG['type'] == 'postgresql':
                     insert_query = """
-                        INSERT INTO users (telegram_id, username, first_name, last_name, balance, created_at, updated_at)
+                    INSERT INTO users (telegram_id, username, first_name, last_name, balance, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         RETURNING id
                     """
@@ -329,14 +330,13 @@ class MishuraDB:
                     conn.close()
                 else:
                     insert_query = """
-                        INSERT INTO users (telegram_id, username, first_name, last_name, balance, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    INSERT INTO users (telegram_id, username, first_name, last_name, balance, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """
                     user_id = self._execute_query(insert_query, (
                         telegram_id, username or 'webapp_user', first_name or 'WebApp', 
                         last_name or 'User', initial_balance
                     ))
-                
                 self.logger.info(f"Пользователь создан: ID={user_id}, telegram_id={telegram_id}, баланс={initial_balance}")
                 return user_id
                 
@@ -370,7 +370,7 @@ class MishuraDB:
                 
         except Exception as e:
             self.logger.error(f"Ошибка при получении пользователя telegram_id={telegram_id}: {e}", exc_info=True)
-            return None
+        return None
         
     def get_user_balance(self, telegram_id: int) -> int:
         """Получает текущий баланс консультаций пользователя"""
@@ -406,7 +406,7 @@ class MishuraDB:
                     
         except Exception as e:
             self.logger.error(f"Ошибка при получении баланса пользователя telegram_id={telegram_id}: {e}", exc_info=True)
-            return 0
+        return 0
         
     def update_user_balance(self, telegram_id: int, amount_change: int, operation_type="manual") -> int:
         """Обновляет баланс пользователя на указанную величину"""
@@ -470,10 +470,9 @@ class MishuraDB:
             
             self.logger.info(f"Консультация для telegram_id={user_id} (internal_id={internal_user_id}) успешно сохранена с ID={consultation_id}.")
             return consultation_id
-            
         except Exception as e:
             self.logger.error(f"Ошибка при сохранении консультации для user_id={user_id}: {e}", exc_info=True)
-            return None
+        return None
 
     def get_consultation(self, consultation_id: int, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Получает информацию о консультации"""
@@ -486,7 +485,7 @@ class MishuraDB:
             else:
                 query = 'SELECT * FROM consultations WHERE id = ?'
                 params = (consultation_id,)
-                
+            
             consultation_row = self._execute_query(query, params, fetch_one=True)
             
             if consultation_row:
@@ -504,10 +503,9 @@ class MishuraDB:
             else:
                 self.logger.info(f"Консультация ID={consultation_id} не найдена" + (f" для user_id={user_id}." if user_id else "."))
                 return None
-                
         except Exception as e:
             self.logger.error(f"Ошибка при получении консультации ID={consultation_id}: {e}", exc_info=True)
-            return None
+        return None
 
     def get_user_consultations(self, user_id: int, limit: int = 20):
         """Получить консультации пользователя"""
@@ -753,11 +751,359 @@ class MishuraDB:
                 )[0]
             except:
                 stats['total_payments_completed'] = 0
-            
+                
             self.logger.info(f"Статистика сервиса МИШУРА получена: {stats}")
         except Exception as e:
             self.logger.error(f"Ошибка при получении статистики: {e}", exc_info=True)
         return stats
+
+    def create_feedback_tables(self):
+        """Создание таблиц для системы отзывов"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.DB_CONFIG['type'] == 'postgresql':
+                # PostgreSQL схема
+                feedback_schema = """
+                -- Таблица отзывов пользователей
+                CREATE TABLE IF NOT EXISTS feedback_submissions (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    feedback_text TEXT NOT NULL,
+                    feedback_rating VARCHAR(10) DEFAULT 'positive',
+                    character_count INTEGER NOT NULL,
+                    consultation_id INTEGER,
+                    ip_address VARCHAR(45),
+                    user_agent TEXT,
+                    google_sheets_synced BOOLEAN DEFAULT FALSE,
+                    google_sheets_row_id VARCHAR(50),
+                    bonus_awarded BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (consultation_id) REFERENCES consultations(id)
+                );
+
+                -- Таблица отслеживания показов форм
+                CREATE TABLE IF NOT EXISTS feedback_prompts (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    consultation_id INTEGER NOT NULL,
+                    prompt_shown_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    user_action VARCHAR(20) DEFAULT 'shown',
+                    dismissal_reason VARCHAR(50),
+                    FOREIGN KEY (consultation_id) REFERENCES consultations(id)
+                );
+
+                -- Индексы
+                CREATE INDEX IF NOT EXISTS idx_feedback_telegram_id ON feedback_submissions(telegram_id);
+                CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback_submissions(created_at);
+                CREATE INDEX IF NOT EXISTS idx_prompts_telegram_user_time ON feedback_prompts(telegram_id, prompt_shown_at);
+                """
+            else:
+                # SQLite схема
+                feedback_schema = """
+                -- Таблица отзывов пользователей
+                CREATE TABLE IF NOT EXISTS feedback_submissions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    telegram_id INTEGER NOT NULL,
+                    feedback_text TEXT NOT NULL,
+                    feedback_rating TEXT DEFAULT 'positive',
+                    character_count INTEGER NOT NULL,
+                    consultation_id INTEGER,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    google_sheets_synced INTEGER DEFAULT 0,
+                    google_sheets_row_id TEXT,
+                    bonus_awarded INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (consultation_id) REFERENCES consultations(id)
+                );
+
+                -- Таблица отслеживания показов форм
+                CREATE TABLE IF NOT EXISTS feedback_prompts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    telegram_id INTEGER NOT NULL,
+                    consultation_id INTEGER NOT NULL,
+                    prompt_shown_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    user_action TEXT DEFAULT 'shown',
+                    dismissal_reason TEXT,
+                    FOREIGN KEY (consultation_id) REFERENCES consultations(id)
+                );
+
+                -- Индексы
+                CREATE INDEX IF NOT EXISTS idx_feedback_telegram_id ON feedback_submissions(telegram_id);
+                CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback_submissions(created_at);
+                CREATE INDEX IF NOT EXISTS idx_prompts_telegram_user_time ON feedback_prompts(telegram_id, prompt_shown_at);
+                """
+            
+            # Выполняем создание таблиц
+            for statement in feedback_schema.split(';'):
+                statement = statement.strip()
+                if statement:
+                    cursor.execute(statement)
+            
+            conn.commit()
+            conn.close()
+            
+            self.logger.info("✅ Таблицы системы отзывов созданы успешно")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания таблиц отзывов: {e}")
+            if 'conn' in locals():
+                conn.rollback()
+                conn.close()
+            return False
+
+    def save_feedback_submission(self, telegram_id: int, feedback_text: str, 
+                               feedback_rating: str, consultation_id: int = None,
+                               ip_address: str = None, user_agent: str = None) -> Optional[int]:
+        """Сохранить отзыв пользователя"""
+        try:
+            char_count = len(feedback_text.strip())
+            
+            if self.DB_CONFIG['type'] == 'postgresql':
+                query = """
+                    INSERT INTO feedback_submissions 
+                    (telegram_id, feedback_text, feedback_rating, character_count, 
+                     consultation_id, ip_address, user_agent)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                cursor.execute(query, (telegram_id, feedback_text, feedback_rating, 
+                                     char_count, consultation_id, ip_address, user_agent))
+                feedback_id = cursor.fetchone()[0]
+                conn.commit()
+                conn.close()
+            else:
+                # ✅ ИСПРАВЛЕНО: Используем _execute_query() правильно
+                query = """
+                    INSERT INTO feedback_submissions 
+                    (telegram_id, feedback_text, feedback_rating, character_count, 
+                     consultation_id, ip_address, user_agent)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """
+                
+                # _execute_query для INSERT возвращает lastrowid автоматически
+                feedback_id = self._execute_query(
+                    query, 
+                    (telegram_id, feedback_text, feedback_rating, char_count, 
+                     consultation_id, ip_address, user_agent)
+                )
+            
+            self.logger.info(f"✅ Отзыв сохранен: ID={feedback_id}, user={telegram_id}, rating={feedback_rating}, chars={char_count}")
+            return feedback_id
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка сохранения отзыва: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return None
+
+    def can_show_feedback_prompt(self, telegram_id: int) -> bool:
+        """Проверить можно ли показать форму отзыва (не чаще раза в 10 дней)"""
+        try:
+            if self.DB_CONFIG['type'] == 'postgresql':
+                query = """
+                    SELECT prompt_shown_at 
+                    FROM feedback_prompts 
+                    WHERE telegram_id = %s 
+                    ORDER BY prompt_shown_at DESC 
+                    LIMIT 1
+                """
+                params = (telegram_id,)
+            else:
+                query = """
+                    SELECT prompt_shown_at 
+                    FROM feedback_prompts 
+                    WHERE telegram_id = ? 
+                    ORDER BY prompt_shown_at DESC 
+                    LIMIT 1
+                """
+                params = (telegram_id,)
+            
+            result = self._execute_query(query, params, fetch_one=True)
+            
+            if not result:
+                return True  # Первый раз показываем
+            
+            from datetime import datetime, timedelta
+            last_prompt = result[0]
+            
+            # Парсим дату в зависимости от типа БД
+            if isinstance(last_prompt, str):
+                last_prompt = datetime.fromisoformat(last_prompt.replace('Z', '+00:00'))
+            
+            days_since = (datetime.now() - last_prompt).days
+            can_show = days_since >= 10
+            
+            self.logger.info(f"🔍 Проверка показа отзыва: user={telegram_id}, days_since={days_since}, can_show={can_show}")
+            return can_show
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка проверки возможности показа отзыва: {e}")
+            return False  # В случае ошибки не показываем
+
+    def log_feedback_prompt(self, telegram_id: int, consultation_id: int, 
+                           action: str = 'shown', dismissal_reason: str = None) -> bool:
+        """Записать факт показа/действия с формой отзыва"""
+        try:
+            if self.DB_CONFIG['type'] == 'postgresql':
+                query = """
+                    INSERT INTO feedback_prompts 
+                    (telegram_id, consultation_id, user_action, dismissal_reason)
+                    VALUES (%s, %s, %s, %s)
+                """
+                params = (telegram_id, consultation_id, action, dismissal_reason)
+            else:
+                query = """
+                    INSERT INTO feedback_prompts 
+                    (telegram_id, consultation_id, user_action, dismissal_reason)
+                    VALUES (?, ?, ?, ?)
+                """
+                params = (telegram_id, consultation_id, action, dismissal_reason)
+            
+            self._execute_query(query, params)
+            
+            self.logger.info(f"📝 Зафиксировано действие с формой отзыва: user={telegram_id}, action={action}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка логирования действия с формой отзыва: {e}")
+            return False
+
+    def get_pending_feedback_sync(self, limit: int = 50) -> List[Dict]:
+        """Получить отзывы для синхронизации с Google Sheets"""
+        try:
+            if self.DB_CONFIG['type'] == 'postgresql':
+                query = """
+                    SELECT id, telegram_id, feedback_text, feedback_rating, 
+                           character_count, created_at, consultation_id
+                    FROM feedback_submissions 
+                    WHERE google_sheets_synced = FALSE 
+                    ORDER BY created_at ASC 
+                    LIMIT %s
+                """
+            else:
+                query = """
+                    SELECT id, telegram_id, feedback_text, feedback_rating, 
+                           character_count, created_at, consultation_id
+                    FROM feedback_submissions 
+                    WHERE google_sheets_synced = 0 
+                    ORDER BY created_at ASC 
+                    LIMIT ?
+                """
+            
+            results = self._execute_query(query, (limit,), fetch_all=True)
+            
+            feedback_list = []
+            for row in results:
+                feedback_list.append({
+                    'id': row[0],
+                    'telegram_id': row[1],
+                    'feedback_text': row[2],
+                    'feedback_rating': row[3],
+                    'character_count': row[4],
+                    'created_at': row[5],
+                    'consultation_id': row[6]
+                })
+            
+            self.logger.info(f"📊 Получено {len(feedback_list)} отзывов для синхронизации")
+            return feedback_list
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения отзывов для синхронизации: {e}")
+            return []
+
+    def mark_feedback_synced(self, feedback_id: int, sheets_row_id: str = None) -> bool:
+        """Отметить отзыв как синхронизированный с Google Sheets"""
+        try:
+            if self.DB_CONFIG['type'] == 'postgresql':
+                query = """
+                    UPDATE feedback_submissions 
+                    SET google_sheets_synced = TRUE, google_sheets_row_id = %s
+                    WHERE id = %s
+                """
+                params = (sheets_row_id, feedback_id)
+            else:
+                query = """
+                    UPDATE feedback_submissions 
+                    SET google_sheets_synced = 1, google_sheets_row_id = ?
+                    WHERE id = ?
+                """
+                params = (sheets_row_id, feedback_id)
+            
+            self._execute_query(query, params)
+            
+            self.logger.info(f"✅ Отзыв ID={feedback_id} отмечен как синхронизированный")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка отметки синхронизации отзыва ID={feedback_id}: {e}")
+            return False
+
+    def mark_feedback_bonus_awarded(self, feedback_id: int) -> bool:
+        """Отметить что бонус за отзыв начислен"""
+        try:
+            if self.DB_CONFIG['type'] == 'postgresql':
+                query = "UPDATE feedback_submissions SET bonus_awarded = TRUE WHERE id = %s"
+            else:
+                query = "UPDATE feedback_submissions SET bonus_awarded = 1 WHERE id = ?"
+            
+            self._execute_query(query, (feedback_id,))
+            
+            self.logger.info(f"💰 Бонус за отзыв ID={feedback_id} отмечен как начисленный")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка отметки начисления бонуса: {e}")
+            return False
+
+    def get_feedback_stats(self) -> Dict[str, Any]:
+        """Получить статистику по отзывам"""
+        try:
+            stats = {}
+            
+            # Общее количество отзывов
+            total_query = "SELECT COUNT(*) FROM feedback_submissions"
+            stats['total_feedback'] = self._execute_query(total_query, fetch_one=True)[0]
+            
+            # Отзывы за сегодня
+            if self.DB_CONFIG['type'] == 'postgresql':
+                today_query = "SELECT COUNT(*) FROM feedback_submissions WHERE created_at >= CURRENT_DATE"
+            else:
+                today_query = "SELECT COUNT(*) FROM feedback_submissions WHERE created_at >= date('now')"
+            
+            stats['feedback_today'] = self._execute_query(today_query, fetch_one=True)[0]
+            
+            # Средняя длина отзывов
+            avg_query = "SELECT AVG(character_count) FROM feedback_submissions"
+            avg_result = self._execute_query(avg_query, fetch_one=True)[0]
+            stats['avg_feedback_length'] = round(avg_result, 1) if avg_result else 0
+            
+            # Процент положительных отзывов
+            if stats['total_feedback'] > 0:
+                positive_query = "SELECT COUNT(*) FROM feedback_submissions WHERE feedback_rating = 'positive'"
+                positive_count = self._execute_query(positive_query, fetch_one=True)[0]
+                stats['positive_feedback_percent'] = round((positive_count / stats['total_feedback']) * 100, 1)
+            else:
+                stats['positive_feedback_percent'] = 0
+            
+            # Количество начисленных бонусов
+            if self.DB_CONFIG['type'] == 'postgresql':
+                bonus_query = "SELECT COUNT(*) FROM feedback_submissions WHERE bonus_awarded = TRUE"
+            else:
+                bonus_query = "SELECT COUNT(*) FROM feedback_submissions WHERE bonus_awarded = 1"
+            
+            stats['bonuses_awarded'] = self._execute_query(bonus_query, fetch_one=True)[0]
+            
+            return stats
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения статистики отзывов: {e}")
+            return {}
 
 
 # === ФУНКЦИИ СОВМЕСТИМОСТИ ===

@@ -26,6 +26,11 @@ from database import MishuraDB
 from gemini_ai import MishuraGeminiAI
 from payment_service import PaymentService
 
+# 🌐 НОВЫЕ ИМПОРТЫ ДЛЯ СИСТЕМЫ ОТЗЫВОВ
+from pydantic import BaseModel
+from typing import Optional
+import asyncio
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -49,6 +54,7 @@ PORT = int(os.getenv('PORT', 8001))
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 TEST_MODE = os.getenv('TEST_MODE', 'false').lower() == 'true'
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+ADMIN_TELEGRAM_ID = os.getenv('ADMIN_TELEGRAM_ID')  # ID админа для уведомлений
 
 # Логирование конфигурации
 logger.info("🔧 Конфигурация МИШУРА API:")
@@ -60,6 +66,7 @@ logger.info(f"   WEBAPP_URL: {WEBAPP_URL}")
 logger.info(f"   TELEGRAM_TOKEN: {'установлен' if TELEGRAM_TOKEN else '❌ НЕ УСТАНОВЛЕН'}")
 logger.info(f"   GEMINI_API_KEY: {'установлен' if GEMINI_API_KEY else '❌ НЕ УСТАНОВЛЕН'}")
 logger.info(f"   YOOKASSA: {'настроена' if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY else '❌ НЕ НАСТРОЕНА'}")
+logger.info(f"   ADMIN_TELEGRAM_ID: {'установлен' if ADMIN_TELEGRAM_ID else '❌ НЕ УСТАНОВЛЕН'}")
 
 # Проверка обязательных переменных в продакшн
 if ENVIRONMENT == 'production':
@@ -84,6 +91,29 @@ class PaymentWebhookData(BaseModel):
     event: str
     object: dict
 
+# === НОВЫЕ МОДЕЛИ ДАННЫХ ДЛЯ ОТЗЫВОВ ===
+
+class FeedbackSubmission(BaseModel):
+    telegram_id: int
+    feedback_text: str
+    feedback_rating: str = 'positive'  # positive/negative
+    consultation_id: Optional[int] = None
+
+class FeedbackPromptAction(BaseModel):
+    telegram_id: int
+    consultation_id: int
+    action: str  # shown/dismissed/completed
+    dismissal_reason: Optional[str] = None
+
+# Импорт системы уведомлений
+try:
+    from admin_notifications import notify_new_feedback, test_admin_notifications
+    NOTIFICATIONS_AVAILABLE = True
+    logger.info("✅ Система уведомлений админу загружена")
+except ImportError as e:
+    NOTIFICATIONS_AVAILABLE = False
+    logger.warning(f"⚠️ Система уведомлений недоступна: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db, gemini_ai, payment_service, financial_service
@@ -94,48 +124,32 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database инициализирована")
         db.init_db()
         logger.info("✅ Таблицы базы данных проверены/созданы")
-        
         # 🔐 НОВОЕ: АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ФИНАНСОВОЙ БЕЗОПАСНОСТИ
         try:
             logger.info("🔐 Инициализация финансовой безопасности...")
-            
-            # Проверяем существование глобального financial_service
             financial_service = getattr(__builtins__, 'GLOBAL_FINANCIAL_SERVICE', None)
             if not financial_service:
-                # Создаем новый FinancialService
                 from financial_service import FinancialService
                 financial_service = FinancialService(db)
-                
-                # Инициализируем balance_locks для существующих пользователей
                 await _init_balance_locks_for_existing_users(db, financial_service)
-                
-                # Патчим database.py для backward compatibility
                 original_update_balance = db.update_user_balance
                 db.update_user_balance = financial_service.update_user_balance
                 db._original_update_user_balance = original_update_balance
-                
-                # Сохраняем глобально для других компонентов
                 try:
                     import builtins
                     builtins.GLOBAL_FINANCIAL_SERVICE = financial_service
                 except:
                     __builtins__['GLOBAL_FINANCIAL_SERVICE'] = financial_service
-                
                 logger.info("✅ Финансовая безопасность инициализирована и установлена глобально")
             else:
                 logger.info("✅ Финансовая безопасность уже загружена из глобальных")
-                
             logger.info("✅ Financial service загружен")
-            
         except Exception as e:
             logger.error(f"❌ Критическая ошибка инициализации финансовой безопасности: {e}")
-            # НЕ останавливаем запуск - система может работать в fallback режиме
             financial_service = None
             logger.warning("⚠️ Система запущена БЕЗ финансовой безопасности (fallback режим)")
-        
         gemini_ai = MishuraGeminiAI()
         logger.info("✅ Gemini AI инициализирован")
-        
         if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
             payment_service = PaymentService(
                 shop_id=YOOKASSA_SHOP_ID,
@@ -147,14 +161,10 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("⚠️ Payment service НЕ ИНИЦИАЛИЗИРОВАН - отсутствуют настройки ЮKassa")
             payment_service = None
-
     except Exception as e:
         logger.error(f"❌ Критическая ошибка при запуске: {e}", exc_info=True)
-        # В случае ошибки при запуске, FastAPI не запустится корректно
         raise
-    
     yield
-    # Shutdown (если нужно)
     logger.info("🛑 Сервер МИШУРА API остановлен.")
 
 # 🔐 НОВАЯ ФУНКЦИЯ: добавить ПОСЛЕ lifespan
@@ -1012,6 +1022,275 @@ async def recover_failed_payments():
     except Exception as e:
         logger.error(f"❌ Ошибка восстановления платежей: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# === НОВЫЕ ЭНДПОИНТЫ ДЛЯ СИСТЕМЫ ОТЗЫВОВ ===
+
+@app.post("/api/v1/feedback/submit")
+async def submit_feedback(request: Request):
+    """🏆 Отправка отзыва с автоматическим начислением бонуса"""
+    
+    correlation_id = str(uuid.uuid4())
+    start_time = time.time()
+    
+    try:
+        data = await request.json()
+        
+        # Валидация данных
+        telegram_id = data.get('telegram_id')
+        feedback_text = data.get('feedback_text', '').strip()
+        feedback_rating = data.get('feedback_rating', 'positive')
+        consultation_id = data.get('consultation_id')
+        
+        # Получаем IP и User-Agent для анализа
+        ip_address = request.client.host if request.client else None
+        user_agent = request.headers.get('user-agent', '')
+        
+        logger.info(f"📝 [{correlation_id}] Получен отзыв от user_id: {telegram_id}, rating: {feedback_rating}")
+        
+        if not telegram_id or not feedback_text:
+            raise HTTPException(status_code=400, detail="Отсутствуют обязательные данные")
+        
+        # Валидация рейтинга
+        if feedback_rating not in ['positive', 'negative']:
+            raise HTTPException(status_code=400, detail="Некорректный рейтинг. Должен быть 'positive' или 'negative'")
+        
+        # Валидация длины отзыва
+        if len(feedback_text) < 150:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Отзыв слишком короткий. Минимум 150 символов, получено: {len(feedback_text)}"
+            )
+        
+        if len(feedback_text) > 1000:
+            raise HTTPException(
+                status_code=400, 
+                detail="Отзыв слишком длинный. Максимум 1000 символов"
+            )
+        
+        # Простая проверка на спам (повторяющиеся символы)
+        if is_spam_text(feedback_text):
+            raise HTTPException(status_code=400, detail="Обнаружен спам в тексте отзыва")
+        
+        # Сохраняем отзыв в БД
+        feedback_id = db.save_feedback_submission(
+            telegram_id=telegram_id,
+            feedback_text=feedback_text,
+            feedback_rating=feedback_rating,
+            consultation_id=consultation_id,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        
+        if not feedback_id:
+            raise HTTPException(status_code=500, detail="Ошибка сохранения отзыва")
+        
+        # 🔔 НОВОЕ: ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ АДМИНУ
+        try:
+            user_data = db.get_user(telegram_id)
+            feedback_notification_data = {
+                'id': feedback_id,
+                'telegram_id': telegram_id,
+                'feedback_text': feedback_text,
+                'feedback_rating': feedback_rating,
+                'character_count': len(feedback_text),
+                'consultation_id': consultation_id,
+                'bonus_awarded': len(feedback_text) >= 150,
+                'created_at': datetime.now().isoformat()
+            }
+            asyncio.create_task(notify_new_feedback(feedback_notification_data, user_data))
+            logger.info(f"📬 Уведомление о отзыве ID={feedback_id} поставлено в очередь отправки")
+        except Exception as e:
+            logger.error(f"⚠️ Ошибка отправки уведомления админу: {e}")
+        
+        # 🎁 НАЧИСЛЯЕМ БОНУС ЗА ОТЗЫВ (только если >= 150 символов)
+        bonus_awarded = False
+        new_balance = None
+        
+        if len(feedback_text) >= 150:
+            if financial_service:
+                bonus_result = financial_service.safe_balance_operation(
+                    telegram_id=telegram_id,
+                    amount_change=10,  # +1 консультация = 10 STcoins
+                    operation_type="feedback_bonus",
+                    correlation_id=correlation_id,
+                    metadata={
+                        "feedback_id": feedback_id,
+                        "character_count": len(feedback_text),
+                        "feedback_rating": feedback_rating,
+                        "service": "feedback_system"
+                    }
+                )
+                
+                if bonus_result['success']:
+                    bonus_awarded = True
+                    new_balance = bonus_result['new_balance']
+                    
+                    # Отмечаем что бонус начислен
+                    db.mark_feedback_bonus_awarded(feedback_id)
+                    
+                    logger.info(f"💰 [{correlation_id}] Бонус начислен: user_id={telegram_id}, new_balance={new_balance}")
+                else:
+                    logger.error(f"❌ [{correlation_id}] Ошибка начисления бонуса: {bonus_result}")
+            else:
+                # Fallback на старую систему
+                try:
+                    new_balance = db.update_user_balance(telegram_id, 10, "feedback_bonus")
+                    bonus_awarded = True
+                    db.mark_feedback_bonus_awarded(feedback_id)
+                    logger.info(f"💰 [{correlation_id}] Бонус начислен (fallback): user_id={telegram_id}, new_balance={new_balance}")
+                except Exception as e:
+                    logger.error(f"❌ [{correlation_id}] Ошибка начисления бонуса (fallback): {e}")
+        
+        # Логируем успешное завершение
+        db.log_feedback_prompt(telegram_id, consultation_id or 0, 'completed')
+        
+        processing_time = time.time() - start_time
+        
+        logger.info(f"✅ [{correlation_id}] Отзыв обработан: feedback_id={feedback_id}, rating={feedback_rating}, bonus={bonus_awarded}, time={processing_time:.2f}s")
+        
+        return {
+            "feedback_id": feedback_id,
+            "bonus_awarded": bonus_awarded,
+            "balance": new_balance,
+            "character_count": len(feedback_text),
+            "feedback_rating": feedback_rating,
+            "correlation_id": correlation_id,
+            "processing_time": round(processing_time, 2),
+            "status": "success",
+            "message": "🎉 Спасибо за отзыв! Вы получили +1 консультацию." if bonus_awarded else "Спасибо за отзыв!"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [{correlation_id}] Критическая ошибка обработки отзыва: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+@app.get("/api/v1/feedback/can-prompt/{telegram_id}")
+async def can_show_feedback_prompt(telegram_id: int):
+    """Проверка возможности показа формы отзыва"""
+    try:
+        can_show = db.can_show_feedback_prompt(telegram_id)
+        
+        return {
+            "telegram_id": telegram_id,
+            "can_show_prompt": can_show,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка проверки возможности показа отзыва для {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/feedback/prompt-action")
+async def log_feedback_prompt_action(request: Request):
+    """Логирование действий пользователя с формой отзыва"""
+    try:
+        data = await request.json()
+        
+        telegram_id = data.get('telegram_id')
+        consultation_id = data.get('consultation_id', 0)
+        action = data.get('action', 'shown')  # shown/dismissed/completed
+        dismissal_reason = data.get('dismissal_reason')
+        
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="Отсутствует telegram_id")
+        
+        success = db.log_feedback_prompt(
+            telegram_id=telegram_id,
+            consultation_id=consultation_id,
+            action=action,
+            dismissal_reason=dismissal_reason
+        )
+        
+        if success:
+            return {
+                "telegram_id": telegram_id,
+                "action": action,
+                "logged_at": datetime.now().isoformat(),
+                "status": "success"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Ошибка логирования действия")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка логирования действия с формой отзыва: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/feedback/stats")
+async def get_feedback_stats():
+    """📊 Статистика системы отзывов"""
+    try:
+        stats = db.get_feedback_stats()
+        
+        return {
+            "stats": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения статистики отзывов: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/admin/test-notifications")
+async def test_notifications():
+    """🧪 ТЕСТ: Проверка работы уведомлений админу"""
+    if not NOTIFICATIONS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Система уведомлений недоступна")
+    try:
+        success = await test_admin_notifications()
+        if success:
+            return {
+                "status": "success",
+                "message": "Тестовое уведомление отправлено успешно",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "status": "failed", 
+                "message": "Не удалось отправить тестовое уведомление",
+                "timestamp": datetime.now().isoformat()
+            }
+    except Exception as e:
+        logger.error(f"Ошибка тестирования уведомлений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+
+def is_spam_text(text: str) -> bool:
+    """Простая проверка на спам"""
+    try:
+        # Проверка на повторяющиеся символы
+        char_counts = {}
+        for char in text:
+            char_counts[char] = char_counts.get(char, 0) + 1
+        
+        total_chars = len(text)
+        for char, count in char_counts.items():
+            if count / total_chars > 0.3:  # Если один символ составляет >30%
+                return True
+        
+        # Проверка на повторяющиеся слова
+        words = text.lower().split()
+        if len(words) < 5:
+            return False
+            
+        word_counts = {}
+        for word in words:
+            if len(word) > 2:  # Игнорируем короткие слова
+                word_counts[word] = word_counts.get(word, 0) + 1
+        
+        total_words = len([w for w in words if len(w) > 2])
+        for word, count in word_counts.items():
+            if total_words > 0 and count / total_words > 0.4:  # Если одно слово >40%
+                return True
+        
+        return False
+        
+    except Exception:
+        return False  # В случае ошибки не блокируем
 
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")

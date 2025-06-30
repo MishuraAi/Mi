@@ -118,15 +118,19 @@ class MishuraApp {
             
             this.setupTelegramIntegration();
             this.initModularNavigation();
+            
+            // ДОБАВЛЯЕМ стили dropdown
+            this.addDropdownStyles();
+            
             this.initializationComplete = true;
             
-            console.log('✅ MishuraApp полностью инициализирован');
+            console.log('✅ MishuraApp инициализирован с ОКОНЧАТЕЛЬНЫМ dropdown');
             
         } catch (error) {
             console.error('❌ Ошибка инициализации:', error);
         }
 
-        this.lastConsultationId = null; // Для отслеживания текущей консультации
+        this.lastConsultationId = null;
     }
 
     // 🚨 ИСПРАВЛЕНИЕ 1: Правильная проверка успешной оплаты
@@ -845,31 +849,22 @@ class MishuraApp {
     closeModal() {
         console.log('📤 Закрытие модального окна...');
         
-        // Получаем все модальные окна
+        // ВАЖНО: закрываем dropdown при закрытии модала
+        this.closeDropdown();
+        
+        // ... остальной код closeModal остается без изменений
         const modals = document.querySelectorAll('.modal-overlay');
         const resultSection = document.getElementById('result');
         
-        // 🎯 КРИТИЧЕСКИ ВАЖНО: Проверяем если закрываем окно с результатом консультации
         const isResultVisible = resultSection && resultSection.classList.contains('active');
         
-        console.log('🔍 Проверка результата:', {
-            resultSection: !!resultSection,
-            isResultVisible: isResultVisible,
-            hasLastConsultationId: !!this.lastConsultationId
-        });
-        
         if (isResultVisible && this.lastConsultationId) {
-            console.log('🎯 Закрывается окно результата консультации - запускаем отзыв');
-            
-            // Сохраняем ID консультации для отзыва
             const consultationIdForFeedback = this.lastConsultationId;
             
-            // СНАЧАЛА закрываем модальное окно
             modals.forEach(modal => {
                 modal.classList.remove('active');
             });
             
-            // Очищаем классы активности у секций
             const sections = ['loading', 'consultation-form', 'result'];
             sections.forEach(sectionId => {
                 const element = document.getElementById(sectionId);
@@ -878,27 +873,19 @@ class MishuraApp {
                 }
             });
             
-            // Очищаем body класс
             document.body.classList.remove('modal-open');
             
-            // ✨ ПОКАЗЫВАЕМ ФОРМУ ОТЗЫВА ЧЕРЕЗ 500ms для плавного перехода
             setTimeout(() => {
-                console.log('✨ Показываем форму отзыва после закрытия результата, consultation_id:', consultationIdForFeedback);
                 this.showFeedbackModal(consultationIdForFeedback);
             }, 500);
             
-            // Очищаем lastConsultationId чтобы не показывать повторно
             this.lastConsultationId = null;
             
         } else {
-            // Обычное закрытие других модальных окон
-            console.log('📤 Обычное закрытие модального окна');
-            
             modals.forEach(modal => {
                 modal.classList.remove('active');
             });
             
-            // Очищаем классы активности
             const sections = ['loading', 'consultation-form', 'result'];
             sections.forEach(sectionId => {
                 const element = document.getElementById(sectionId);
@@ -907,11 +894,9 @@ class MishuraApp {
                 }
             });
             
-            // Очищаем body класс для восстановления прокрутки
             document.body.classList.remove('modal-open');
         }
         
-        // Очищаем форму и изображения
         this.clearForm();
         this.clearImages();
     }
@@ -1791,39 +1776,269 @@ class MishuraApp {
         this.submitButtonSetup = true;
     }
 
+    // ========== ОКОНЧАТЕЛЬНОЕ DROPDOWN-РЕШЕНИЕ ========== //
+
     setupOccasionDropdown() {
         if (this.occasionDropdownSetup) return;
 
-        document.addEventListener('click', (event) => {
-            const occasionInput = document.getElementById('occasion');
-            const optionsContainer = document.getElementById('occasion-options');
-            
-            if (!occasionInput || !optionsContainer) return;
-            
-            if (event.target === occasionInput) {
-                if (optionsContainer.children.length === 0) {
-                    this.occasionOptions.forEach(option => {
-                        const optionElement = document.createElement('div');
-                        optionElement.className = 'occasion-option';
-                        optionElement.textContent = option;
-                        optionElement.addEventListener('click', () => {
-                            occasionInput.value = option;
-                            optionsContainer.classList.remove('active');
-                            this.updateSubmitButton();
-                            this.triggerHapticFeedback('light');
-                        });
-                        optionsContainer.appendChild(optionElement);
-                    });
-                }
-                
-                optionsContainer.classList.toggle('active');
-                this.triggerHapticFeedback('light');
-            } else if (!event.target.closest('.occasion-dropdown')) {
-                optionsContainer.classList.remove('active');
+        console.log('🎯 Настройка ОКОНЧАТЕЛЬНОГО dropdown решения...');
+
+        // Удаляем встроенный dropdown навсегда
+        setTimeout(() => {
+            const builtinDropdown = document.getElementById('occasion-options');
+            if (builtinDropdown) {
+                builtinDropdown.remove();
             }
-        });
+        }, 100);
+
+        // Глобальные переменные для dropdown
+        window.DROPDOWN_STATE = {
+            isOpen: false,
+            element: null,
+            inputElement: null
+        };
+
+        // Создаем ЕДИНСТВЕННЫЙ обработчик событий
+        this.createDropdownHandler();
 
         this.occasionDropdownSetup = true;
+        console.log('✅ ОКОНЧАТЕЛЬНЫЙ dropdown настроен');
+    }
+
+    createDropdownHandler() {
+        // Находим input только один раз
+        const occasionInput = document.getElementById('occasion');
+        if (!occasionInput) {
+            console.error('❌ Input occasion не найден');
+            return;
+        }
+
+        // Удаляем ВСЕ старые обработчики через клонирование
+        const cleanInput = occasionInput.cloneNode(true);
+        occasionInput.parentNode.replaceChild(cleanInput, occasionInput);
+        
+        // Сохраняем ссылку на чистый input
+        window.DROPDOWN_STATE.inputElement = cleanInput;
+
+        console.log('🧹 Input очищен от всех обработчиков');
+
+        // ЕДИНСТВЕННЫЙ обработчик input - с правильной изоляцией событий
+        cleanInput.addEventListener('click', this.handleInputClick.bind(this), true);
+
+        // Обработчик document - с задержкой для предотвращения конфликтов
+        setTimeout(() => {
+            document.addEventListener('click', this.handleDocumentClick.bind(this), false);
+        }, 500);
+
+        console.log('🎯 Обработчики установлены с правильной изоляцией');
+    }
+
+    handleInputClick(event) {
+        console.log('🎯 Клик по input occasion');
+        
+        // КРИТИЧНО: полная остановка всплытия
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        // Переключаем состояние dropdown
+        if (window.DROPDOWN_STATE.isOpen) {
+            this.closeDropdown();
+        } else {
+            // Задержка для предотвращения конфликта с document обработчиком
+            setTimeout(() => {
+                this.openDropdown();
+            }, 50);
+        }
+    }
+
+    handleDocumentClick(event) {
+        // Проверяем что dropdown открыт
+        if (!window.DROPDOWN_STATE.isOpen || !window.DROPDOWN_STATE.element) {
+            return;
+        }
+
+        // Проверяем что клик НЕ по input и НЕ по dropdown
+        const clickedInput = event.target === window.DROPDOWN_STATE.inputElement;
+        const clickedDropdown = window.DROPDOWN_STATE.element && 
+                               window.DROPDOWN_STATE.element.contains(event.target);
+
+        if (!clickedInput && !clickedDropdown) {
+            console.log('👆 Клик вне dropdown - закрываем');
+            this.closeDropdown();
+        }
+    }
+
+    openDropdown() {
+        if (window.DROPDOWN_STATE.isOpen) {
+            console.log('⚠️ Dropdown уже открыт');
+            return;
+        }
+
+        console.log('📂 Открываем dropdown...');
+        
+        const inputElement = window.DROPDOWN_STATE.inputElement;
+        if (!inputElement) {
+            console.error('❌ Input element не найден');
+            return;
+        }
+
+        // Создаем dropdown элемент
+        const dropdown = document.createElement('div');
+        dropdown.className = 'final-dropdown';
+        dropdown.style.cssText = this.getDropdownStyles(inputElement);
+
+        // Добавляем опции
+        this.occasionOptions.forEach((option, index) => {
+            const optionElement = document.createElement('div');
+            optionElement.className = 'final-dropdown-option';
+            optionElement.textContent = option;
+            optionElement.style.cssText = this.getOptionStyles(index === this.occasionOptions.length - 1);
+
+            // Обработчики для опции
+            optionElement.addEventListener('mouseenter', () => {
+                optionElement.style.background = 'rgba(212, 175, 55, 0.1)';
+                optionElement.style.color = '#d4af37';
+            });
+
+            optionElement.addEventListener('mouseleave', () => {
+                optionElement.style.background = 'transparent';
+                optionElement.style.color = '#ffffff';
+            });
+
+            optionElement.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.selectOption(option);
+            });
+
+            dropdown.appendChild(optionElement);
+        });
+
+        // КРИТИЧНО: добавляем dropdown в body, а НЕ в модальное окно
+        document.body.appendChild(dropdown);
+
+        // Обновляем состояние
+        window.DROPDOWN_STATE.isOpen = true;
+        window.DROPDOWN_STATE.element = dropdown;
+
+        console.log('✅ Dropdown открыт и добавлен в body');
+    }
+
+    closeDropdown() {
+        if (!window.DROPDOWN_STATE.isOpen || !window.DROPDOWN_STATE.element) {
+            return;
+        }
+
+        console.log('📁 Закрываем dropdown...');
+
+        // Удаляем элемент
+        window.DROPDOWN_STATE.element.remove();
+        
+        // Сбрасываем состояние
+        window.DROPDOWN_STATE.isOpen = false;
+        window.DROPDOWN_STATE.element = null;
+
+        console.log('✅ Dropdown закрыт');
+    }
+
+    selectOption(option) {
+        console.log('✅ Выбрана опция:', option);
+
+        if (window.DROPDOWN_STATE.inputElement) {
+            window.DROPDOWN_STATE.inputElement.value = option;
+        }
+
+        this.closeDropdown();
+        this.updateSubmitButton();
+        this.triggerHapticFeedback('light');
+    }
+
+    getDropdownStyles(inputElement) {
+        const rect = inputElement.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - rect.bottom - 20;
+        const maxHeight = Math.min(Math.max(spaceBelow, 200), 350);
+
+        return `
+            position: fixed !important;
+            z-index: 2147483647 !important;
+            background: #1a1a1a !important;
+            border: 2px solid #d4af37 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 32px rgba(212, 175, 55, 0.4) !important;
+            backdrop-filter: blur(20px) !important;
+            max-height: ${maxHeight}px !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            left: ${rect.left}px !important;
+            top: ${rect.bottom + 4}px !important;
+            width: ${rect.width}px !important;
+            pointer-events: auto !important;
+            font-family: inherit !important;
+        `;
+    }
+
+    getOptionStyles(isLast) {
+        return `
+            padding: 14px 16px !important;
+            cursor: pointer !important;
+            color: #ffffff !important;
+            transition: all 0.2s ease !important;
+            min-height: 48px !important;
+            display: flex !important;
+            align-items: center !important;
+            font-size: 16px !important;
+            user-select: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+            border-bottom: ${isLast ? 'none' : '1px solid rgba(212, 175, 55, 0.1)'} !important;
+        `;
+    }
+
+    addDropdownStyles() {
+        if (document.getElementById('final-dropdown-styles')) return;
+
+        const styles = document.createElement('style');
+        styles.id = 'final-dropdown-styles';
+        styles.textContent = `
+            .final-dropdown::-webkit-scrollbar {
+                width: 8px !important;
+            }
+            .final-dropdown::-webkit-scrollbar-track {
+                background: rgba(42, 42, 42, 0.8) !important;
+                border-radius: 4px !important;
+            }
+            .final-dropdown::-webkit-scrollbar-thumb {
+                background: #d4af37 !important;
+                border-radius: 4px !important;
+            }
+            .final-dropdown::-webkit-scrollbar-thumb:hover {
+                background: #f7dc6f !important;
+            }
+            
+            @media (max-width: 768px) {
+                .final-dropdown {
+                    font-size: 18px !important;
+                }
+                .final-dropdown-option {
+                    min-height: 52px !important;
+                    padding: 16px !important;
+                    font-size: 18px !important;
+                }
+            }
+            
+            /* Скрываем встроенный dropdown навсегда */
+            .occasion-options,
+            #occasion-options {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+        `;
+
+        document.head.appendChild(styles);
     }
 
     setupResultNavigation() {

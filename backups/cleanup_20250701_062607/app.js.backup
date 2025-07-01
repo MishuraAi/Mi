@@ -22,6 +22,7 @@ class MishuraApp {
         this.eventListenersAttached = false;
         this.initializationComplete = false;
         
+        // 🆕 СИНХРОНИЗАЦИЯ БАЛАНСА
         this.balanceSync = {
             interval: null,
             lastUpdate: 0,
@@ -101,6 +102,7 @@ class MishuraApp {
         if (this.initializationComplete) return;
 
         try {
+            // 🚨 КРИТИЧЕСКИ ВАЖНО: Проверяем успешную оплату ПЕРВЫМ ДЕЛОМ
             await this.checkForSuccessfulPayment();
             
             this.setupNavigation();
@@ -108,8 +110,10 @@ class MishuraApp {
             this.setupBasicEventHandlers();
             this.loadUserData();
             
+            // 🆕 ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ОТЗЫВОВ
             this.initFeedbackSystem();
             
+            // 🆕 ЗАПУСК СИНХРОНИЗАЦИИ БАЛАНСА
             this.startBalanceSync();
             
             this.setupTelegramIntegration();
@@ -129,6 +133,7 @@ class MishuraApp {
         this.lastConsultationId = null;
     }
 
+    // 🚨 ИСПРАВЛЕНИЕ 1: Правильная проверка успешной оплаты
     async checkForSuccessfulPayment() {
         const urlParams = new URLSearchParams(window.location.search);
         const paymentSuccess = urlParams.get('payment_success'); // 'true', не '1'
@@ -143,6 +148,7 @@ class MishuraApp {
         if (paymentSuccess === 'true') {
             console.log('🎉 УСПЕШНАЯ ОПЛАТА ОБНАРУЖЕНА!');
             
+            // 🔄 Принудительное обновление баланса
             setTimeout(async () => {
                 await this.forceBalanceUpdate();
             }, 1000);
@@ -161,6 +167,7 @@ class MishuraApp {
         }
     }
 
+    // 🆕 Уведомление об успешной оплате
     showPaymentSuccessNotification() {
         // Удаляем предыдущие уведомления
         document.querySelectorAll('.payment-success-notification').forEach(el => el.remove());
@@ -208,6 +215,7 @@ class MishuraApp {
         }, 6000);
     }
 
+    // 🆕 СИНХРОНИЗАЦИЯ БАЛАНСА
     startBalanceSync() {
         console.log('🔄 Запуск синхронизации баланса...');
         
@@ -296,6 +304,7 @@ class MishuraApp {
         await this.syncBalance();
     }
 
+    // 🆕 Анимация изменения баланса
     animateBalanceChange() {
         const balanceElements = document.querySelectorAll('.balance-amount, .balance-value, [data-balance-display]');
         
@@ -737,6 +746,7 @@ class MishuraApp {
         this.triggerHapticFeedback('light');
     }
 
+    // 🚨 ИСПРАВЛЕНИЕ 2: Правильный return_url с нужными параметрами
     async initiatePayment(planId) {
         const plan = window.PRICING_PLANS[planId];
         if (!plan) {
@@ -977,6 +987,7 @@ class MishuraApp {
     }
 
     showResult(result) {
+        // 🆕 ДОБАВИТЬ В САМОЕ НАЧАЛО МЕТОДА:
         // Сохраняем ID консультации для системы отзывов
         this.lastConsultationId = result.consultation_id || Date.now();
         console.log('💾 Сохранен ID консультации для отзыва:', this.lastConsultationId);
@@ -1055,6 +1066,7 @@ class MishuraApp {
             }, 2000);
         }
         
+        // 🆕 ЗАПУСК ПРОВЕРКИ ОТЗЫВА ЧЕРЕЗ 1-3 МИНУТЫ ПОСЛЕ ПОКАЗА РЕЗУЛЬТАТА
         if (consultation && consultation.id) {
             setTimeout(() => {
                 this.checkAndShowFeedbackPrompt(consultation.id);
@@ -1076,6 +1088,7 @@ class MishuraApp {
     }
 
     normalizeAPIResponse(response) {
+        // 🚨 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Поддержка и "advice" и "analysis"
         if (response && typeof response === 'object') {
             // Проверяем и advice и analysis
             const advice = response.advice || response.analysis;

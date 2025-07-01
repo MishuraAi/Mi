@@ -1687,38 +1687,3 @@ body.modal-open .phone-container {
         font-size: 18px;
     }
 }
-
-/* ===== Œ ŒÕ◊¿“≈À‹Õ€≈ —“»À» DROPDOWN ===== */
-.occasion-options,
-#occasion-options {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-
-.final-dropdown::-webkit-scrollbar {
-    width: 6px;
-}
-
-.final-dropdown::-webkit-scrollbar-track {
-    background: rgba(42, 42, 42, 0.8);
-    border-radius: 3px;
-}
-
-.final-dropdown::-webkit-scrollbar-thumb {
-    background: #d4af37;
-    border-radius: 3px;
-}
-
-@media (max-width: 768px) {
-    .final-dropdown {
-        max-height: 250px;
-        font-size: 18px;
-    }
-    .final-dropdown-option {
-        min-height: 52px;
-        padding: 16px;
-        font-size: 18px;
-    }
-}

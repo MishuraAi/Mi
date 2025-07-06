@@ -1,0 +1,12 @@
+# === RENDER PRODUCTION REQUIREMENTS ===
+# Специально для Render Web Service
+
+-r requirements.txt
+
+# === PRODUCTION DATABASE ===
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.41
+
+# === ADDITIONAL PRODUCTION LIBS ===
+structlog==25.3.0
+prometheus_client==0.22.0

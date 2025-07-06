@@ -690,7 +690,7 @@ async def compare_consultation(request: Request):
 
 @app.post("/api/v1/payments/create")
 async def create_payment_endpoint(request: PaymentRequest):
-    """Создание платежа"""
+    """Создание платежа с правильным return_url"""
     
     if not payment_service:
         raise HTTPException(
@@ -701,8 +701,8 @@ async def create_payment_endpoint(request: PaymentRequest):
     logger.info("🔍 НАЧАЛО создания платежа:")
     logger.info(f"   telegram_id: {request.telegram_id}")
     logger.info(f"   plan_id: {request.plan_id}")
+    logger.info(f"   WEBAPP_URL: {WEBAPP_URL}")
     logger.info(f"   TEST_MODE: {TEST_MODE}")
-    logger.info(f"   payment_service: {'инициализирован' if payment_service else '❌ НЕ ИНИЦИАЛИЗИРОВАН'}")
     
     try:
         # Проверка тарифного плана
@@ -725,13 +725,11 @@ async def create_payment_endpoint(request: PaymentRequest):
             )
             logger.info(f"✅ Создан новый пользователь: user_id={user_id}, telegram_id={request.telegram_id}")
             
-            # 🚨 Устанавливаем начальный баланс 0 для нового пользователя
+            # Устанавливаем начальный баланс 0
             db.update_user_balance(request.telegram_id, 0, "initialization")
             
             # Получаем созданного пользователя
             user = db.get_user_by_telegram_id(request.telegram_id)
-        
-        logger.info(f"🔍 Верификация пользователя: {user}")
         
         if not user:
             logger.error(f"❌ Не удалось создать/найти пользователя для telegram_id: {request.telegram_id}")
@@ -742,14 +740,18 @@ async def create_payment_endpoint(request: PaymentRequest):
         # Генерируем уникальный ID платежа
         payment_id = str(uuid.uuid4())
         
-        logger.info(f"💎 Тарифный план: {plan}")
+        # 🔧 ИСПРАВЛЕНО: Динамический return_url на основе WEBAPP_URL
+        correct_return_url = f"{WEBAPP_URL}?payment_success=true&section=balance"
         
-        # 🚨 КРИТИЧЕСКИ ВАЖНО: Правильный return_url для секции баланса
+        logger.info(f"💎 Тарифный план: {plan}")
+        logger.info(f"🔗 Return URL: {correct_return_url}")
+        
+        # Создание платежа с правильным return_url
         payment_result = payment_service.create_payment(
             payment_id=payment_id,
             amount=plan['price'],
             description=f"МИШУРА - {plan['name']} ({plan['stcoins']} STCoins)",
-            return_url="https://style-ai-bot.onrender.com/?payment_success=true&section=balance",
+            return_url=correct_return_url,  # 🔧 ИСПРАВЛЕНО!
             user_id=user_id,
             telegram_id=request.telegram_id,
             plan_id=request.plan_id,
@@ -767,6 +769,7 @@ async def create_payment_endpoint(request: PaymentRequest):
             "payment_id": payment_id,
             "yookassa_payment_id": payment_result.get('yookassa_payment_id'),
             "payment_url": payment_result['payment_url'],
+            "return_url": correct_return_url,  # 🔧 ДОБАВЛЕНО для отладки
             "amount": plan['price'],
             "currency": "RUB",
             "plan": {
@@ -779,6 +782,7 @@ async def create_payment_endpoint(request: PaymentRequest):
         }
         
         logger.info(f"✅ Платеж создан: {payment_id} для пользователя {request.telegram_id}, план {request.plan_id} ({plan['name']})")
+        logger.info(f"🎯 Return URL установлен: {correct_return_url}")
         
         return response_data
         

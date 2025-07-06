@@ -148,12 +148,31 @@ class MishuraAPIService {
     // 🚨 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Надежное получение userId
     getCurrentUserId() {
         try {
+            // НОВОЕ: Используем UserService если доступен
+            if (window.userService) {
+                const userId = window.userService.getCurrentUserId();
+                console.log('🔥 User ID через UserService:', userId);
+                return userId;
+            }
+            
+            console.warn('⚠️ UserService недоступен, используем fallback');
+            
+            // Fallback на старую логику
+            return this.getFallbackUserId();
+            
+        } catch (error) {
+            console.error('❌ Ошибка получения user ID:', error);
+            return this.getFallbackUserId();
+        }
+    }
+
+    // НОВЫЙ fallback метод для api.js
+    getFallbackUserId() {
+        try {
             // 1. Проверяем Telegram WebApp (приоритет)
             if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
                 const telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
-                console.log('🔥 User ID из Telegram WebApp:', telegramId);
-                // Сохраняем в localStorage для будущих запросов
-                localStorage.setItem('user_id', telegramId.toString());
+                console.log('🔥 Fallback: User ID из Telegram WebApp:', telegramId);
                 return parseInt(telegramId);
             }
             
@@ -162,8 +181,7 @@ class MishuraAPIService {
             if (urlParams.has('user_id')) {
                 const userId = parseInt(urlParams.get('user_id'));
                 if (!isNaN(userId)) {
-                    console.log('🔥 User ID из URL параметров:', userId);
-                    localStorage.setItem('user_id', userId.toString());
+                    console.log('🔥 Fallback: User ID из URL параметров:', userId);
                     return userId;
                 }
             }
@@ -172,7 +190,7 @@ class MishuraAPIService {
             const storedId = localStorage.getItem('user_id');
             if (storedId && !isNaN(storedId)) {
                 const userId = parseInt(storedId);
-                console.log('🔥 User ID из localStorage:', userId);
+                console.log('🔥 Fallback: User ID из localStorage:', userId);
                 return userId;
             }
             
@@ -180,22 +198,17 @@ class MishuraAPIService {
             const telegramUserId = localStorage.getItem('telegram_user_id');
             if (telegramUserId && !isNaN(telegramUserId)) {
                 const userId = parseInt(telegramUserId);
-                console.log('🔥 User ID из telegram_user_id:', userId);
-                // Синхронизируем ключи
-                localStorage.setItem('user_id', userId.toString());
+                console.log('🔥 Fallback: User ID из telegram_user_id:', userId);
                 return userId;
             }
             
-            // 5. Fallback - используем ID из логов (который работает)
+            // 5. Последний fallback
             const fallbackId = 5930269100;
-            console.warn('⚠️ Используется fallback user_id:', fallbackId);
-            localStorage.setItem('user_id', fallbackId.toString());
-            localStorage.setItem('telegram_user_id', fallbackId.toString());
+            console.warn('⚠️ Fallback: используется default user_id:', fallbackId);
             return fallbackId;
             
         } catch (error) {
-            console.error('❌ Ошибка получения user ID:', error);
-            // Последний fallback
+            console.error('❌ Ошибка fallback getUserId:', error);
             const emergencyId = 5930269100;
             console.warn('🚨 EMERGENCY fallback user_id:', emergencyId);
             return emergencyId;
@@ -403,6 +416,21 @@ class MishuraAPIService {
         });
 
         return true;
+    }
+
+    // ДОБАВИТЬ В КОНЕЦ КЛАССА MishuraAPIService новый метод
+    async notifyBalanceChange(newBalance) {
+        /**
+         * Уведомляет о изменении баланса через UserService
+         */
+        try {
+            if (window.userService) {
+                window.userService.notifyBalanceChange(newBalance);
+                console.log(`📢 API: Уведомление об изменении баланса: ${newBalance}`);
+            }
+        } catch (error) {
+            console.error('❌ Ошибка уведомления об изменении баланса:', error);
+        }
     }
 }
 

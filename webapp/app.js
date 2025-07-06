@@ -101,6 +101,11 @@ class MishuraApp {
         if (this.initializationComplete) return;
 
         try {
+            // НОВОЕ: Инициализируем UserService
+            if (window.userService) {
+                await this.initializeUserService();
+            }
+            
             await this.checkForSuccessfulPayment();
             
             this.setupNavigation();
@@ -110,23 +115,286 @@ class MishuraApp {
             
             this.initFeedbackSystem();
             
-            this.startBalanceSync();
+            // ОБНОВЛЕНО: Новая система синхронизации
+            this.startAdvancedBalanceSync();
             
             this.setupTelegramIntegration();
             this.initModularNavigation();
             
-            // ДОБАВЛЯЕМ стили dropdown
             this.addDropdownStyles();
             
             this.initializationComplete = true;
             
-            console.log('✅ MishuraApp инициализирован с ОКОНЧАТЕЛЬНЫМ dropdown');
+            console.log('✅ MishuraApp инициализирован с UserService');
             
         } catch (error) {
             console.error('❌ Ошибка инициализации:', error);
         }
 
         this.lastConsultationId = null;
+    }
+
+    // НОВЫЙ метод инициализации UserService
+    async initializeUserService() {
+        try {
+            console.log('👤 Инициализация UserService...');
+            
+            // Получаем актуального пользователя
+            const userId = window.userService.getCurrentUserId();
+            console.log(`✅ Пользователь определен: ${userId}`);
+            
+            // Синхронизируем баланс
+            const balance = await window.userService.getBalance(true);
+            if (balance !== null && balance !== this.userBalance) {
+                console.log(`💰 Баланс синхронизирован: ${this.userBalance} → ${balance}`);
+                this.userBalance = balance;
+                this.saveUserData();
+                this.updateBalanceDisplay();
+            }
+            
+            // Подписываемся на изменения баланса
+            document.addEventListener('balanceChanged', (event) => {
+                const newBalance = event.detail.balance;
+                if (newBalance !== this.userBalance) {
+                    console.log(`📢 Получено уведомление об изменении баланса: ${this.userBalance} → ${newBalance}`);
+                    this.userBalance = newBalance;
+                    this.saveUserData();
+                    this.updateBalanceDisplay();
+                    this.animateBalanceChange();
+                }
+            });
+            
+            console.log('✅ UserService инициализирован');
+            
+        } catch (error) {
+            console.error('❌ Ошибка инициализации UserService:', error);
+        }
+    }
+
+    // ОБНОВЛЕННАЯ система синхронизации баланса
+    startAdvancedBalanceSync() {
+        console.log('🔄 Запуск продвинутой синхронизации баланса...');
+        
+        // Основной интервал синхронизации (каждые 30 секунд)
+        this.balanceSync.interval = setInterval(async () => {
+            if (!this.balanceSync.isUpdating && window.userService) {
+                await this.advancedSyncBalance();
+            }
+        }, 30000);
+        
+        // Синхронизация при изменении видимости
+        document.addEventListener('visibilitychange', async () => {
+            if (!document.hidden && window.userService && !this.balanceSync.isUpdating) {
+                await this.advancedSyncBalance();
+            }
+        });
+        
+        // Синхронизация при фокусе окна
+        window.addEventListener('focus', async () => {
+            if (window.userService && !this.balanceSync.isUpdating) {
+                await this.advancedSyncBalance();
+            }
+        });
+        
+        // Синхронизация при online/offline
+        window.addEventListener('online', async () => {
+            console.log('🌐 Подключение восстановлено, синхронизируем баланс');
+            if (window.userService && !this.balanceSync.isUpdating) {
+                await this.advancedSyncBalance();
+            }
+        });
+        
+        console.log('✅ Продвинутая синхронизация активирована');
+    }
+
+    // НОВЫЙ метод синхронизации баланса
+    async advancedSyncBalance() {
+        const now = Date.now();
+        
+        // Не синхронизируем слишком часто
+        if (now - this.balanceSync.lastUpdate < 10000 && !this.balanceSync.forceUpdate) {
+            return;
+        }
+        
+        console.log('🔄 Продвинутая синхронизация баланса...');
+        
+        try {
+            this.balanceSync.isUpdating = true;
+            
+            if (!window.userService) {
+                console.warn('⚠️ UserService недоступен, используем fallback');
+                await this.syncBalance(); // Старый метод
+                return;
+            }
+            
+            // Получаем актуальный баланс через UserService
+            const newBalance = await window.userService.getBalance(this.balanceSync.forceUpdate);
+            
+            if (newBalance !== null && newBalance !== this.userBalance) {
+                const oldBalance = this.userBalance;
+                this.userBalance = newBalance;
+                this.saveUserData();
+                
+                console.log(`💰 Баланс синхронизирован: ${oldBalance} → ${newBalance}`);
+                
+                // Обновляем отображение
+                this.updateBalanceDisplay();
+                
+                // Показываем уведомление при увеличении
+                if (newBalance > oldBalance) {
+                    const difference = newBalance - oldBalance;
+                    this.showNotification(
+                        `🎉 Баланс пополнен на ${difference} STcoin!`, 
+                        'success', 
+                        4000
+                    );
+                    this.animateBalanceChange();
+                }
+            }
+            
+            this.balanceSync.lastUpdate = now;
+            this.balanceSync.forceUpdate = false;
+            
+        } catch (error) {
+            console.error('❌ Ошибка продвинутой синхронизации баланса:', error);
+            
+            // Fallback на старый метод
+            try {
+                await this.syncBalance();
+            } catch (fallbackError) {
+                console.error('❌ Fallback синхронизация также не удалась:', fallbackError);
+            }
+        } finally {
+            this.balanceSync.isUpdating = false;
+        }
+    }
+
+    // ОБНОВЛЕННЫЙ метод принудительного обновления
+    async forceBalanceUpdate() {
+        console.log('🔄 Принудительное обновление баланса...');
+        
+        if (window.userService) {
+            try {
+                const balance = await window.userService.syncBalance();
+                if (balance !== null) {
+                    console.log('✅ Принудительное обновление через UserService завершено');
+                    return;
+                }
+            } catch (error) {
+                console.error('❌ Ошибка принудительного обновления через UserService:', error);
+            }
+        }
+        
+        // Fallback на старый метод
+        this.balanceSync.forceUpdate = true;
+        await this.syncBalance();
+    }
+
+    // ОБНОВЛЕННЫЙ метод получения userId
+    getUserId() {
+        if (window.userService) {
+            try {
+                const userId = window.userService.getCurrentUserId();
+                console.log(`✅ User ID получен через UserService: ${userId}`);
+                return userId;
+            } catch (error) {
+                console.error('❌ Ошибка получения User ID через UserService:', error);
+            }
+        }
+        
+        // Fallback на старый метод
+        console.warn('⚠️ Используем fallback метод получения User ID');
+        return this.getFallbackUserId();
+    }
+
+    // НОВЫЙ fallback метод
+    getFallbackUserId() {
+        try {
+            // Проверяем Telegram WebApp
+            if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+                const telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
+                console.log('✅ Fallback: Telegram ID:', telegramId);
+                return parseInt(telegramId);
+            }
+            
+            // Проверяем localStorage
+            const storedId = localStorage.getItem('user_id');
+            if (storedId && !isNaN(storedId)) {
+                const userId = parseInt(storedId);
+                console.log('✅ Fallback: localStorage ID:', userId);
+                return userId;
+            }
+            
+            // Последний fallback
+            const defaultId = 5930269100;
+            console.warn('⚠️ Fallback: используем default ID:', defaultId);
+            return defaultId;
+            
+        } catch (error) {
+            console.error('❌ Ошибка fallback getUserId:', error);
+            return 5930269100;
+        }
+    }
+
+    // НОВЫЙ метод диагностики
+    async diagnoseSyncIssues() {
+        console.log('🔍 === ДИАГНОСТИКА СИНХРОНИЗАЦИИ БАЛАНСА ===');
+        
+        // Диагностика UserService
+        if (window.userService) {
+            await window.userService.diagnose();
+        } else {
+            console.warn('⚠️ UserService недоступен');
+        }
+        
+        // Диагностика app.js
+        console.log('📱 App.js состояние:');
+        console.log(`   userBalance: ${this.userBalance}`);
+        console.log(`   consultationsHistory: ${this.consultationsHistory.length}`);
+        console.log(`   балансSync.lastUpdate: ${new Date(this.balanceSync.lastUpdate).toLocaleTimeString()}`);
+        console.log(`   balanceSync.isUpdating: ${this.balanceSync.isUpdating}`);
+        
+        // Диагностика localStorage
+        console.log('💾 LocalStorage:');
+        console.log(`   mishura_user_data: ${localStorage.getItem('mishura_user_data')}`);
+        console.log(`   user_id: ${localStorage.getItem('user_id')}`);
+        console.log(`   current_user_session: ${localStorage.getItem('current_user_session')}`);
+        
+        console.log('🔍 === КОНЕЦ ДИАГНОСТИКИ ===');
+    }
+
+    // ОБНОВЛЕНИЕ метода загрузки пользовательских данных
+    loadUserData() {
+        try {
+            const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
+            
+            // Загружаем данные
+            this.userBalance = data.balance || 200;
+            this.consultationsHistory = data.history || [];
+            this.consultationsUsed = data.used || 0;
+            
+            // НОВОЕ: Проверяем через UserService если доступен
+            if (window.userService) {
+                console.log('🔄 Проверяем актуальность баланса через UserService...');
+                // Асинхронно проверяем актуальный баланс
+                window.userService.getBalance().then(serverBalance => {
+                    if (serverBalance !== null && serverBalance !== this.userBalance) {
+                        console.log(`💰 Обнаружено расхождение баланса: local=${this.userBalance}, server=${serverBalance}`);
+                        this.userBalance = serverBalance;
+                        this.saveUserData();
+                        this.updateBalanceDisplay();
+                    }
+                }).catch(error => {
+                    console.warn('⚠️ Не удалось проверить актуальный баланс:', error);
+                });
+            }
+            
+            console.log(`💾 Данные пользователя загружены: баланс=${this.userBalance}, консультаций=${this.consultationsHistory.length}`);
+            
+        } catch (error) {
+            console.error('❌ Ошибка загрузки данных пользователя:', error);
+            this.initializeUserData();
+        }
     }
 
     async checkForSuccessfulPayment() {
@@ -206,94 +474,6 @@ class MishuraApp {
                 }
             }, 500);
         }, 6000);
-    }
-
-    startBalanceSync() {
-        console.log('🔄 Запуск синхронизации баланса...');
-        
-        // Синхронизация каждые 30 секунд
-        this.balanceSync.interval = setInterval(async () => {
-            if (!this.balanceSync.isUpdating) {
-                await this.syncBalance();
-            }
-        }, 30000);
-        
-        // Синхронизация при фокусе вкладки
-        document.addEventListener('visibilitychange', async () => {
-            if (!document.hidden && !this.balanceSync.isUpdating) {
-                await this.syncBalance();
-            }
-        });
-        
-        // Синхронизация при фокусе окна
-        window.addEventListener('focus', async () => {
-            if (!this.balanceSync.isUpdating) {
-                await this.syncBalance();
-            }
-        });
-        
-        console.log('✅ Синхронизация баланса активирована');
-    }
-
-    async syncBalance() {
-        const now = Date.now();
-        
-        // Не синхронизируем слишком часто (минимум 10 секунд)
-        if (now - this.balanceSync.lastUpdate < 10000 && !this.balanceSync.forceUpdate) {
-            return;
-        }
-        
-        console.log('🔄 Синхронизация баланса...');
-        
-        try {
-            this.balanceSync.isUpdating = true;
-            
-            const userId = this.getUserId();
-            const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/balance?_t=${now}`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const balanceData = await response.json();
-            const newBalance = balanceData.balance;
-            
-            if (newBalance !== this.userBalance) {
-                const oldBalance = this.userBalance;
-                this.userBalance = newBalance;
-                this.saveUserData();
-                
-                console.log(`💰 Баланс синхронизирован: ${oldBalance} → ${newBalance}`);
-                
-                // Обновляем отображение
-                this.updateBalanceDisplay();
-                
-                // Показываем уведомление только если баланс увеличился
-                if (newBalance > oldBalance) {
-                    const difference = newBalance - oldBalance;
-                    this.showNotification(
-                        `🎉 Баланс пополнен на ${difference} STcoin!`, 
-                        'success', 
-                        4000
-                    );
-                    this.animateBalanceChange();
-                }
-            }
-            
-            this.balanceSync.lastUpdate = now;
-            this.balanceSync.forceUpdate = false;
-            
-        } catch (error) {
-            console.error('❌ Ошибка синхронизации баланса:', error);
-        } finally {
-            this.balanceSync.isUpdating = false;
-        }
-    }
-
-    async forceBalanceUpdate() {
-        console.log('🔄 Принудительное обновление баланса...');
-        this.balanceSync.forceUpdate = true;
-        await this.syncBalance();
     }
 
     animateBalanceChange() {
@@ -1588,9 +1768,30 @@ class MishuraApp {
     loadUserData() {
         try {
             const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
+            
+            // Загружаем данные
             this.userBalance = data.balance || 200;
             this.consultationsHistory = data.history || [];
             this.consultationsUsed = data.used || 0;
+            
+            // НОВОЕ: Проверяем через UserService если доступен
+            if (window.userService) {
+                console.log('🔄 Проверяем актуальность баланса через UserService...');
+                // Асинхронно проверяем актуальный баланс
+                window.userService.getBalance().then(serverBalance => {
+                    if (serverBalance !== null && serverBalance !== this.userBalance) {
+                        console.log(`💰 Обнаружено расхождение баланса: local=${this.userBalance}, server=${serverBalance}`);
+                        this.userBalance = serverBalance;
+                        this.saveUserData();
+                        this.updateBalanceDisplay();
+                    }
+                }).catch(error => {
+                    console.warn('⚠️ Не удалось проверить актуальный баланс:', error);
+                });
+            }
+            
+            console.log(`💾 Данные пользователя загружены: баланс=${this.userBalance}, консультаций=${this.consultationsHistory.length}`);
+            
         } catch (error) {
             console.error('❌ Ошибка загрузки данных пользователя:', error);
             this.initializeUserData();
@@ -1663,67 +1864,6 @@ class MishuraApp {
         
         document.body.appendChild(modal);
         this.triggerHapticFeedback('light');
-    }
-
-    // === УТИЛИТЫ ===
-    
-    getUserId() {
-        try {
-            // 1. Проверяем Telegram WebApp (приоритет)
-            if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-                const telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
-                console.log('✅ Получен Telegram ID из WebApp:', telegramId);
-                // Сохраняем в localStorage для будущих запросов
-                localStorage.setItem('user_id', telegramId.toString());
-                localStorage.setItem('telegram_user_id', telegramId.toString());
-                return parseInt(telegramId);
-            }
-            
-            // 2. Проверяем URL параметры
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('user_id')) {
-                const userId = parseInt(urlParams.get('user_id'));
-                if (!isNaN(userId)) {
-                    console.log('✅ Получен user_id из URL:', userId);
-                    localStorage.setItem('user_id', userId.toString());
-                    localStorage.setItem('telegram_user_id', userId.toString());
-                    return userId;
-                }
-            }
-            
-            // 3. Проверяем localStorage с ключом 'user_id'
-            const storedId = localStorage.getItem('user_id');
-            if (storedId && !isNaN(storedId)) {
-                const userId = parseInt(storedId);
-                console.log('✅ Получен user_id из localStorage:', userId);
-                return userId;
-            }
-            
-            // 4. Проверяем localStorage с ключом 'telegram_user_id'
-            const telegramUserId = localStorage.getItem('telegram_user_id');
-            if (telegramUserId && !isNaN(telegramUserId)) {
-                const userId = parseInt(telegramUserId);
-                console.log('✅ Получен telegram_user_id из localStorage:', userId);
-                // Синхронизируем ключи
-                localStorage.setItem('user_id', userId.toString());
-                return userId;
-            }
-            
-            // 5. Тестовый ID для разработки (как в логах - этот ID работает!)
-            const testId = 5930269100;
-            console.warn('⚠️ Используется тестовый telegram_id:', testId);
-            localStorage.setItem('user_id', testId.toString());
-            localStorage.setItem('telegram_user_id', testId.toString());
-            return testId;
-            
-        } catch (error) {
-            console.error('❌ Ошибка получения user ID:', error);
-            const fallbackId = 5930269100;
-            console.warn('🔄 Используется fallback telegram_id:', fallbackId);
-            localStorage.setItem('user_id', fallbackId.toString());
-            localStorage.setItem('telegram_user_id', fallbackId.toString());
-            return fallbackId;
-        }
     }
 
     deductConsultation(cost = 10) {

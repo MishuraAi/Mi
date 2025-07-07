@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import Optional, Any
 from contextlib import asynccontextmanager
 import time
+import psutil
+import gc
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -1431,6 +1433,272 @@ async def shutdown_event():
     """Остановка приложения"""
     logger.info("🛑 Остановка МИШУРА API сервера")
     keep_alive.stop_keepalive()
+
+# === ДИАГНОСТИЧЕСКИЕ ENDPOINTS ===
+
+@app.get("/api/v1/diagnostics/health")
+async def comprehensive_health_check():
+    """🔍 Комплексная диагностика состояния сервиса"""
+    start_time = time.time()
+    try:
+        memory_info = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=1)
+        db_status = "unknown"
+        db_response_time = None
+        try:
+            db_start = time.time()
+            stats = db.get_stats()
+            db_response_time = time.time() - db_start
+            db_status = "healthy"
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+        gemini_status = "unknown"
+        gemini_response_time = None
+        try:
+            gemini_start = time.time()
+            gemini_test = await gemini_ai.test_gemini_connection()
+            gemini_response_time = time.time() - gemini_start
+            gemini_status = "healthy" if gemini_test else "quota_exceeded"
+        except Exception as e:
+            gemini_status = f"error: {str(e)}"
+        boot_time = datetime.fromtimestamp(psutil.boot_time())
+        uptime = datetime.now() - boot_time
+        gc_stats = gc.get_stats()
+        total_time = time.time() - start_time
+        health_report = {
+            "timestamp": datetime.now().isoformat(),
+            "service_status": "healthy",
+            "render_plan": "starter",
+            "diagnostics": {
+                "response_time_ms": round(total_time * 1000, 2),
+                "system": {
+                    "cpu_percent": cpu_percent,
+                    "memory_used_mb": round(memory_info.used / 1024 / 1024, 2),
+                    "memory_available_mb": round(memory_info.available / 1024 / 1024, 2),
+                    "memory_percent": memory_info.percent,
+                    "uptime_hours": round(uptime.total_seconds() / 3600, 2)
+                },
+                "database": {
+                    "status": db_status,
+                    "response_time_ms": round(db_response_time * 1000, 2) if db_response_time else None
+                },
+                "gemini_ai": {
+                    "status": gemini_status,
+                    "response_time_ms": round(gemini_response_time * 1000, 2) if gemini_response_time else None
+                },
+                "python": {
+                    "gc_collections": len(gc_stats),
+                    "gc_objects": sum(stat['collected'] for stat in gc_stats)
+                }
+            },
+            "alerts": []
+        }
+        if memory_info.percent > 80:
+            health_report["alerts"].append("⚠️ High memory usage")
+        if cpu_percent > 80:
+            health_report["alerts"].append("⚠️ High CPU usage")
+        if gemini_status == "quota_exceeded":
+            health_report["alerts"].append("🔄 Gemini API quota exceeded")
+        if db_response_time and db_response_time > 1.0:
+            health_report["alerts"].append("🐌 Slow database response")
+        return health_report
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "service_status": "unhealthy",
+            "error": str(e),
+            "render_plan": "starter"
+        }
+
+@app.get("/api/v1/diagnostics/cold-start")
+async def cold_start_test():
+    """🧊 Тест холодного старта"""
+    start_time = time.time()
+    operations = {}
+    db_start = time.time()
+    try:
+        test_db = MishuraDB()
+        test_db.get_stats()
+        operations["database_init"] = time.time() - db_start
+    except Exception as e:
+        operations["database_init"] = f"error: {e}"
+    env_start = time.time()
+    env_vars = {
+        "TELEGRAM_TOKEN": "set" if os.getenv('TELEGRAM_TOKEN') else "missing",
+        "GEMINI_API_KEY": "set" if os.getenv('GEMINI_API_KEY') else "missing",
+        "WEBAPP_URL": os.getenv('WEBAPP_URL', 'not_set'),
+        "ENVIRONMENT": os.getenv('ENVIRONMENT', 'not_set')
+    }
+    operations["env_check"] = time.time() - env_start
+    import_start = time.time()
+    try:
+        import google.generativeai as genai
+        operations["heavy_imports"] = time.time() - import_start
+    except Exception as e:
+        operations["heavy_imports"] = f"error: {e}"
+    total_time = time.time() - start_time
+    return {
+        "cold_start_test": {
+            "total_time_ms": round(total_time * 1000, 2),
+            "operations": {k: round(v * 1000, 2) if isinstance(v, float) else v 
+                         for k, v in operations.items()},
+            "environment": env_vars,
+            "timestamp": datetime.now().isoformat()
+        },
+        "recommendations": {
+            "acceptable_cold_start": "< 10 seconds",
+            "your_result": f"{total_time:.2f} seconds",
+            "status": "good" if total_time < 10 else "slow"
+        }
+    }
+
+@app.get("/api/v1/diagnostics/memory")
+async def memory_diagnostics():
+    """🧠 Диагностика использования памяти"""
+    try:
+        memory = psutil.virtual_memory()
+        import sys
+        python_objects = len(gc.get_objects())
+        process = psutil.Process()
+        process_memory = process.memory_info()
+        return {
+            "memory_diagnostics": {
+                "system": {
+                    "total_mb": round(memory.total / 1024 / 1024, 2),
+                    "used_mb": round(memory.used / 1024 / 1024, 2),
+                    "available_mb": round(memory.available / 1024 / 1024, 2),
+                    "percent": memory.percent
+                },
+                "process": {
+                    "rss_mb": round(process_memory.rss / 1024 / 1024, 2),
+                    "vms_mb": round(process_memory.vms / 1024 / 1024, 2),
+                    "python_objects": python_objects
+                },
+                "limits": {
+                    "starter_plan_limit_mb": 512,
+                    "memory_pressure": memory.percent > 80,
+                    "process_size_ok": process_memory.rss < 400 * 1024 * 1024
+                }
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e), "timestamp": datetime.now().isoformat()}
+
+@app.get("/api/v1/diagnostics/gemini-quota")
+async def gemini_quota_diagnostics():
+    """🤖 Детальная диагностика квот Gemini API"""
+    try:
+        test_start = time.time()
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content("Hi", 
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=1,
+                    temperature=0
+                ))
+            test_time = time.time() - test_start
+            return {
+                "gemini_quota_status": {
+                    "status": "available",
+                    "response_time_ms": round(test_time * 1000, 2),
+                    "test_response": str(response.text)[:50],
+                    "model": "gemini-1.5-flash",
+                    "quota_info": {
+                        "tier": "free",
+                        "daily_limit": 50,
+                        "note": "Quota resets at 00:00 UTC"
+                    }
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            error_msg = str(e).lower()
+            if 'quota' in error_msg or '429' in error_msg:
+                return {
+                    "gemini_quota_status": {
+                        "status": "quota_exceeded",
+                        "error": str(e),
+                        "diagnosis": "Daily quota of 50 requests exceeded",
+                        "reset_time": "00:00 UTC tomorrow",
+                        "recommendation": "Wait for quota reset or upgrade to paid tier"
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+            else:
+                return {
+                    "gemini_quota_status": {
+                        "status": "api_error",
+                        "error": str(e),
+                        "diagnosis": "API connectivity or configuration issue"
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+    except Exception as e:
+        return {
+            "gemini_quota_status": {
+                "status": "system_error",
+                "error": str(e)
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/v1/diagnostics/render-logs")
+async def render_deployment_info():
+    """📋 Информация о deployment в Render"""
+    return {
+        "render_info": {
+            "service_name": os.getenv('RENDER_SERVICE_NAME', 'unknown'),
+            "service_id": os.getenv('RENDER_SERVICE_ID', 'unknown'),
+            "deploy_id": os.getenv('RENDER_DEPLOY_ID', 'unknown'),
+            "git_commit": os.getenv('RENDER_GIT_COMMIT', 'unknown'),
+            "external_url": os.getenv('RENDER_EXTERNAL_URL', 'unknown'),
+            "region": os.getenv('RENDER_REGION', 'unknown'),
+            "plan": "starter",
+            "should_not_sleep": True
+        },
+        "python_info": {
+            "version": sys.version,
+            "executable": sys.executable,
+            "path": sys.path[:3]
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+# === ENDPOINT ДЛЯ КОМПЛЕКСНОЙ ДИАГНОСТИКИ ===
+
+@app.get("/api/v1/diagnostics/full-report")
+async def full_diagnostic_report():
+    """📊 Полный диагностический отчет"""
+    report_start = time.time()
+    health = await comprehensive_health_check()
+    cold_start = await cold_start_test()
+    memory = await memory_diagnostics()
+    gemini = await gemini_quota_diagnostics()
+    render_info = await render_deployment_info()
+    total_time = time.time() - report_start
+    return {
+        "full_diagnostic_report": {
+            "generated_at": datetime.now().isoformat(),
+            "report_generation_time_ms": round(total_time * 1000, 2),
+            "summary": {
+                "service_healthy": health.get("service_status") == "healthy",
+                "memory_ok": memory.get("memory_diagnostics", {}).get("limits", {}).get("memory_pressure", True) == False,
+                "gemini_available": gemini.get("gemini_quota_status", {}).get("status") == "available",
+                "cold_start_acceptable": cold_start.get("recommendations", {}).get("status") == "good"
+            },
+            "detailed_reports": {
+                "health": health,
+                "cold_start": cold_start,
+                "memory": memory,
+                "gemini": gemini,
+                "render": render_info
+            }
+        }
+    }
 
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")

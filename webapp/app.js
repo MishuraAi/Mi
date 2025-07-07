@@ -180,7 +180,7 @@ class MishuraApp {
             if (!this.balanceSync.isUpdating && window.userService) {
                 await this.advancedSyncBalance();
             }
-        } 30000);
+        }, 30000);
         
         // Синхронизация при изменении видимости
         document.addEventListener('visibilitychange', async () => {
@@ -460,19 +460,19 @@ class MishuraApp {
             
             setTimeout(async () => {
                 await this.forceBalanceUpdate();
-            } 1000);
+            }, 1000);
             
             // 🧭 Переход в секцию баланса
             setTimeout(() => {
                 this.navigateToSection('balance');
-            } 1500);
+            }, 1500);
             
             // 🧹 Очистка URL
             setTimeout(() => {
                 const newUrl = window.location.origin + window.location.pathname;
-                window.history.replaceState({} document.title, newUrl);
+                window.history.replaceState({}, document.title, newUrl);
                 console.log('🧹 URL очищен от параметров оплаты');
-            } 3000);
+            }, 3000);
         }
     }
 
@@ -519,8 +519,8 @@ class MishuraApp {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);
                 }
-            } 500);
-        } 6000);
+            }, 500);
+        }, 6000);
     }
 
     animateBalanceChange() {
@@ -531,7 +531,7 @@ class MishuraApp {
             
             setTimeout(() => {
                 element.style.animation = '';
-            } 1000);
+            }, 1000);
         });
     }
 
@@ -685,7 +685,7 @@ class MishuraApp {
         
         setTimeout(() => {
             this.fixModeButtons();
-        } 100);
+        }, 100);
     }
 
     async showBalanceSection() {
@@ -988,7 +988,7 @@ class MishuraApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
                 body: JSON.stringify(paymentData)
             });
 
@@ -1094,7 +1094,7 @@ class MishuraApp {
             
             setTimeout(() => {
                 this.showFeedbackModal(consultationIdForFeedback);
-            } 500);
+            }, 500);
             
             this.lastConsultationId = null;
             
@@ -1279,19 +1279,19 @@ class MishuraApp {
             setTimeout(() => {
                 const consultationsRemaining = Math.floor(this.userBalance / 10);
                 this.showNotification(`⚠️ Осталось ${consultationsRemaining} консультаций`, 'warning', 4000);
-            } 2000);
+            }, 2000);
         }
         
         if (consultation && consultation.id) {
             setTimeout(() => {
                 this.checkAndShowFeedbackPrompt(consultation.id);
-            } Math.random() * 120000 + 60000); // 1-3 минуты
+            }, Math.random() * 120000 + 60000); // 1-3 минуты
         } else {
             // Если нет ID консультации, используем timestamp как ID
             const mockConsultationId = Date.now();
             setTimeout(() => {
                 this.checkAndShowFeedbackPrompt(mockConsultationId);
-            } Math.random() * 120000 + 60000);
+            }, Math.random() * 120000 + 60000);
         }
         
         // Запускаем проверку отзыва через 2 минуты после показа результата
@@ -1299,7 +1299,7 @@ class MishuraApp {
             const mockConsultationId = Date.now();
             console.log('⏰ Автоматический запуск проверки отзыва через 2 минуты');
             this.checkAndShowFeedbackPrompt(mockConsultationId);
-        } 120000); // 2 минуты для тестирования
+        }, 120000); // 2 минуты для тестирования
     }
 
     normalizeAPIResponse(response) {
@@ -1480,7 +1480,7 @@ class MishuraApp {
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
                 reject(new Error(`Превышено время ожидания (${this.requestTimeout / 1000} сек)`));
-            } this.requestTimeout);
+            }, this.requestTimeout);
         });
         
         try {
@@ -1537,7 +1537,7 @@ class MishuraApp {
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
                 reject(new Error(`Превышено время ожидания сравнения (${this.requestTimeout / 1000} сек)`));
-            } this.requestTimeout);
+            }, this.requestTimeout);
         });
         
         try {
@@ -1677,9 +1677,9 @@ class MishuraApp {
                 notificationElement.style.animation = 'slideOutUp 0.3s ease forwards';
                 setTimeout(() => {
                     notification.remove();
-                } 300);
+                }, 300);
             }
-        } duration);
+        }, duration);
     }
 
     // === ЗАГРУЗЧИКИ ФАЙЛОВ ===
@@ -1956,7 +1956,7 @@ class MishuraApp {
             if (builtinDropdown) {
                 builtinDropdown.remove();
             }
-        } 100);
+        }, 100);
 
         // Глобальные переменные для dropdown
         window.DROPDOWN_STATE = {
@@ -1995,7 +1995,7 @@ class MishuraApp {
         // Обработчик document - с задержкой для предотвращения конфликтов
         setTimeout(() => {
             document.addEventListener('click', this.handleDocumentClick.bind(this), false);
-        } 500);
+        }, 500);
 
         console.log('🎯 Обработчики установлены с правильной изоляцией');
     }
@@ -2015,7 +2015,7 @@ class MishuraApp {
             // Задержка для предотвращения конфликта с document обработчиком
             setTimeout(() => {
                 this.openDropdown();
-            } 50);
+            }, 50);
         }
     }
 
@@ -2320,7 +2320,7 @@ class MishuraApp {
                 
                 setTimeout(() => {
                     this.showFeedbackModal(consultationId);
-                } delay);
+                }, delay);
                 
                 // Логируем что показали форму
                 await this.logFeedbackPromptAction(consultationId, 'shown');
@@ -2354,7 +2354,7 @@ class MishuraApp {
         // Анимация появления
         setTimeout(() => {
             modal.classList.add('active');
-        } 100);
+        }, 100);
         
         // Настройка обработчиков
         this.setupFeedbackModalHandlers(modal);
@@ -2517,7 +2517,7 @@ class MishuraApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
                 body: JSON.stringify({
                     telegram_id: userId,
                     feedback_text: trimmedText,
@@ -2597,7 +2597,7 @@ class MishuraApp {
         modal.classList.remove('active');
         setTimeout(() => {
             modal.remove();
-        } 300);
+        }, 300);
         
         this.feedbackSystem.currentConsultationId = null;
         this.feedbackSystem.selectedRating = null;
@@ -2611,7 +2611,7 @@ class MishuraApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
                 body: JSON.stringify({
                     telegram_id: userId,
                     consultation_id: consultationId,

@@ -23,6 +23,8 @@ from PIL import Image, ImageOps, ImageDraw
 from io import BytesIO
 from typing import Optional, List, Tuple, Union, Dict, Any
 import traceback
+import re
+import base64
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -331,104 +333,120 @@ async def _send_to_gemini_with_retries(parts: List[Any], context: str) -> str:
                 logger.error(f"❌ Все попытки исчерпаны: {error_msg}")
                 raise RuntimeError(error_msg)
 
-async def analyze_clothing_image(image_data: bytes, occasion: str, preferences: Optional[str] = None) -> str:
-    """
-    Анализирует одежду на изображении с помощью Gemini AI.
-    
-    Args:
-        image_data: Бинарные данные изображения
-        occasion: Повод для консультации
-        preferences: Предпочтения пользователя
-        
-    Returns:
-        str: Анализ и рекомендации
-    """
-    logger.info(f"🎨 Начало анализа образа для повода: {occasion}")
-    
+async def analyze_clothing_image(image_data: bytes, occasion: str = "повседневный", preferences: str = "") -> str:
+    """Анализ одежды на изображении с чистым ответом без комментариев"""
     try:
+        logger.info(f"🎨 Начало анализа образа для: {occasion}")
         # Оптимизируем изображение
-        img = Image.open(BytesIO(image_data))
-        optimized_image = optimize_image(img)
-        
-        # Создаем промпт
-        prompt = create_analysis_prompt(occasion, preferences)
-        
-        # Подготавливаем части запроса
-        parts = [
-            prompt,
-            {
-                "mime_type": "image/jpeg",
-                "data": optimized_image
-            }
-        ]
-        
-        # Отправляем запрос
+        optimized_image = optimize_image(Image.open(BytesIO(image_data)))
+        logger.info("✅ Изображение оптимизировано")
+        # 🔧 ИСПРАВЛЕННЫЙ ПРОМТ БЕЗ МЕТАКОММЕНТАРИЕВ
+        system_prompt = f"""Ты профессиональный стилист-консультант. Проанализируй образ на фотографии и дай ТОЛЬКО практические рекомендации.
+
+ПРАВИЛА ОТВЕТА:
+- НЕ комментируй свою работу
+- НЕ объясняй как ты анализируешь  
+- НЕ добавляй метаинформацию
+- Отвечай ТОЛЬКО как стилист клиенту
+
+ФОРМАТ ОТВЕТА:
+Дай краткий анализ образа и практические советы для улучшения стиля.
+
+КОНТЕКСТ:
+Повод: {occasion}
+Пожелания: {preferences if preferences else "Общие рекомендации"}
+
+Проанализируй образ и дай профессиональные рекомендации по стилю."""
         response = await _send_to_gemini_with_retries(
-            parts,
+            [system_prompt, {"mime_type": "image/jpeg", "data": optimized_image}],
             f"анализ образа для {occasion}"
         )
-        
-        logger.info("✅ Анализ образа завершен успешно")
-        return response
-        
+        cleaned_response = _clean_gemini_response(response)
+        logger.info("✅ Анализ образа завершен")
+        return cleaned_response
     except Exception as e:
-        error_msg = handle_gemini_error(e, f"анализ образа для {occasion}")
-        logger.error(f"❌ Ошибка анализа: {error_msg}")
-        raise RuntimeError(error_msg)
+        logger.error(f"❌ Ошибка анализа образа для {occasion}: {e}")
+        raise RuntimeError(f"Произошла ошибка при обработке запроса: {type(e).__name__}")
 
-async def compare_clothing_images(image_data_list: List[bytes], occasion: str, preferences: Optional[str] = None) -> str:
-    """
-    Сравнивает несколько образов одежды.
-    
-    Args:
-        image_data_list: Список бинарных данных изображений
-        occasion: Повод для консультации
-        preferences: Предпочтения пользователя
-        
-    Returns:
-        str: Сравнительный анализ
-    """
-    num_images = len(image_data_list)
-    logger.info(f"⚖️ Начало сравнения {num_images} образов для: {occasion}")
-    
+async def compare_clothing_images(image_data_list: list, occasion: str = "повседневный", preferences: str = "") -> str:
+    """Сравнение нескольких образов с чистым ответом"""
+    if len(image_data_list) < 2:
+        raise ValueError("Для сравнения нужно минимум 2 изображения")
+    if len(image_data_list) > 4:
+        raise ValueError("Максимум 4 изображения для сравнения")
     try:
-        # Оптимизируем изображения
+        logger.info(f"⚖️ Начало сравнения {len(image_data_list)} образов для: {occasion}")
         optimized_images = []
-        mime_types = []
-        for i, img_data in enumerate(image_data_list):
-            img = Image.open(BytesIO(img_data))
-            optimized = optimize_image(img)
-            optimized_images.append(optimized)
-            # Определяем mime_type динамически
-            fmt = img.format if hasattr(img, 'format') and img.format else 'JPEG'
-            mime_type = f"image/{fmt.lower()}"
-            mime_types.append(mime_type)
-            logger.info(f"📷 Оптимизировано изображение {i+1}/{num_images}")
-        
-        # Создаем ДИНАМИЧЕСКИЙ промпт с учетом количества изображений
-        prompt = create_comparison_prompt(occasion, num_images, preferences)
-        
-        # Подготавливаем части запроса
-        parts = [prompt]
-        for img, mime_type in zip(optimized_images, mime_types):
+        for i, image_data in enumerate(image_data_list):
+            optimized_image = optimize_image(Image.open(BytesIO(image_data)))
+            optimized_images.append(optimized_image)
+            logger.info(f"📷 Оптимизировано изображение {i+1}/{len(image_data_list)}")
+        system_prompt = f"""Ты профессиональный стилист. Сравни образы на фотографиях и дай ТОЛЬКО практические рекомендации.
+
+ПРАВИЛА ОТВЕТА:
+- НЕ комментируй процесс анализа
+- НЕ объясняй как ты сравниваешь
+- НЕ добавляй метаинформацию о своей работе
+- Отвечай ТОЛЬКО как стилист клиенту
+
+ФОРМАТ ОТВЕТА:
+1. Краткая оценка каждого образа
+2. Рейтинг от лучшего к худшему  
+3. Рекомендации по улучшению
+
+КОНТЕКСТ:
+Повод: {occasion}
+Пожелания: {preferences if preferences else "Общие рекомендации"}
+
+Сравни образы и дай профессиональную оценку."""
+        parts = [system_prompt]
+        for optimized_image in optimized_images:
             parts.append({
-                "mime_type": mime_type, 
-                "data": img
+                "mime_type": "image/jpeg",
+                "data": optimized_image if isinstance(optimized_image, bytes) else base64.b64encode(optimized_image).decode()
             })
-        
-        # Отправляем запрос
+        logger.info("📤 Отправка запроса к Gemini: сравнение образов")
         response = await _send_to_gemini_with_retries(
             parts,
-            f"сравнение {num_images} образов для {occasion}"
+            f"сравнение {len(image_data_list)} образов для {occasion}"
         )
-        
-        logger.info("✅ Сравнение образов завершено успешно")
-        return response
-        
+        cleaned_response = _clean_gemini_response(response)
+        logger.info("✅ Сравнение образов завершено")
+        return cleaned_response
     except Exception as e:
-        error_msg = handle_gemini_error(e, f"сравнение образов для {occasion}")
-        logger.error(f"❌ Ошибка сравнения: {error_msg}\n{traceback.format_exc()}")
-        raise RuntimeError(error_msg)
+        logger.error(f"❌ Ошибка сравнение {len(image_data_list)} образов для {occasion}: {e}")
+        raise RuntimeError(f"Произошла ошибка при обработке запроса: {type(e).__name__}")
+
+def _clean_gemini_response(response: str) -> str:
+    """🧹 Очистка ответа Gemini от метакомментариев"""
+    if not response:
+        return response
+    meta_patterns = [
+        r"Я проанализировал.*?(?=\n|$)",
+        r"Анализируя.*?(?=\n|$)", 
+        r"При анализе.*?(?=\n|$)",
+        r"Исходя из анализа.*?(?=\n|$)",
+        r"Как ИИ-стилист.*?(?=\n|$)",
+        r"В качестве ИИ.*?(?=\n|$)",
+        r"Я как ИИ.*?(?=\n|$)",
+        r"Надеюсь.*помогли?.*?(?=\n|$)",
+        r"Если у вас есть.*вопросы.*?(?=\n|$)",
+        r"Буду рад.*помочь.*?(?=\n|$)",
+        r"Пожалуйста.*дайте знать.*?(?=\n|$)",
+        r"Обратите внимание.*качество.*?(?=\n|$)",
+        r"Учтите что.*ограничения.*?(?=\n|$)",
+        r"В заключение.*?(?=\n|$)",
+        r"Подводя итог.*?(?=\n|$)",
+        r"Таким образом.*?(?=\n|$)"
+    ]
+    cleaned = response.strip()
+    for pattern in meta_patterns:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    cleaned = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned)
+    cleaned = cleaned.strip()
+    if len(cleaned) < len(response) * 0.3:
+        return response
+    return cleaned
 
 # Версия модуля
 __version__ = "0.5.0"

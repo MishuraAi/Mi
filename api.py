@@ -222,7 +222,7 @@ app = FastAPI(
 # 🔧 КРИТИЧЕСКИ ВАЖНО: Настройка статических файлов
 app.mount("/static", StaticFiles(directory="webapp"), name="static")
 
-# 🔧 ИСПРАВЛЕНО: Тарифные планы с правильными запятыми
+# 🔧 ИСПРАВЛЕНО: Тарифные планы с правильным синтаксисом
 PRICING_PLANS = {
     "mini": {
         "name": "🌱 Мини",
@@ -237,7 +237,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🟢"
-    },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
+    },
     "basic": {
         "name": "🌟 Базовый",
         "description": "Стартовый план",
@@ -251,7 +251,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🔵"
-    },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
+    },
     "standard": {
         "name": "⭐ Стандарт",
         "description": "Популярный (ПОПУЛЯРНЫЙ)",
@@ -265,7 +265,7 @@ PRICING_PLANS = {
         "popular": True,
         "temporary": False,
         "color": "🟣"
-    },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
+    },
     "premium": {
         "name": "💎 Премиум",
         "description": "Выгодный план",
@@ -279,7 +279,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🟡"
-    }  # 🔧 БЕЗ ЗАПЯТОЙ - последний элемент
+    }
 }
 
 # === API ENDPOINTS ===
@@ -322,7 +322,7 @@ async def health_check():
                 "database": "healthy",
                 "gemini_ai": "healthy" if gemini_status else "unhealthy",
                 "payments": "healthy" if payment_service else "disabled"
-            },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
+            },
             "version": "2.6.1",
             "environment": ENVIRONMENT
         }
@@ -752,7 +752,7 @@ async def create_payment_endpoint(request: PaymentRequest):
             payment_id=payment_id,
             amount=plan['price'],
             description=f"МИШУРА - {plan['name']} ({plan['stcoins']} STCoins)",
-            return_url=correct_return_url,  # 🔧 ИСПРАВЛЕНО!
+            return_url=correct_return_url,
             user_id=user_id,
             telegram_id=request.telegram_id,
             plan_id=request.plan_id,
@@ -770,14 +770,14 @@ async def create_payment_endpoint(request: PaymentRequest):
             "payment_id": payment_id,
             "yookassa_payment_id": payment_result.get('yookassa_payment_id'),
             "payment_url": payment_result['payment_url'],
-            "return_url": correct_return_url,  # 🔧 ДОБАВЛЕНО для отладки
+            "return_url": correct_return_url,
             "amount": plan['price'],
             "currency": "RUB",
             "plan": {
                 "id": request.plan_id,
                 "name": plan['name'],
                 "stcoins": plan['stcoins']
-            },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
+            },
             "status": "pending",
             "stcoins_amount": plan['stcoins']
         }
@@ -1353,7 +1353,7 @@ async def service_status():
                 "gemini_ai": gemini_status,
                 "webapp": "running",
                 "api": "running"
-            },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
+            },
             "statistics": stats,
             "environment": os.getenv("RENDER", "local")
         }

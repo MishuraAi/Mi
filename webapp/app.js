@@ -368,34 +368,81 @@ class MishuraApp {
         try {
             const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
             
-            // Загружаем данные
-            this.userBalance = data.balance || 200;
-            this.consultationsHistory = data.history || [];
-            this.consultationsUsed = data.used || 0;
+            // 🔧 ИСПРАВЛЕНО: Начальный баланс 50 вместо 200
+            this.userBalance = data.balance || 50; // Было: || 200
+            this.consultationsHistory = data.consultations || [];
+            this.lastSyncTimestamp = data.lastSync || 0;
             
-            // НОВОЕ: Проверяем через UserService если доступен
-            if (window.userService) {
-                console.log('🔄 Проверяем актуальность баланса через UserService...');
-                // Асинхронно проверяем актуальный баланс
-                window.userService.getBalance().then(serverBalance => {
-                    if (serverBalance !== null && serverBalance !== this.userBalance) {
-                        console.log(`💰 Обнаружено расхождение баланса: local=${this.userBalance}, server=${serverBalance}`);
-                        this.userBalance = serverBalance;
-                        this.saveUserData();
-                        this.updateBalanceDisplay();
-                    }
-                }).catch(error => {
-                    console.warn('⚠️ Не удалось проверить актуальный баланс:', error);
-                });
-            }
+            // 🆕 НОВОЕ: Автоматическая валидация и синхронизация баланса
+            this.validateAndSyncBalance();
             
-            console.log(`💾 Данные пользователя загружены: баланс=${this.userBalance}, консультаций=${this.consultationsHistory.length}`);
-            
+            this.updateUI();
+            console.log('📊 Данные пользователя загружены:', {
+                balance: this.userBalance,
+                consultations: this.consultationsHistory.length,
+                lastSync: new Date(this.lastSyncTimestamp).toLocaleString()
+            });
         } catch (error) {
             console.error('❌ Ошибка загрузки данных пользователя:', error);
             this.initializeUserData();
         }
-    }
+    },
+
+    // 🆕 НОВЫЙ МЕТОД: Валидация и автоматическая синхронизация
+    async validateAndSyncBalance() {
+        try {
+            // Получаем актуальный баланс с сервера через UserService
+            if (window.userService) {
+                const serverBalance = await window.userService.getActualBalance();
+                
+                // Если есть расхождение - исправляем автоматически
+                if (Math.abs(this.userBalance - serverBalance) > 0.01) {
+                    console.log(`🔄 Обнаружено расхождение баланса: localStorage=${this.userBalance}, сервер=${serverBalance}`);
+                    console.log('🔧 Автоматическая синхронизация...');
+                    
+                    // Обновляем баланс из авторитетного источника
+                    this.userBalance = serverBalance;
+                    
+                    // Сохраняем исправленные данные
+                    this.saveUserData();
+                    
+                    // Обновляем UI
+                    this.updateUI();
+                    
+                    console.log(`✅ Баланс синхронизирован: ${serverBalance} STcoin`);
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Не удалось проверить баланс с сервером:', error);
+            // Продолжаем работу с кэшированными данными
+        }
+    },
+
+    // 🔧 ИСПРАВЛЕНИЕ 2: initializeUserData
+    initializeUserData() {
+        console.log('🔄 Инициализация новых данных пользователя...');
+        this.userBalance = 50;
+        this.consultationsHistory = [];
+        this.lastSyncTimestamp = Date.now();
+        this.saveUserData();
+        this.updateUI();
+        console.log('✅ Новый пользователь инициализирован с балансом: 50 STcoin');
+    },
+
+    saveUserData() {
+        try {
+            const data = {
+                balance: this.userBalance,
+                history: this.consultationsHistory,
+                used: this.consultationsUsed,
+                lastSaved: Date.now()
+            };
+            
+            localStorage.setItem('mishura_user_data', JSON.stringify(data));
+        } catch (error) {
+            console.error('❌ Ошибка сохранения данных пользователя:', error);
+        }
+    },
 
     async checkForSuccessfulPayment() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1769,34 +1816,65 @@ class MishuraApp {
         try {
             const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
             
-            // Загружаем данные
-            this.userBalance = data.balance || 200;
-            this.consultationsHistory = data.history || [];
-            this.consultationsUsed = data.used || 0;
+            // 🔧 ИСПРАВЛЕНО: Начальный баланс 50 вместо 200
+            this.userBalance = data.balance || 50; // Было: || 200
+            this.consultationsHistory = data.consultations || [];
+            this.lastSyncTimestamp = data.lastSync || 0;
             
-            // НОВОЕ: Проверяем через UserService если доступен
-            if (window.userService) {
-                console.log('🔄 Проверяем актуальность баланса через UserService...');
-                // Асинхронно проверяем актуальный баланс
-                window.userService.getBalance().then(serverBalance => {
-                    if (serverBalance !== null && serverBalance !== this.userBalance) {
-                        console.log(`💰 Обнаружено расхождение баланса: local=${this.userBalance}, server=${serverBalance}`);
-                        this.userBalance = serverBalance;
-                        this.saveUserData();
-                        this.updateBalanceDisplay();
-                    }
-                }).catch(error => {
-                    console.warn('⚠️ Не удалось проверить актуальный баланс:', error);
-                });
-            }
+            // 🆕 НОВОЕ: Автоматическая валидация и синхронизация баланса
+            this.validateAndSyncBalance();
             
-            console.log(`💾 Данные пользователя загружены: баланс=${this.userBalance}, консультаций=${this.consultationsHistory.length}`);
-            
+            this.updateUI();
+            console.log('📊 Данные пользователя загружены:', {
+                balance: this.userBalance,
+                consultations: this.consultationsHistory.length,
+                lastSync: new Date(this.lastSyncTimestamp).toLocaleString()
+            });
         } catch (error) {
             console.error('❌ Ошибка загрузки данных пользователя:', error);
             this.initializeUserData();
         }
-    }
+    },
+
+    initializeUserData() {
+        console.log('🔄 Инициализация новых данных пользователя...');
+        this.userBalance = 50;
+        this.consultationsHistory = [];
+        this.lastSyncTimestamp = Date.now();
+        this.saveUserData();
+        this.updateUI();
+        console.log('✅ Новый пользователь инициализирован с балансом: 50 STcoin');
+    },
+
+    // 🆕 НОВЫЙ МЕТОД: Валидация и автоматическая синхронизация
+    async validateAndSyncBalance() {
+        try {
+            // Получаем актуальный баланс с сервера через UserService
+            if (window.userService) {
+                const serverBalance = await window.userService.getActualBalance();
+                
+                // Если есть расхождение - исправляем автоматически
+                if (Math.abs(this.userBalance - serverBalance) > 0.01) {
+                    console.log(`🔄 Обнаружено расхождение баланса: localStorage=${this.userBalance}, сервер=${serverBalance}`);
+                    console.log('🔧 Автоматическая синхронизация...');
+                    
+                    // Обновляем баланс из авторитетного источника
+                    this.userBalance = serverBalance;
+                    
+                    // Сохраняем исправленные данные
+                    this.saveUserData();
+                    
+                    // Обновляем UI
+                    this.updateUI();
+                    
+                    console.log(`✅ Баланс синхронизирован: ${serverBalance} STcoin`);
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Не удалось проверить баланс с сервером:', error);
+            // Продолжаем работу с кэшированными данными
+        }
+    },
 
     saveUserData() {
         try {
@@ -1811,15 +1889,7 @@ class MishuraApp {
         } catch (error) {
             console.error('❌ Ошибка сохранения данных пользователя:', error);
         }
-    }
-
-    initializeUserData() {
-        this.userBalance = 200;
-        this.consultationsHistory = [];
-        this.consultationsUsed = 0;
-        this.saveUserData();
-        this.showNotification('🎉 Добро пожаловать! У вас 200 STcoin!', 'success', 5000);
-    }
+    },
 
     viewConsultation(index) {
         const consultation = this.consultationsHistory[index];
@@ -1864,14 +1934,14 @@ class MishuraApp {
         
         document.body.appendChild(modal);
         this.triggerHapticFeedback('light');
-    }
+    },
 
     deductConsultation(cost = 10) {
         this.userBalance -= cost;
         this.consultationsUsed += cost;
         this.saveUserData();
         this.updateBalanceDisplay();
-    }
+    },
 
     setupCloseButtons() {
         if (this.eventListenersAttached) return;
@@ -1882,7 +1952,7 @@ class MishuraApp {
                 this.triggerHapticFeedback('light');
             }
         });
-    }
+    },
 
     setupSubmitButton() {
         if (this.submitButtonSetup) return;
@@ -1901,7 +1971,7 @@ class MishuraApp {
         });
 
         this.submitButtonSetup = true;
-    }
+    },
 
     // ========== ОКОНЧАТЕЛЬНОЕ DROPDOWN-РЕШЕНИЕ ========== //
 
@@ -1930,7 +2000,7 @@ class MishuraApp {
 
         this.occasionDropdownSetup = true;
         console.log('✅ ОКОНЧАТЕЛЬНЫЙ dropdown настроен');
-    }
+    },
 
     createDropdownHandler() {
         // Находим input только один раз
@@ -1958,7 +2028,7 @@ class MishuraApp {
         }, 500);
 
         console.log('🎯 Обработчики установлены с правильной изоляцией');
-    }
+    },
 
     handleInputClick(event) {
         console.log('🎯 Клик по input occasion');
@@ -1977,7 +2047,7 @@ class MishuraApp {
                 this.openDropdown();
             }, 50);
         }
-    }
+    },
 
     handleDocumentClick(event) {
         // Проверяем что dropdown открыт
@@ -1994,7 +2064,7 @@ class MishuraApp {
             console.log('👆 Клик вне dropdown - закрываем');
             this.closeDropdown();
         }
-    }
+    },
 
     openDropdown() {
         if (window.DROPDOWN_STATE.isOpen) {
@@ -2050,7 +2120,7 @@ class MishuraApp {
         window.DROPDOWN_STATE.element = dropdown;
 
         console.log('✅ Dropdown открыт и добавлен в body');
-    }
+    },
 
     closeDropdown() {
         if (!window.DROPDOWN_STATE.isOpen || !window.DROPDOWN_STATE.element) {
@@ -2067,7 +2137,7 @@ class MishuraApp {
         window.DROPDOWN_STATE.element = null;
 
         console.log('✅ Dropdown закрыт');
-    }
+    },
 
     selectOption(option) {
         console.log('✅ Выбрана опция:', option);
@@ -2079,7 +2149,7 @@ class MishuraApp {
         this.closeDropdown();
         this.updateSubmitButton();
         this.triggerHapticFeedback('light');
-    }
+    },
 
     getDropdownStyles(inputElement) {
         const rect = inputElement.getBoundingClientRect();
@@ -2105,7 +2175,7 @@ class MishuraApp {
             pointer-events: auto !important;
             font-family: inherit !important;
         `;
-    }
+    },
 
     getOptionStyles(isLast) {
         return `
@@ -2121,7 +2191,7 @@ class MishuraApp {
             -webkit-tap-highlight-color: transparent !important;
             border-bottom: ${isLast ? 'none' : '1px solid rgba(212, 175, 55, 0.1)'} !important;
         `;
-    }
+    },
 
     addDropdownStyles() {
         if (document.getElementById('final-dropdown-styles')) return;
@@ -2166,7 +2236,7 @@ class MishuraApp {
         `;
 
         document.head.appendChild(styles);
-    }
+    },
 
     setupResultNavigation() {
         document.addEventListener('click', (event) => {
@@ -2176,7 +2246,7 @@ class MishuraApp {
                 this.startNewAnalysis();
             }
         });
-    }
+    },
 
     backToSelection() {
         this.hideResult();
@@ -2193,11 +2263,11 @@ class MishuraApp {
             (this.currentMode === 'compare' && this.compareImages.filter(img => img !== null).length >= 2)) {
             this.showForm();
         }
-    }
+    },
 
     startNewAnalysis() {
         this.closeModal();
-    }
+    },
 
     setupTelegramIntegration() {
         if (window.Telegram?.WebApp) {
@@ -2215,7 +2285,7 @@ class MishuraApp {
                 }
             });
         }
-    }
+    },
 
     triggerHapticFeedback(type = 'light') {
         try {
@@ -2233,14 +2303,14 @@ class MishuraApp {
         } catch (error) {
             // Игнорируем ошибки haptic feedback
         }
-    }
+    },
 
     initModularNavigation() {
         if (window.MishuraApp?.components?.navigation) {
             console.log('🔧 Инициализация модульной навигации');
             window.MishuraApp.components.navigation.init();
         }
-    }
+    },
 
     // === СИСТЕМА ОТЗЫВОВ ===
 
@@ -2255,7 +2325,7 @@ class MishuraApp {
         };
         
         console.log('📝 Система отзывов инициализирована');
-    }
+    },
 
     async checkAndShowFeedbackPrompt(consultationId) {
         if (this.feedbackSystem.isShowing) return;
@@ -2291,7 +2361,7 @@ class MishuraApp {
         } catch (error) {
             console.error('❌ Ошибка проверки возможности показа отзыва:', error);
         }
-    }
+    },
 
     showFeedbackModal(consultationId) {
         if (this.feedbackSystem.isShowing) return;
@@ -2320,7 +2390,7 @@ class MishuraApp {
         this.setupFeedbackModalHandlers(modal);
         
         this.triggerHapticFeedback('light');
-    }
+    },
 
     getFeedbackModalHTML() {
         return `
@@ -2371,7 +2441,7 @@ class MishuraApp {
                 </div>
             </div>
         `;
-    }
+    },
 
     setupFeedbackModalHandlers(modal) {
         const textarea = modal.querySelector('#feedback-textarea');
@@ -2440,7 +2510,7 @@ class MishuraApp {
                 this.closeFeedbackModal('dismissed', 'clicked_outside');
             }
         });
-    }
+    },
 
     updateFeedbackSubmitButton(textarea, submitBtn) {
         const length = textarea.value.length;
@@ -2450,7 +2520,7 @@ class MishuraApp {
         // Кнопка активна если есть рейтинг И текст >= 150 символов
         const canSubmit = hasRating && hasEnoughText;
         submitBtn.disabled = !canSubmit;
-    }
+    },
 
     async submitFeedback(feedbackText) {
         const trimmedText = feedbackText.trim();
@@ -2536,7 +2606,7 @@ class MishuraApp {
             this.showNotification(errorMessage, 'error');
             this.triggerHapticFeedback('error');
         }
-    }
+    },
 
     async closeFeedbackModal(action = 'dismissed', reason = null) {
         const modal = document.querySelector('.feedback-modal-overlay');
@@ -2561,7 +2631,7 @@ class MishuraApp {
         
         this.feedbackSystem.currentConsultationId = null;
         this.feedbackSystem.selectedRating = null;
-    }
+    },
 
     async logFeedbackPromptAction(consultationId, action, dismissalReason = null) {
         try {
@@ -2603,4 +2673,18 @@ window.buyPlan = function(planId) {
 if (!window.mishuraApp) {
     console.log('🎭 Инициализация МИШУРА App v2.6.1...');
     window.mishuraApp = new MishuraApp();
+}
+
+// 🧹 ДОПОЛНИТЕЛЬНО: Функция для очистки поврежденного кэша (выполнить в консоли)
+function clearCorruptedCache() {
+    console.log('🧹 Очистка поврежденного кэша...');
+    localStorage.removeItem('mishura_user_data');
+    if (window.mishuraApp) {
+        window.mishuraApp.initializeUserData();
+        console.log('✅ Кэш очищен, приложение переинициализировано');
+    }
+    if (window.userService) {
+        window.userService.syncBalance();
+        console.log('🔄 Запущена синхронизация с сервером');
+    }
 }

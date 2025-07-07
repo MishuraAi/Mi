@@ -222,7 +222,7 @@ app = FastAPI(
 # 🔧 КРИТИЧЕСКИ ВАЖНО: Настройка статических файлов
 app.mount("/static", StaticFiles(directory="webapp"), name="static")
 
-# Тарифные планы
+# 🔧 ИСПРАВЛЕНО: Тарифные планы с правильными запятыми
 PRICING_PLANS = {
     "mini": {
         "name": "🌱 Мини",
@@ -237,7 +237,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🟢"
-    }
+    },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
     "basic": {
         "name": "🌟 Базовый",
         "description": "Стартовый план",
@@ -251,7 +251,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🔵"
-    }
+    },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
     "standard": {
         "name": "⭐ Стандарт",
         "description": "Популярный (ПОПУЛЯРНЫЙ)",
@@ -265,7 +265,7 @@ PRICING_PLANS = {
         "popular": True,
         "temporary": False,
         "color": "🟣"
-    }
+    },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
     "premium": {
         "name": "💎 Премиум",
         "description": "Выгодный план",
@@ -279,7 +279,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🟡"
-    }
+    }  # 🔧 БЕЗ ЗАПЯТОЙ - последний элемент
 }
 
 # === API ENDPOINTS ===
@@ -322,7 +322,7 @@ async def health_check():
                 "database": "healthy",
                 "gemini_ai": "healthy" if gemini_status else "unhealthy",
                 "payments": "healthy" if payment_service else "disabled"
-            }
+            },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
             "version": "2.6.1",
             "environment": ENVIRONMENT
         }
@@ -777,7 +777,7 @@ async def create_payment_endpoint(request: PaymentRequest):
                 "id": request.plan_id,
                 "name": plan['name'],
                 "stcoins": plan['stcoins']
-            }
+            },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
             "status": "pending",
             "stcoins_amount": plan['stcoins']
         }
@@ -869,7 +869,7 @@ async def financial_health_check():
             'timestamp': datetime.now().isoformat(),
             'status': 'healthy',
             'financial_service': 'available' if financial_service else 'unavailable',
-            'metrics': {}
+            'metrics': {},
             'alerts': []
         }
         
@@ -1353,7 +1353,7 @@ async def service_status():
                 "gemini_ai": gemini_status,
                 "webapp": "running",
                 "api": "running"
-            }
+            },  # 🔧 ДОБАВЛЕНА ЗАПЯТАЯ!
             "statistics": stats,
             "environment": os.getenv("RENDER", "local")
         }

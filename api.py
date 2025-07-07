@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 import uvicorn
 from pydantic import BaseModel
 import asyncio
+import aiohttp
 try:
     import builtins
     financial_service = getattr(builtins, 'GLOBAL_FINANCIAL_SERVICE', None)
@@ -236,7 +237,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🟢"
-    },
+    }
     "basic": {
         "name": "🌟 Базовый",
         "description": "Стартовый план",
@@ -250,7 +251,7 @@ PRICING_PLANS = {
         "popular": False,
         "temporary": False,
         "color": "🔵"
-    },
+    }
     "standard": {
         "name": "⭐ Стандарт",
         "description": "Популярный (ПОПУЛЯРНЫЙ)",
@@ -264,7 +265,7 @@ PRICING_PLANS = {
         "popular": True,
         "temporary": False,
         "color": "🟣"
-    },
+    }
     "premium": {
         "name": "💎 Премиум",
         "description": "Выгодный план",
@@ -321,7 +322,7 @@ async def health_check():
                 "database": "healthy",
                 "gemini_ai": "healthy" if gemini_status else "unhealthy",
                 "payments": "healthy" if payment_service else "disabled"
-            },
+            }
             "version": "2.6.1",
             "environment": ENVIRONMENT
         }
@@ -437,7 +438,7 @@ async def analyze_consultation(request: Request):
                 if error_detail == 'insufficient_balance':
                     raise HTTPException(
                         status_code=400, 
-                        detail=f"Недостаточно STcoins. Требуется: {operation_result.get('required', 10)}, доступно: {operation_result.get('available', 0)}"
+                        detail=f"Недостаточно STcoins. Требуется: {operation_result.get('required', 10)} доступно: {operation_result.get('available', 0)}"
                     )
                 else:
                     logger.error(f"[{correlation_id}] Financial operation failed: {operation_result}")
@@ -519,7 +520,7 @@ async def analyze_consultation(request: Request):
         
         processing_time = time.time() - start_time
         
-        logger.info(f"✅ [{correlation_id}] Анализ завершен: user_id={user_id}, time={processing_time:.2f}s, balance={new_balance}")
+        logger.info(f"✅ [{correlation_id}] Анализ завершен: user_id={user_id} time={processing_time:.2f}s, balance={new_balance}")
         
         return {
             "consultation_id": consultation_id,
@@ -551,7 +552,7 @@ async def compare_consultation(request: Request):
         preferences = data.get('preferences', '')
         images_data = data.get('images_data', [])
         
-        logger.info(f"⚖️ [{correlation_id}] Запрос сравнения от user_id: {user_id}, изображений: {len(images_data)}")
+        logger.info(f"⚖️ [{correlation_id}] Запрос сравнения от user_id: {user_id} изображений: {len(images_data)}")
         
         if not user_id:
             raise HTTPException(status_code=400, detail="Отсутствует user_id")
@@ -583,7 +584,7 @@ async def compare_consultation(request: Request):
                 if error_detail == 'insufficient_balance':
                     raise HTTPException(
                         status_code=400, 
-                        detail=f"Недостаточно STcoins для сравнения. Требуется: {operation_result.get('required', 15)}, доступно: {operation_result.get('available', 0)}"
+                        detail=f"Недостаточно STcoins для сравнения. Требуется: {operation_result.get('required', 15)} доступно: {operation_result.get('available', 0)}"
                     )
                 else:
                     logger.error(f"[{correlation_id}] Financial operation failed: {operation_result}")
@@ -668,7 +669,7 @@ async def compare_consultation(request: Request):
         
         processing_time = time.time() - start_time
         
-        logger.info(f"✅ [{correlation_id}] Сравнение завершено: user_id={user_id}, time={processing_time:.2f}s, balance={new_balance}")
+        logger.info(f"✅ [{correlation_id}] Сравнение завершено: user_id={user_id} time={processing_time:.2f}s, balance={new_balance}")
         
         return {
             "consultation_id": consultation_id,
@@ -723,7 +724,7 @@ async def create_payment_endpoint(request: PaymentRequest):
                 first_name="WebApp",
                 last_name="User"
             )
-            logger.info(f"✅ Создан новый пользователь: user_id={user_id}, telegram_id={request.telegram_id}")
+            logger.info(f"✅ Создан новый пользователь: user_id={user_id} telegram_id={request.telegram_id}")
             
             # Устанавливаем начальный баланс 0
             db.update_user_balance(request.telegram_id, 0, "initialization")
@@ -776,12 +777,12 @@ async def create_payment_endpoint(request: PaymentRequest):
                 "id": request.plan_id,
                 "name": plan['name'],
                 "stcoins": plan['stcoins']
-            },
+            }
             "status": "pending",
             "stcoins_amount": plan['stcoins']
         }
         
-        logger.info(f"✅ Платеж создан: {payment_id} для пользователя {request.telegram_id}, план {request.plan_id} ({plan['name']})")
+        logger.info(f"✅ Платеж создан: {payment_id} для пользователя {request.telegram_id} план {request.plan_id} ({plan['name']})")
         logger.info(f"🎯 Return URL установлен: {correct_return_url}")
         
         return response_data
@@ -868,7 +869,7 @@ async def financial_health_check():
             'timestamp': datetime.now().isoformat(),
             'status': 'healthy',
             'financial_service': 'available' if financial_service else 'unavailable',
-            'metrics': {},
+            'metrics': {}
             'alerts': []
         }
         
@@ -1049,7 +1050,7 @@ async def submit_feedback(request: Request):
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get('user-agent', '')
         
-        logger.info(f"📝 [{correlation_id}] Получен отзыв от user_id: {telegram_id}, rating: {feedback_rating}")
+        logger.info(f"📝 [{correlation_id}] Получен отзыв от user_id: {telegram_id} rating: {feedback_rating}")
         
         if not telegram_id or not feedback_text:
             raise HTTPException(status_code=400, detail="Отсутствуют обязательные данные")
@@ -1132,7 +1133,7 @@ async def submit_feedback(request: Request):
                     # Отмечаем что бонус начислен
                     db.mark_feedback_bonus_awarded(feedback_id)
                     
-                    logger.info(f"💰 [{correlation_id}] Бонус начислен: user_id={telegram_id}, new_balance={new_balance}")
+                    logger.info(f"💰 [{correlation_id}] Бонус начислен: user_id={telegram_id} new_balance={new_balance}")
                 else:
                     logger.error(f"❌ [{correlation_id}] Ошибка начисления бонуса: {bonus_result}")
             else:
@@ -1141,7 +1142,7 @@ async def submit_feedback(request: Request):
                     new_balance = db.update_user_balance(telegram_id, 10, "feedback_bonus")
                     bonus_awarded = True
                     db.mark_feedback_bonus_awarded(feedback_id)
-                    logger.info(f"💰 [{correlation_id}] Бонус начислен (fallback): user_id={telegram_id}, new_balance={new_balance}")
+                    logger.info(f"💰 [{correlation_id}] Бонус начислен (fallback): user_id={telegram_id} new_balance={new_balance}")
                 except Exception as e:
                     logger.error(f"❌ [{correlation_id}] Ошибка начисления бонуса (fallback): {e}")
         
@@ -1150,7 +1151,7 @@ async def submit_feedback(request: Request):
         
         processing_time = time.time() - start_time
         
-        logger.info(f"✅ [{correlation_id}] Отзыв обработан: feedback_id={feedback_id}, rating={feedback_rating}, bonus={bonus_awarded}, time={processing_time:.2f}s")
+        logger.info(f"✅ [{correlation_id}] Отзыв обработан: feedback_id={feedback_id} rating={feedback_rating} bonus={bonus_awarded} time={processing_time:.2f}s")
         
         return {
             "feedback_id": feedback_id,
@@ -1295,6 +1296,141 @@ def is_spam_text(text: str) -> bool:
         
     except Exception:
         return False  # В случае ошибки не блокируем
+
+# 🆕 НОВЫЕ ЭНДПОИНТЫ для keep-alive
+@app.get("/health")
+async def health_check():
+    """Health check для Render и мониторинга"""
+    try:
+        # Быстрая проверка БД
+        db = MishuraDB()
+        stats = db.get_stats()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "service": "mishura-ai-stylist",
+            "database": "connected",
+            "users": stats.get('total_users', 0),
+            "uptime": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Health check failed: {e}")
+        return {
+            "status": "unhealthy", 
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/ping")
+async def ping():
+    """Простой ping для keep-alive"""
+    return {"status": "pong", "timestamp": datetime.now().isoformat()}
+
+@app.get("/status")
+async def service_status():
+    """Детальный статус сервиса"""
+    try:
+        # Проверяем компоненты
+        db = MishuraDB()
+        stats = db.get_stats()
+        
+        # Проверяем Gemini AI
+        gemini_status = "unknown"
+        try:
+            from gemini_ai import test_gemini_connection
+            gemini_test = await test_gemini_connection()
+            gemini_status = "connected" if gemini_test else "disconnected"
+        except:
+            gemini_status = "error"
+        
+        return {
+            "service": "МИШУРА AI Stylist",
+            "status": "operational",
+            "timestamp": datetime.now().isoformat(),
+            "components": {
+                "database": "connected",
+                "gemini_ai": gemini_status,
+                "webapp": "running",
+                "api": "running"
+            }
+            "statistics": stats,
+            "environment": os.getenv("RENDER", "local")
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Status check failed: {e}")
+        return {
+            "service": "МИШУРА AI Stylist",
+            "status": "degraded",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+# 🆕 KEEP-ALIVE механизм для предотвращения засыпания
+class RenderKeepAlive:
+    """Класс для поддержания активности Render сервиса"""
+    
+    def __init__(self):
+        self.app_url = os.getenv('RENDER_EXTERNAL_URL', 'https://mi-q7ae.onrender.com')
+        self.is_running = False
+        
+    async def ping_self(self):
+        """Ping собственного сервиса"""
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.get(f"{self.app_url}/ping") as response:
+                    if response.status == 200:
+                        logger.info("🏓 Keep-alive ping successful")
+                        return True
+                    else:
+                        logger.warning(f"⚠️ Keep-alive ping failed: {response.status}")
+                        return False
+        except Exception as e:
+            logger.warning(f"⚠️ Keep-alive ping error: {e}")
+            return False
+    
+    async def start_keepalive(self):
+        """Запуск keep-alive процесса"""
+        if self.is_running:
+            return
+            
+        self.is_running = True
+        logger.info("🚀 Запуск Render Keep-Alive сервиса")
+        
+        while self.is_running:
+            try:
+                # Пингуем себя каждые 10 минут
+                await asyncio.sleep(600)  # 10 minutes
+                await self.ping_self()
+                
+            except Exception as e:
+                logger.error(f"❌ Keep-alive error: {e}")
+                await asyncio.sleep(60)  # Retry in 1 minute
+    
+    def stop_keepalive(self):
+        """Остановка keep-alive"""
+        self.is_running = False
+        logger.info("🛑 Render Keep-Alive остановлен")
+
+# Глобальный экземпляр keep-alive
+keep_alive = RenderKeepAlive()
+
+@app.on_event("startup")
+async def startup_event():
+    """Запуск приложения"""
+    logger.info("🚀 Запуск МИШУРА API сервера")
+    
+    # Запускаем keep-alive только на Render
+    if os.getenv('RENDER'):
+        asyncio.create_task(keep_alive.start_keepalive())
+        logger.info("🏓 Render Keep-Alive активирован")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Остановка приложения"""
+    logger.info("🛑 Остановка МИШУРА API сервера")
+    keep_alive.stop_keepalive()
 
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")

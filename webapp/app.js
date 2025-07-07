@@ -180,7 +180,7 @@ class MishuraApp {
             if (!this.balanceSync.isUpdating && window.userService) {
                 await this.advancedSyncBalance();
             }
-        }, 30000);
+        } 30000);
         
         // Синхронизация при изменении видимости
         document.addEventListener('visibilitychange', async () => {
@@ -386,7 +386,7 @@ class MishuraApp {
             console.error('❌ Ошибка загрузки данных пользователя:', error);
             this.initializeUserData();
         }
-    },
+    }
 
     // 🆕 НОВЫЙ МЕТОД: Валидация и автоматическая синхронизация
     async validateAndSyncBalance() {
@@ -397,7 +397,7 @@ class MishuraApp {
                 
                 // Если есть расхождение - исправляем автоматически
                 if (Math.abs(this.userBalance - serverBalance) > 0.01) {
-                    console.log(`🔄 Обнаружено расхождение баланса: localStorage=${this.userBalance}, сервер=${serverBalance}`);
+                    console.log(`🔄 Обнаружено расхождение баланса: localStorage=${this.userBalance} сервер=${serverBalance}`);
                     console.log('🔧 Автоматическая синхронизация...');
                     
                     // Обновляем баланс из авторитетного источника
@@ -416,10 +416,10 @@ class MishuraApp {
             console.warn('⚠️ Не удалось проверить баланс с сервером:', error);
             // Продолжаем работу с кэшированными данными
         }
-    },
+    }
 
     // 🔧 ИСПРАВЛЕНИЕ 2: initializeUserData
-    initializeUserData() {
+    async initializeUserData() {
         console.log('🔄 Инициализация новых данных пользователя...');
         this.userBalance = 50;
         this.consultationsHistory = [];
@@ -427,7 +427,7 @@ class MishuraApp {
         this.saveUserData();
         this.updateUI();
         console.log('✅ Новый пользователь инициализирован с балансом: 50 STcoin');
-    },
+    }
 
     saveUserData() {
         try {
@@ -442,7 +442,7 @@ class MishuraApp {
         } catch (error) {
             console.error('❌ Ошибка сохранения данных пользователя:', error);
         }
-    },
+    }
 
     async checkForSuccessfulPayment() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -460,19 +460,19 @@ class MishuraApp {
             
             setTimeout(async () => {
                 await this.forceBalanceUpdate();
-            }, 1000);
+            } 1000);
             
             // 🧭 Переход в секцию баланса
             setTimeout(() => {
                 this.navigateToSection('balance');
-            }, 1500);
+            } 1500);
             
             // 🧹 Очистка URL
             setTimeout(() => {
                 const newUrl = window.location.origin + window.location.pathname;
-                window.history.replaceState({}, document.title, newUrl);
+                window.history.replaceState({} document.title, newUrl);
                 console.log('🧹 URL очищен от параметров оплаты');
-            }, 3000);
+            } 3000);
         }
     }
 
@@ -519,8 +519,8 @@ class MishuraApp {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);
                 }
-            }, 500);
-        }, 6000);
+            } 500);
+        } 6000);
     }
 
     animateBalanceChange() {
@@ -531,7 +531,7 @@ class MishuraApp {
             
             setTimeout(() => {
                 element.style.animation = '';
-            }, 1000);
+            } 1000);
         });
     }
 
@@ -685,7 +685,7 @@ class MishuraApp {
         
         setTimeout(() => {
             this.fixModeButtons();
-        }, 100);
+        } 100);
     }
 
     async showBalanceSection() {
@@ -988,7 +988,7 @@ class MishuraApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                },
+                }
                 body: JSON.stringify(paymentData)
             });
 
@@ -1094,7 +1094,7 @@ class MishuraApp {
             
             setTimeout(() => {
                 this.showFeedbackModal(consultationIdForFeedback);
-            }, 500);
+            } 500);
             
             this.lastConsultationId = null;
             
@@ -1279,19 +1279,19 @@ class MishuraApp {
             setTimeout(() => {
                 const consultationsRemaining = Math.floor(this.userBalance / 10);
                 this.showNotification(`⚠️ Осталось ${consultationsRemaining} консультаций`, 'warning', 4000);
-            }, 2000);
+            } 2000);
         }
         
         if (consultation && consultation.id) {
             setTimeout(() => {
                 this.checkAndShowFeedbackPrompt(consultation.id);
-            }, Math.random() * 120000 + 60000); // 1-3 минуты
+            } Math.random() * 120000 + 60000); // 1-3 минуты
         } else {
             // Если нет ID консультации, используем timestamp как ID
             const mockConsultationId = Date.now();
             setTimeout(() => {
                 this.checkAndShowFeedbackPrompt(mockConsultationId);
-            }, Math.random() * 120000 + 60000);
+            } Math.random() * 120000 + 60000);
         }
         
         // Запускаем проверку отзыва через 2 минуты после показа результата
@@ -1299,7 +1299,7 @@ class MishuraApp {
             const mockConsultationId = Date.now();
             console.log('⏰ Автоматический запуск проверки отзыва через 2 минуты');
             this.checkAndShowFeedbackPrompt(mockConsultationId);
-        }, 120000); // 2 минуты для тестирования
+        } 120000); // 2 минуты для тестирования
     }
 
     normalizeAPIResponse(response) {
@@ -1480,7 +1480,7 @@ class MishuraApp {
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
                 reject(new Error(`Превышено время ожидания (${this.requestTimeout / 1000} сек)`));
-            }, this.requestTimeout);
+            } this.requestTimeout);
         });
         
         try {
@@ -1537,7 +1537,7 @@ class MishuraApp {
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
                 reject(new Error(`Превышено время ожидания сравнения (${this.requestTimeout / 1000} сек)`));
-            }, this.requestTimeout);
+            } this.requestTimeout);
         });
         
         try {
@@ -1677,9 +1677,9 @@ class MishuraApp {
                 notificationElement.style.animation = 'slideOutUp 0.3s ease forwards';
                 setTimeout(() => {
                     notification.remove();
-                }, 300);
+                } 300);
             }
-        }, duration);
+        } duration);
     }
 
     // === ЗАГРУЗЧИКИ ФАЙЛОВ ===
@@ -1834,7 +1834,7 @@ class MishuraApp {
             console.error('❌ Ошибка загрузки данных пользователя:', error);
             this.initializeUserData();
         }
-    },
+    }
 
     initializeUserData() {
         console.log('🔄 Инициализация новых данных пользователя...');
@@ -1844,37 +1844,7 @@ class MishuraApp {
         this.saveUserData();
         this.updateUI();
         console.log('✅ Новый пользователь инициализирован с балансом: 50 STcoin');
-    },
-
-    // 🆕 НОВЫЙ МЕТОД: Валидация и автоматическая синхронизация
-    async validateAndSyncBalance() {
-        try {
-            // Получаем актуальный баланс с сервера через UserService
-            if (window.userService) {
-                const serverBalance = await window.userService.getActualBalance();
-                
-                // Если есть расхождение - исправляем автоматически
-                if (Math.abs(this.userBalance - serverBalance) > 0.01) {
-                    console.log(`🔄 Обнаружено расхождение баланса: localStorage=${this.userBalance}, сервер=${serverBalance}`);
-                    console.log('🔧 Автоматическая синхронизация...');
-                    
-                    // Обновляем баланс из авторитетного источника
-                    this.userBalance = serverBalance;
-                    
-                    // Сохраняем исправленные данные
-                    this.saveUserData();
-                    
-                    // Обновляем UI
-                    this.updateUI();
-                    
-                    console.log(`✅ Баланс синхронизирован: ${serverBalance} STcoin`);
-                }
-            }
-        } catch (error) {
-            console.warn('⚠️ Не удалось проверить баланс с сервером:', error);
-            // Продолжаем работу с кэшированными данными
-        }
-    },
+    }
 
     saveUserData() {
         try {
@@ -1889,7 +1859,7 @@ class MishuraApp {
         } catch (error) {
             console.error('❌ Ошибка сохранения данных пользователя:', error);
         }
-    },
+    }
 
     viewConsultation(index) {
         const consultation = this.consultationsHistory[index];
@@ -1934,14 +1904,14 @@ class MishuraApp {
         
         document.body.appendChild(modal);
         this.triggerHapticFeedback('light');
-    },
+    }
 
     deductConsultation(cost = 10) {
         this.userBalance -= cost;
         this.consultationsUsed += cost;
         this.saveUserData();
         this.updateBalanceDisplay();
-    },
+    }
 
     setupCloseButtons() {
         if (this.eventListenersAttached) return;
@@ -1952,7 +1922,7 @@ class MishuraApp {
                 this.triggerHapticFeedback('light');
             }
         });
-    },
+    }
 
     setupSubmitButton() {
         if (this.submitButtonSetup) return;
@@ -1971,7 +1941,7 @@ class MishuraApp {
         });
 
         this.submitButtonSetup = true;
-    },
+    }
 
     // ========== ОКОНЧАТЕЛЬНОЕ DROPDOWN-РЕШЕНИЕ ========== //
 
@@ -1986,7 +1956,7 @@ class MishuraApp {
             if (builtinDropdown) {
                 builtinDropdown.remove();
             }
-        }, 100);
+        } 100);
 
         // Глобальные переменные для dropdown
         window.DROPDOWN_STATE = {
@@ -2000,7 +1970,7 @@ class MishuraApp {
 
         this.occasionDropdownSetup = true;
         console.log('✅ ОКОНЧАТЕЛЬНЫЙ dropdown настроен');
-    },
+    }
 
     createDropdownHandler() {
         // Находим input только один раз
@@ -2025,10 +1995,10 @@ class MishuraApp {
         // Обработчик document - с задержкой для предотвращения конфликтов
         setTimeout(() => {
             document.addEventListener('click', this.handleDocumentClick.bind(this), false);
-        }, 500);
+        } 500);
 
         console.log('🎯 Обработчики установлены с правильной изоляцией');
-    },
+    }
 
     handleInputClick(event) {
         console.log('🎯 Клик по input occasion');
@@ -2045,9 +2015,9 @@ class MishuraApp {
             // Задержка для предотвращения конфликта с document обработчиком
             setTimeout(() => {
                 this.openDropdown();
-            }, 50);
+            } 50);
         }
-    },
+    }
 
     handleDocumentClick(event) {
         // Проверяем что dropdown открыт
@@ -2064,7 +2034,7 @@ class MishuraApp {
             console.log('👆 Клик вне dropdown - закрываем');
             this.closeDropdown();
         }
-    },
+    }
 
     openDropdown() {
         if (window.DROPDOWN_STATE.isOpen) {
@@ -2120,7 +2090,7 @@ class MishuraApp {
         window.DROPDOWN_STATE.element = dropdown;
 
         console.log('✅ Dropdown открыт и добавлен в body');
-    },
+    }
 
     closeDropdown() {
         if (!window.DROPDOWN_STATE.isOpen || !window.DROPDOWN_STATE.element) {
@@ -2137,7 +2107,7 @@ class MishuraApp {
         window.DROPDOWN_STATE.element = null;
 
         console.log('✅ Dropdown закрыт');
-    },
+    }
 
     selectOption(option) {
         console.log('✅ Выбрана опция:', option);
@@ -2149,7 +2119,7 @@ class MishuraApp {
         this.closeDropdown();
         this.updateSubmitButton();
         this.triggerHapticFeedback('light');
-    },
+    }
 
     getDropdownStyles(inputElement) {
         const rect = inputElement.getBoundingClientRect();
@@ -2175,7 +2145,7 @@ class MishuraApp {
             pointer-events: auto !important;
             font-family: inherit !important;
         `;
-    },
+    }
 
     getOptionStyles(isLast) {
         return `
@@ -2191,7 +2161,7 @@ class MishuraApp {
             -webkit-tap-highlight-color: transparent !important;
             border-bottom: ${isLast ? 'none' : '1px solid rgba(212, 175, 55, 0.1)'} !important;
         `;
-    },
+    }
 
     addDropdownStyles() {
         if (document.getElementById('final-dropdown-styles')) return;
@@ -2236,7 +2206,7 @@ class MishuraApp {
         `;
 
         document.head.appendChild(styles);
-    },
+    }
 
     setupResultNavigation() {
         document.addEventListener('click', (event) => {
@@ -2246,7 +2216,7 @@ class MishuraApp {
                 this.startNewAnalysis();
             }
         });
-    },
+    }
 
     backToSelection() {
         this.hideResult();
@@ -2263,11 +2233,11 @@ class MishuraApp {
             (this.currentMode === 'compare' && this.compareImages.filter(img => img !== null).length >= 2)) {
             this.showForm();
         }
-    },
+    }
 
     startNewAnalysis() {
         this.closeModal();
-    },
+    }
 
     setupTelegramIntegration() {
         if (window.Telegram?.WebApp) {
@@ -2285,7 +2255,7 @@ class MishuraApp {
                 }
             });
         }
-    },
+    }
 
     triggerHapticFeedback(type = 'light') {
         try {
@@ -2303,14 +2273,14 @@ class MishuraApp {
         } catch (error) {
             // Игнорируем ошибки haptic feedback
         }
-    },
+    }
 
     initModularNavigation() {
         if (window.MishuraApp?.components?.navigation) {
             console.log('🔧 Инициализация модульной навигации');
             window.MishuraApp.components.navigation.init();
         }
-    },
+    }
 
     // === СИСТЕМА ОТЗЫВОВ ===
 
@@ -2325,7 +2295,7 @@ class MishuraApp {
         };
         
         console.log('📝 Система отзывов инициализирована');
-    },
+    }
 
     async checkAndShowFeedbackPrompt(consultationId) {
         if (this.feedbackSystem.isShowing) return;
@@ -2350,7 +2320,7 @@ class MishuraApp {
                 
                 setTimeout(() => {
                     this.showFeedbackModal(consultationId);
-                }, delay);
+                } delay);
                 
                 // Логируем что показали форму
                 await this.logFeedbackPromptAction(consultationId, 'shown');
@@ -2361,7 +2331,7 @@ class MishuraApp {
         } catch (error) {
             console.error('❌ Ошибка проверки возможности показа отзыва:', error);
         }
-    },
+    }
 
     showFeedbackModal(consultationId) {
         if (this.feedbackSystem.isShowing) return;
@@ -2384,13 +2354,13 @@ class MishuraApp {
         // Анимация появления
         setTimeout(() => {
             modal.classList.add('active');
-        }, 100);
+        } 100);
         
         // Настройка обработчиков
         this.setupFeedbackModalHandlers(modal);
         
         this.triggerHapticFeedback('light');
-    },
+    }
 
     getFeedbackModalHTML() {
         return `
@@ -2441,7 +2411,7 @@ class MishuraApp {
                 </div>
             </div>
         `;
-    },
+    }
 
     setupFeedbackModalHandlers(modal) {
         const textarea = modal.querySelector('#feedback-textarea');
@@ -2510,7 +2480,7 @@ class MishuraApp {
                 this.closeFeedbackModal('dismissed', 'clicked_outside');
             }
         });
-    },
+    }
 
     updateFeedbackSubmitButton(textarea, submitBtn) {
         const length = textarea.value.length;
@@ -2520,7 +2490,7 @@ class MishuraApp {
         // Кнопка активна если есть рейтинг И текст >= 150 символов
         const canSubmit = hasRating && hasEnoughText;
         submitBtn.disabled = !canSubmit;
-    },
+    }
 
     async submitFeedback(feedbackText) {
         const trimmedText = feedbackText.trim();
@@ -2547,7 +2517,7 @@ class MishuraApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                },
+                }
                 body: JSON.stringify({
                     telegram_id: userId,
                     feedback_text: trimmedText,
@@ -2606,7 +2576,7 @@ class MishuraApp {
             this.showNotification(errorMessage, 'error');
             this.triggerHapticFeedback('error');
         }
-    },
+    }
 
     async closeFeedbackModal(action = 'dismissed', reason = null) {
         const modal = document.querySelector('.feedback-modal-overlay');
@@ -2627,11 +2597,11 @@ class MishuraApp {
         modal.classList.remove('active');
         setTimeout(() => {
             modal.remove();
-        }, 300);
+        } 300);
         
         this.feedbackSystem.currentConsultationId = null;
         this.feedbackSystem.selectedRating = null;
-    },
+    }
 
     async logFeedbackPromptAction(consultationId, action, dismissalReason = null) {
         try {
@@ -2641,7 +2611,7 @@ class MishuraApp {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                },
+                }
                 body: JSON.stringify({
                     telegram_id: userId,
                     consultation_id: consultationId,

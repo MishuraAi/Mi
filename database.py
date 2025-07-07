@@ -131,7 +131,7 @@ class MishuraDB:
             username TEXT,
             first_name TEXT,
             last_name TEXT,
-            balance INTEGER DEFAULT 200,
+            balance INTEGER DEFAULT 50,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -294,20 +294,28 @@ class MishuraDB:
         """
         Сохранение нового пользователя с начальным балансом 50 STcoin
         """
-        cursor = self.conn.cursor()
-        
-        # 🔧 ИСПРАВЛЕНО: Начальный баланс 50 вместо 200
-        initial_balance = 50  # Было: 200
-        
-        cursor.execute('''
-            INSERT OR REPLACE INTO users 
-            (telegram_id, username, first_name, last_name, balance, created_at)
-            VALUES (?, ?, ?, ?, ?, datetime('now'))
-        ''', (telegram_id, username, first_name, last_name, initial_balance))
-        
-        self.conn.commit()
-        logger.info(f"Пользователь {telegram_id} сохранен с начальным балансом {initial_balance} STcoin")
-        return cursor.rowid
+        try:
+            # 🔧 ИСПРАВЛЕНО: Начальный баланс 50 вместо 200
+            initial_balance = 50  # Было: 200
+            
+            query = '''
+                INSERT OR REPLACE INTO users 
+                (telegram_id, username, first_name, last_name, balance, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+            '''
+            
+            # ✅ ИСПОЛЬЗУЕМ ПРАВИЛЬНУЮ АРХИТЕКТУРУ
+            user_id = self._execute_query(
+                query, 
+                (telegram_id, username, first_name, last_name, initial_balance)
+            )
+            
+            self.logger.info(f"Пользователь {telegram_id} сохранен с начальным балансом {initial_balance} STcoin")
+            return user_id
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка сохранения пользователя {telegram_id}: {e}")
+            return None
 
     def get_user(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         """Получает информацию о пользователе по его telegram_id"""
@@ -341,19 +349,23 @@ class MishuraDB:
         """
         Получение баланса пользователя
         """
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT balance FROM users WHERE telegram_id = ?', (telegram_id,))
-        result = cursor.fetchone()
-        
-        if result:
-            balance = result[0]
-            logger.info(f"Баланс для пользователя telegram_id={telegram_id} составляет: {balance}")
-            return balance
-        else:
-            # 🔧 ИСПРАВЛЕНО: Создаем нового пользователя с балансом 50
-            logger.info(f"Пользователь {telegram_id} не найден, создаем с начальным балансом 50 STcoin")
-            self.save_user(telegram_id)
-            return 50  # Было: 200
+        try:
+            query = 'SELECT balance FROM users WHERE telegram_id = ?'
+            result = self._execute_query(query, (telegram_id,), fetch_one=True)
+            
+            if result:
+                balance = result[0]
+                self.logger.info(f"Баланс для пользователя telegram_id={telegram_id} составляет: {balance}")
+                return balance
+            else:
+                # 🔧 ИСПРАВЛЕНО: Создаем нового пользователя с балансом 50
+                self.logger.info(f"Пользователь {telegram_id} не найден, создаем с начальным балансом 50 STcoin")
+                self.save_user(telegram_id)
+                return 50  # Было: 200
+                
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения баланса для {telegram_id}: {e}")
+            return 50  # Возвращаем стандартный баланс при ошибке
 
     def update_user_balance(self, telegram_id: int, amount_change: int, operation_type="manual") -> int:
         """Обновляет баланс пользователя на указанную величину"""
@@ -378,46 +390,6 @@ class MishuraDB:
         except Exception as e:
             self.logger.error(f"Ошибка обновления баланса для telegram_id={telegram_id}: {e}")
             return current_balance if 'current_balance' in locals() else 0
-
-    # 🆕 НОВЫЙ МЕТОД: Миграция существующих пользователей с неправильным балансом
-    def migrate_user_balances(self):
-        """
-        Миграция пользователей с неправильным начальным балансом 200 → 50
-        Только для пользователей которые не тратили средства
-        """
-        cursor = self.conn.cursor()
-        
-        # Находим пользователей с балансом 200 и без консультаций
-        cursor.execute('''
-            SELECT u.telegram_id, u.balance, COUNT(c.id) as consultations_count
-            FROM users u
-            LEFT JOIN consultations c ON u.telegram_id = c.user_id
-            WHERE u.balance = 200
-            GROUP BY u.telegram_id, u.balance
-            HAVING consultations_count = 0
-        ''')
-        
-        users_to_migrate = cursor.fetchall()
-        
-        if users_to_migrate:
-            logger.info(f"Найдено {len(users_to_migrate)} пользователей для миграции баланса 200 → 50")
-            
-            for user_id, current_balance, _ in users_to_migrate:
-                cursor.execute('''
-                    UPDATE users 
-                    SET balance = 50, 
-                        updated_at = datetime('now')
-                    WHERE telegram_id = ? AND balance = 200
-                ''', (user_id,))
-                
-                logger.info(f"Пользователь {user_id}: баланс изменен с 200 на 50 STcoin")
-            
-            self.conn.commit()
-            logger.info("✅ Миграция балансов завершена")
-        else:
-            logger.info("Пользователи для миграции не найдены")
-        
-        return len(users_to_migrate)
 
     # --- ФУНКЦИИ ДЛЯ РАБОТЫ С КОНСУЛЬТАЦИЯМИ ---
     

@@ -29,10 +29,7 @@ from database import MishuraDB
 from gemini_ai import MishuraGeminiAI
 from payment_service import PaymentService
 
-# 🌐 НОВЫЕ ИМПОРТЫ ДЛЯ СИСТЕМЫ ОТЗЫВОВ
-from pydantic import BaseModel
-from typing import Optional
-import asyncio
+# 🌐 НОВЫЕ ИМПОРТЫ ДЛЯ СИСТЕМЫ ОТЗЫВОВ (уже импортированы выше)
 
 # Настройка логирования
 logging.basicConfig(

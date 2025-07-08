@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT,
     first_name TEXT,
     last_name TEXT,
-    balance INTEGER DEFAULT 200,  -- STcoin баланс (стартовый бонус 200)
+    balance INTEGER DEFAULT 50,  -- STcoin баланс (стартовый бонус 50)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -205,105 +205,40 @@ window.MishuraApp.components.navigation = (function() {
      */
     function showBalanceSection() {
         console.log('💰 Модульная навигация: Показ секции баланса');
-        
-        const container = document.querySelector('.container');
-        if (!container) return;
-        
-        // Получаем данные из app.js если доступно
-        const mishuraApp = window.mishuraApp;
-        const userBalance = mishuraApp ? mishuraApp.userBalance : 200;
-        const consultationsHistory = mishuraApp ? mishuraApp.consultationsHistory : [];
-        const consultationsUsed = mishuraApp ? mishuraApp.consultationsUsed : 0;
-        const consultationsRemaining = Math.floor(userBalance / 10);
-        
-        // ИСПРАВЛЕНО: Карточка баланса БЕЗ кнопок внутри
-        container.innerHTML = `
-            <div class="balance-card" style="
-                background: var(--gold-gradient);
-                color: var(--text-dark);
-                border-radius: 20px;
-                padding: 24px;
-                margin-bottom: 24px;
-                text-align: center;
-                box-shadow: var(--shadow-gold);
-            ">
-                <!-- УБРАЛИ кнопки отсюда -->
-                <div style="font-size: 2.5rem; font-weight: 900; margin-bottom: 8px;" data-balance-display>
-                    ${userBalance}
-                </div>
-                <div style="font-size: 1.1rem; font-weight: 600; text-transform: uppercase;">
-                    STcoin
-                </div>
-                <div style="font-size: 0.9rem; margin-top: 8px; opacity: 0.8;">
-                    Доступно консультаций: <span data-consultations-display>${consultationsRemaining}</span>
-                </div>
-            </div>
-            
-            <!-- Статистика -->
-            <div class="usage-stats" style="
-                background: rgba(26, 26, 26, 0.8);
-                border: 1px solid var(--border-light);
-                border-radius: 16px;
-                padding: 20px;
-                margin-bottom: 24px;
-            ">
-                <h3 style="
-                    color: var(--text-gold);
-                    margin-bottom: 16px;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                    font-size: 1rem;
-                ">📊 Статистика использования</h3>
-                
-                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="color: var(--text-muted);">Всего получено:</span>
-                    <span style="color: var(--text-light); font-weight: 600;">${consultationsHistory.length}</span>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="color: var(--text-muted);">Потрачено STcoin:</span>
-                    <span style="color: var(--text-light); font-weight: 600;">${consultationsUsed}</span>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="color: var(--text-muted);">Остаток STcoin:</span>
-                    <span style="color: var(--text-gold); font-weight: 600;" data-balance-display>${userBalance}</span>
-                </div>
-            </div>
-            
-            <!-- ИСПРАВЛЕНО: Кнопки ВНИЗУ как отдельные блоки -->
-            <div class="balance-actions">
-                <!-- Кнопка пополнения -->
-                <button class="action-btn" onclick="window.mishuraApp && window.mishuraApp.showPaymentModal ? window.mishuraApp.showPaymentModal() : window.showPricingModal()" style="
-                    width: 100%;
-                    margin-bottom: 16px;
-                    background: rgba(26, 26, 26, 0.8);
-                    border: 2px solid var(--border-gold);
-                    color: var(--text-gold);
-                    padding: 20px;
-                    font-size: 1.1rem;
-                ">
-                    <span style="margin-right: 8px;">💳</span>
-                    Пополнить STcoin
-                </button>
-                
-                <!-- Кнопка поддержки -->
-                <button class="action-btn" onclick="window.open('https://t.me/marketolog_online', '_blank')" style="
-                    width: 100%;
-                    margin-bottom: 16px;
-                    background: rgba(26, 26, 26, 0.8);
-                    border: 2px solid rgba(0, 123, 255, 0.5);
-                    color: #007bff;
-                    padding: 20px;
-                    font-size: 1.1rem;
-                ">
-                    <span style="margin-right: 8px;">💬</span>
-                    Связаться с поддержкой
-                </button>
-            </div>
-        `;
-        
-        logger.info('Секция баланса отображена: кнопки вынесены внизу');
+        try {
+            const balanceSection = document.getElementById('balance-section');
+            const sections = ['home-section', 'history-section', 'balance-section'];
+            // Скрываем все секции
+            sections.forEach(sectionId => {
+                const section = document.getElementById(sectionId);
+                if (section) {
+                    section.style.display = 'none';
+                }
+            });
+            // Показываем секцию баланса
+            if (balanceSection) {
+                balanceSection.style.display = 'block';
+                // ✅ ИСПРАВЛЕНИЕ: Безопасная проверка logger
+                if (window.logger && typeof window.logger.info === 'function') {
+                    window.logger.info('💰 Секция баланса отображена');
+                } else {
+                    console.log('💰 Секция баланса отображена');
+                }
+                // Обновляем баланс при показе секции
+                if (window.userService && typeof window.userService.syncBalance === 'function') {
+                    window.userService.syncBalance();
+                } else if (window.balanceManager && typeof window.balanceManager.forceSyncWithServer === 'function') {
+                    window.balanceManager.forceSyncWithServer();
+                }
+            }
+        } catch (error) {
+            console.error('❌ Ошибка показа секции баланса:', error);
+            // Fallback - показываем хотя бы элемент
+            const balanceSection = document.getElementById('balance-section');
+            if (balanceSection) {
+                balanceSection.style.display = 'block';
+            }
+        }
     }
     
     // Публичный API

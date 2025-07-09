@@ -420,7 +420,12 @@ def _clean_gemini_response(response: str) -> str:
         r"Учтите что.*ограничения.*?(?=\n|$)",
         r"В заключение.*?(?=\n|$)",
         r"Подводя итог.*?(?=\n|$)",
-        r"Таким образом.*?(?=\n|$)"
+        r"Таким образом.*?(?=\n|$)",
+        # Новые паттерны для чек-листов
+        r".*проанализированы все.*образов.*?(?=\n|$)",
+        r".*даны рекомендации.*?(?=\n|$)",
+        r".*выбран лучший.*?(?=\n|$)",
+        r"- \[ \].*?(?=\n|$)",
     ]
     cleaned = response.strip()
     for pattern in meta_patterns:
@@ -481,6 +486,15 @@ class MishuraGeminiAI:
             "retry_delay": RETRY_DELAY,
             "optimized_for": "style_analysis"
         }
+
+    async def test_gemini_connection(self) -> bool:
+        return await test_gemini_connection()
+
+    async def analyze_clothing_image(self, image_data: bytes, occasion: str, preferences: Optional[str] = None) -> str:
+        return await analyze_clothing_image(image_data, occasion, preferences or "")
+
+    async def compare_clothing_images(self, image_data_list: List[bytes], occasion: str, preferences: Optional[str] = None) -> str:
+        return await compare_clothing_images(image_data_list, occasion, preferences or "")
 
 # Тестирование при прямом запуске
 if __name__ == "__main__":

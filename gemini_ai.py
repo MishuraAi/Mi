@@ -47,49 +47,103 @@ class DummyCacheManager:
     def save_to_cache(self, *args, **kwargs):
         pass
 
-# Конфигурация Gemini API
-API_CONFIGURED_SUCCESSFULLY = False
-
-if not GEMINI_API_KEY:
-    logger.error("❌ GEMINI_API_KEY не найден в переменных окружения")
-    raise ValueError("GEMINI_API_KEY не найден в .env файле или переменных окружения")
-
-try:
-    # Конфигурируем API
-    genai.configure(api_key=GEMINI_API_KEY)
-    
-    # Проверяем доступные модели
-    logger.info("🔍 Проверка доступных моделей Gemini...")
-    
-    # Список моделей для тестирования
-    models_to_try = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash", 
+# === ШАГ 1: Новый способ выбора модели ===
+def get_optimal_gemini_model():
+    """
+    🎯 Выбор оптимальной модели Gemini для стилиста МИШУРА
+    Приоритет: качество анализа стиля > квота > скорость
+    """
+    # Модели в порядке приоритета для анализа стиля
+    models_priority = [
+        # 🏆 ЛУЧШИЕ для анализа стиля (2025)
+        "gemini-2.5-flash",           # 1500/день, thinking, лучшее качество
+        "gemini-2.0-flash",           # 1500/день, быстрая, стабильная
+        # ⚡ Для высокой нагрузки
+        "gemini-2.0-flash-lite",      # 3000/день, экономичная
+        # 🔄 Fallback на старые модели (временно)
+        "gemini-1.5-flash-latest",    # 50/день, устаревает
+        "gemini-1.5-flash",           # 50/день, устаревает
+        "gemini-1.5-pro",             # 50/день, устаревает
+        # 📜 Совместимость
         "gemini-pro-vision",
         "gemini-pro"
     ]
-    
-    VISION_MODEL = None
-    
-    for model_name in models_to_try:
+    logger.info("🎭 Поиск лучшей модели для анализа стиля...")
+    for model_name in models_priority:
         try:
-            # Создаем модель для проверки
+            logger.info(f"🧪 Тестируем модель: {model_name}")
             test_model = genai.GenerativeModel(model_name)
-            VISION_MODEL = model_name
-            logger.info(f"✅ Модель {model_name} доступна")
-            break
-        except Exception as model_error:
-            logger.warning(f"⚠️ Модель {model_name} недоступна: {str(model_error)}")
+            test_response = test_model.generate_content(
+                "Опиши стиль одним словом: классический",
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=5,
+                    temperature=0.1
+                )
+            )
+            if test_response and test_response.text:
+                response_text = test_response.text.strip().lower()
+                if any(version in model_name for version in ["2.5", "2.0"]):
+                    logger.info(f"✨ Найдена новая модель {model_name}!")
+                    try:
+                        multimodal_test = test_model.generate_content([
+                            "Test multimodal",
+                            {"mime_type": "image/jpeg", "data": b"test"}
+                        ])
+                        logger.info(f"🖼️ Модель {model_name} поддерживает мультимодальность")
+                    except:
+                        logger.info(f"📝 Модель {model_name} работает в текстовом режиме")
+                logger.info(f"✅ Выбрана модель: {model_name}")
+                return model_name
+            else:
+                logger.warning(f"⚠️ Модель {model_name} не вернула ответ")
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "not found" in error_msg or "does not exist" in error_msg:
+                logger.warning(f"❌ Модель {model_name} не найдена в API")
+            elif "quota" in error_msg or "429" in error_msg:
+                logger.warning(f"🚫 Модель {model_name} заблокирована квотой")
+                return model_name
+            elif "permission" in error_msg or "access" in error_msg:
+                logger.warning(f"🔐 Нет доступа к модели {model_name}")
+            else:
+                logger.warning(f"⚠️ Ошибка тестирования {model_name}: {str(e)}")
             continue
-    
+    raise RuntimeError(
+        "❌ Ни одна модель Gemini не доступна! "
+        "Проверьте API ключ и подключение к интернету."
+    )
+
+# === ШАГ 2: Новый блок инициализации модели ===
+try:
+    genai.configure(api_key=GEMINI_API_KEY)
+    logger.info("🔍 Проверка доступных моделей Gemini...")
+    VISION_MODEL = get_optimal_gemini_model()
     if VISION_MODEL:
         API_CONFIGURED_SUCCESSFULLY = True
         logger.info(f"✅ Gemini API успешно сконфигурирован с моделью: {VISION_MODEL}")
+        if "2.5" in VISION_MODEL:
+            logger.info("🧠 Используется модель 2.5 с thinking capabilities!")
+            logger.info("💡 Ожидайте более качественные рекомендации по стилю")
+        elif "2.0" in VISION_MODEL:
+            logger.info("🆕 Используется новая модель Gemini 2.0!")
+            logger.info("⚡ Быстрая обработка и высокие квоты")
+        elif "1.5" in VISION_MODEL:
+            logger.warning("⚠️ Используется устаревающая модель 1.5")
+            logger.warning("📅 Рекомендуется обновление до 2.0/2.5 до апреля 2025")
+        if "2.5" in VISION_MODEL or "2.0" in VISION_MODEL:
+            logger.info("📊 Дневная квота: ~1500 запросов (vs 50 у старых моделей)")
+        elif "lite" in VISION_MODEL:
+            logger.info("📊 Дневная квота: ~3000 запросов (экономичная модель)")
+        else:
+            logger.info("📊 Дневная квота: ~50 запросов (ограниченная)")
     else:
         raise RuntimeError("Ни одна из моделей Gemini не доступна")
-        
 except Exception as e:
     logger.error(f"❌ КРИТИЧЕСКАЯ ОШИБКА при конфигурации Gemini API: {str(e)}")
+    logger.error("🔧 Возможные решения:")
+    logger.error("   1. Проверьте GEMINI_API_KEY в .env файле")
+    logger.error("   2. Убедитесь что API ключ действителен")
+    logger.error("   3. Проверьте подключение к интернету")
     raise RuntimeError(f"Не удалось сконфигурировать Gemini API: {str(e)}")
 
 # Параметры повторных запросов
@@ -451,76 +505,52 @@ def _clean_gemini_response(response: str) -> str:
 # Версия модуля
 __version__ = "0.5.0"
 
+# === ШАГ 3: Обновление класса MishuraGeminiAI ===
 class MishuraGeminiAI:
     """
-    Основной класс для работы с Gemini AI в проекте МИШУРА.
-    Обеспечивает совместимость с api.py и другими модулями.
+    🎭 ОБНОВЛЕННЫЙ класс для работы с Gemini AI в проекте МИШУРА
+    Оптимизирован для анализа стиля с лучшими моделями 2025
     """
-    
     def __init__(self):
-        """Инициализация класса MishuraGeminiAI"""
+        """Инициализация класса MishuraGeminiAI с оптимальной моделью"""
         self.cache_manager = cache_manager
         self.model_name = VISION_MODEL
         self.api_configured = API_CONFIGURED_SUCCESSFULLY
-        
         if not self.api_configured:
             logger.error("❌ Gemini API не сконфигурирован при инициализации класса")
             raise RuntimeError("Gemini API не сконфигурирован")
-        
+        # Определяем возможности модели
+        self.model_capabilities = self._detect_model_capabilities()
         logger.info(f"✅ MishuraGeminiAI инициализирован с моделью: {self.model_name}")
-    
-    async def test_gemini_connection(self) -> bool:
-        """
-        Тестирует соединение с Gemini API.
-        
-        Returns:
-            bool: True если соединение успешно, False в случае ошибки
-        """
-        return await test_gemini_connection()
-    
-    async def analyze_clothing_image(self, image_data: bytes, occasion: str, 
-                                   preferences: Optional[str] = None) -> str:
-        """
-        Анализирует одежду на изображении с помощью Gemini AI.
-        
-        Args:
-            image_data: Бинарные данные изображения
-            occasion: Повод для консультации
-            preferences: Предпочтения пользователя
-            
-        Returns:
-            str: Анализ и рекомендации
-        """
-        return await analyze_clothing_image(image_data, occasion, preferences)
-    
-    async def compare_clothing_images(self, image_data_list: List[bytes], occasion: str, 
-                                    preferences: Optional[str] = None) -> str:
-        """
-        Сравнивает несколько образов одежды.
-        
-        Args:
-            image_data_list: Список бинарных данных изображений
-            occasion: Повод для консультации
-            preferences: Предпочтения пользователя
-            
-        Returns:
-            str: Сравнительный анализ
-        """
-        return await compare_clothing_images(image_data_list, occasion, preferences)
-    
+        logger.info(f"🎯 Возможности модели: {self.model_capabilities}")
+    def _detect_model_capabilities(self):
+        """Определяет возможности выбранной модели"""
+        capabilities = {
+            "thinking": "2.5" in self.model_name,
+            "high_quota": any(v in self.model_name for v in ["2.5", "2.0"]),
+            "multimodal": "vision" in self.model_name or "flash" in self.model_name,
+            "fast_processing": "lite" in self.model_name or "2.0" in self.model_name,
+            "style_optimized": True
+        }
+        return capabilities
     def get_model_info(self) -> Dict[str, Any]:
-        """
-        Возвращает информацию о текущей модели.
-        
-        Returns:
-            dict: Информация о модели и статусе API
-        """
+        """Возвращает расширенную информацию о модели"""
+        if "2.5" in self.model_name or "2.0" in self.model_name:
+            if "lite" in self.model_name:
+                estimated_quota = 3000
+            else:
+                estimated_quota = 1500
+        else:
+            estimated_quota = 50
         return {
             "model_name": self.model_name,
             "api_configured": self.api_configured,
             "version": __version__,
+            "capabilities": self.model_capabilities,
+            "estimated_daily_quota": estimated_quota,
             "max_retries": MAX_RETRIES,
-            "retry_delay": RETRY_DELAY
+            "retry_delay": RETRY_DELAY,
+            "optimized_for": "style_analysis"
         }
 
 # Тестирование при прямом запуске

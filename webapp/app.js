@@ -173,97 +173,80 @@ class MishuraApp {
 
     // ОБНОВЛЕННАЯ система синхронизации баланса
     startAdvancedBalanceSync() {
-        console.log('🔄 Запуск продвинутой синхронизации баланса...');
-        
-        // Основной интервал синхронизации (каждые 30 секунд)
+        console.log('🔄 Запуск ИСПРАВЛЕННОЙ синхронизации баланса...');
+        // 🔧 ИСПРАВЛЕНО: Увеличенные интервалы для снижения нагрузки
         this.balanceSync.interval = setInterval(async () => {
             if (!this.balanceSync.isUpdating && window.userService) {
-                await this.advancedSyncBalance();
+                await this.safeAdvancedSyncBalance();
             }
-        }, 30000);
-        
-        // Синхронизация при изменении видимости
+        }, 120000); // 🔧 ИСПРАВЛЕНО: 2 минуты вместо 30 секунд
+        // 🔧 ИСПРАВЛЕНО: Синхронизация только при длительном отсутствии
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden && window.userService && !this.balanceSync.isUpdating) {
-                await this.advancedSyncBalance();
+                // Синхронизируем только если прошло больше 5 минут
+                if (Date.now() - this.balanceSync.lastUpdate > 300000) {
+                    await this.safeAdvancedSyncBalance();
+                }
             }
         });
-        
-        // Синхронизация при фокусе окна
-        window.addEventListener('focus', async () => {
-            if (window.userService && !this.balanceSync.isUpdating) {
-                await this.advancedSyncBalance();
-            }
-        });
-        
-        // Синхронизация при online/offline
+        // 🔧 ИСПРАВЛЕНО: Убираем агрессивную синхронизацию при фокусе
+        // window.addEventListener('focus', ...) - УДАЛЕНО
+        // Синхронизация только при восстановлении соединения
         window.addEventListener('online', async () => {
-            console.log('🌐 Подключение восстановлено, синхронизируем баланс');
+            console.log('🌐 Подключение восстановлено, проверяем баланс');
             if (window.userService && !this.balanceSync.isUpdating) {
-                await this.advancedSyncBalance();
+                if (Date.now() - this.balanceSync.lastUpdate > 180000) { // 3 минуты
+                    await this.safeAdvancedSyncBalance();
+                }
             }
         });
-        
-        console.log('✅ Продвинутая синхронизация активирована');
+        console.log('✅ ИСПРАВЛЕННАЯ синхронизация активирована с защитой от спама');
     }
 
-    // НОВЫЙ метод синхронизации баланса
-    async advancedSyncBalance() {
+    // 🔧 НОВЫЙ МЕТОД: Безопасная синхронизация с защитой от спама
+    async safeAdvancedSyncBalance() {
         const now = Date.now();
-        
-        // Не синхронизируем слишком часто
-        if (now - this.balanceSync.lastUpdate < 10000 && !this.balanceSync.forceUpdate) {
+        // 🔧 ИСПРАВЛЕНО: Минимальный интервал 1 минута между запросами
+        if (now - this.balanceSync.lastUpdate < 60000 && !this.balanceSync.forceUpdate) {
+            console.log('🛡️ Защита от спама: слишком рано для синхронизации');
             return;
         }
-        
-        console.log('🔄 Продвинутая синхронизация баланса...');
-        
+        console.log('🔄 Безопасная синхронизация баланса...');
         try {
             this.balanceSync.isUpdating = true;
-            
             if (!window.userService) {
-                console.warn('⚠️ UserService недоступен, используем fallback');
-                await this.syncBalance(); // Старый метод
+                console.warn('⚠️ UserService недоступен');
                 return;
             }
-            
-            // Получаем актуальный баланс через UserService
-            const newBalance = await window.userService.getBalance(this.balanceSync.forceUpdate);
-            
+            // 🔧 ИСПРАВЛЕНО: Таймаут для предотвращения зависания
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Sync timeout')), 10000);
+            });
+            const syncPromise = window.userService.getBalance(this.balanceSync.forceUpdate);
+            const newBalance = await Promise.race([syncPromise, timeoutPromise]);
             if (newBalance !== null && newBalance !== this.userBalance) {
                 const oldBalance = this.userBalance;
                 this.userBalance = newBalance;
                 this.saveUserData();
-                
                 console.log(`💰 Баланс синхронизирован: ${oldBalance} → ${newBalance}`);
-                
-                // Обновляем отображение
                 this.updateBalanceDisplay();
-                
-                // Показываем уведомление при увеличении
-                if (newBalance > oldBalance) {
+                // Показываем уведомление только при значительном изменении
+                if (Math.abs(newBalance - oldBalance) >= 10) {
                     const difference = newBalance - oldBalance;
                     this.showNotification(
-                        `🎉 Баланс пополнен на ${difference} STcoin!`, 
-                        'success', 
+                        `${difference > 0 ? '🎉' : '📉'} Баланс ${difference > 0 ? 'пополнен' : 'обновлен'}: ${difference > 0 ? '+' : ''}${difference} STcoin`, 
+                        difference > 0 ? 'success' : 'info', 
                         4000
                     );
                     this.animateBalanceChange();
                 }
             }
-            
             this.balanceSync.lastUpdate = now;
             this.balanceSync.forceUpdate = false;
-            
         } catch (error) {
-            console.error('❌ Ошибка продвинутой синхронизации баланса:', error);
-            
-            // Fallback на старый метод
-            try {
-                await this.syncBalance();
-            } catch (fallbackError) {
-                console.error('❌ Fallback синхронизация также не удалась:', fallbackError);
-            }
+            console.error('❌ Ошибка безопасной синхронизации баланса:', error);
+            // 🔧 НЕ ДЕЛАЕМ fallback для предотвращения лишних запросов
+            console.warn('⚠️ Пропускаем fallback для предотвращения спама API');
         } finally {
             this.balanceSync.isUpdating = false;
         }

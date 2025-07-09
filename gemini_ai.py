@@ -55,18 +55,12 @@ def get_optimal_gemini_model():
     """
     # Модели в порядке приоритета для анализа стиля
     models_priority = [
-        # 🏆 ЛУЧШИЕ для анализа стиля (2025)
-        "gemini-2.5-flash",           # 1500/день, thinking, лучшее качество
-        "gemini-2.0-flash",           # 1500/день, быстрая, стабильная
-        # ⚡ Для высокой нагрузки
-        "gemini-2.0-flash-lite",      # 3000/день, экономичная
-        # 🔄 Fallback на старые модели (временно)
-        "gemini-1.5-flash-latest",    # 50/день, устаревает
-        "gemini-1.5-flash",           # 50/день, устаревает
-        "gemini-1.5-pro",             # 50/день, устаревает
-        # 📜 Совместимость
-        "gemini-pro-vision",
-        "gemini-pro"
+        "gemini-2.5-flash",           # 🏆 ТОП выбор - 1500/день
+        "gemini-2.5-pro",             # 🔥 Еще мощнее  
+        "gemini-2.0-flash",           # ⚡ Быстрая
+        "gemini-2.0-flash-lite",      # 💰 Экономичная - 3000/день
+        "gemini-1.5-flash-latest",    # 📦 Fallback
+        "gemini-1.5-flash"            # 📦 Fallback
     ]
     logger.info("🎭 Поиск лучшей модели для анализа стиля...")
     for model_name in models_priority:

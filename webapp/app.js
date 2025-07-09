@@ -371,33 +371,89 @@ class MishuraApp {
         }
     }
 
-    // 🆕 НОВЫЙ МЕТОД: Валидация и автоматическая синхронизация
+    // 🆕 Улучшенная валидация и синхронизация баланса
     async validateAndSyncBalance() {
         try {
-            // Получаем актуальный баланс с сервера через UserService
-            if (window.userService) {
-                const serverBalance = await window.userService.getActualBalance();
-                
-                // Если есть расхождение - исправляем автоматически
-                if (Math.abs(this.userBalance - serverBalance) > 0.01) {
-                    console.log(`🔄 Обнаружено расхождение баланса: localStorage=${this.userBalance} сервер=${serverBalance}`);
-                    console.log('🔧 Автоматическая синхронизация...');
-                    
-                    // Обновляем баланс из авторитетного источника
-                    this.userBalance = serverBalance;
-                    
-                    // Сохраняем исправленные данные
-                    this.saveUserData();
-                    
-                    // Обновляем UI
-                    this.updateUI();
-                    
-                    console.log(`✅ Баланс синхронизирован: ${serverBalance} STcoin`);
+            console.log('🔍 Валидация и синхронизация баланса...');
+            if (!window.userService) {
+                console.warn('⚠️ UserService недоступен, пропускаем валидацию');
+                return;
+            }
+            let serverBalance;
+            try {
+                if (typeof window.userService.getActualBalance === 'function') {
+                    serverBalance = await window.userService.getActualBalance();
+                } else if (typeof window.userService.getBalance === 'function') {
+                    serverBalance = await window.userService.getBalance(true);
+                } else {
+                    const userId = this.getUserId();
+                    const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/balance`);
+                    const data = await response.json();
+                    serverBalance = data.balance;
                 }
+            } catch (apiError) {
+                console.warn('⚠️ Не удалось получить баланс с сервера:', apiError);
+                return;
+            }
+            if (serverBalance !== null && Math.abs(this.userBalance - serverBalance) > 0.01) {
+                console.log(`🔄 Обнаружено расхождение баланса: localStorage=${this.userBalance} сервер=${serverBalance}`);
+                console.log('🔧 Автоматическая синхронизация...');
+                this.userBalance = serverBalance;
+                this.saveUserData();
+                this.updateBalanceDisplay();
+                console.log(`✅ Баланс синхронизирован: ${serverBalance} STcoin`);
+            } else {
+                console.log('✅ Баланс актуален, синхронизация не требуется');
             }
         } catch (error) {
             console.warn('⚠️ Не удалось проверить баланс с сервером:', error);
-            // Продолжаем работу с кэшированными данными
+        }
+    }
+
+    // 🆕 Обновление пользовательского интерфейса
+    updateUI() {
+        try {
+            console.log('🎨 Обновление UI...');
+            this.updateBalanceDisplay();
+            const consultationsRemaining = Math.floor(this.userBalance / 10);
+            const consultationsElements = document.querySelectorAll('[data-consultations-remaining]');
+            consultationsElements.forEach(element => {
+                element.textContent = consultationsRemaining;
+            });
+            console.log('✅ UI обновлен');
+        } catch (error) {
+            console.error('❌ Ошибка обновления UI:', error);
+        }
+    }
+
+    // 🆕 Улучшенное обновление отображения баланса
+    updateBalanceDisplay() {
+        try {
+            console.log('📊 Обновление отображения баланса:', this.userBalance);
+            const balanceElements = document.querySelectorAll('.balance-amount, .balance-value, [data-balance-display]');
+            balanceElements.forEach(element => {
+                if (element) {
+                    element.textContent = this.userBalance;
+                }
+            });
+            const consultationsRemaining = Math.floor(this.userBalance / 10);
+            const consultationsElements = document.querySelectorAll('[data-consultations-display]');
+            consultationsElements.forEach(element => {
+                if (element) {
+                    element.textContent = consultationsRemaining;
+                }
+            });
+            const balanceTitle = document.querySelector('#balance-section .section-title');
+            if (balanceTitle) {
+                balanceTitle.innerHTML = `💰 Баланс: <span class="balance-highlight">${this.userBalance}</span> STCoins`;
+            }
+            const headerBalance = document.querySelector('.header-balance');
+            if (headerBalance) {
+                headerBalance.textContent = `${this.userBalance} STcoin`;
+            }
+            console.log('📊 Отображение баланса обновлено');
+        } catch (error) {
+            console.error('❌ Ошибка обновления отображения баланса:', error);
         }
     }
 
@@ -516,29 +572,6 @@ class MishuraApp {
                 element.style.animation = '';
             }, 1000);
         });
-    }
-
-    updateBalanceDisplay() {
-        // Обновляем все элементы с балансом
-        const balanceElements = document.querySelectorAll('.balance-amount, .balance-value, [data-balance-display]');
-        balanceElements.forEach(element => {
-            element.textContent = this.userBalance;
-        });
-        
-        // Обновляем количество консультаций
-        const consultationsRemaining = Math.floor(this.userBalance / 10);
-        const consultationsElements = document.querySelectorAll('[data-consultations-display]');
-        consultationsElements.forEach(element => {
-            element.textContent = consultationsRemaining;
-        });
-        
-        // Обновляем заголовок секции баланса
-        const balanceTitle = document.querySelector('#balance-section .section-title');
-        if (balanceTitle) {
-            balanceTitle.innerHTML = `💰 Баланс: <span class="balance-highlight">${this.userBalance}</span> STCoins`;
-        }
-        
-        console.log('📊 Отображение баланса обновлено:', this.userBalance);
     }
 
     setupBasicEventHandlers() {

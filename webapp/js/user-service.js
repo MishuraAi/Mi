@@ -326,6 +326,74 @@ class UserService {
         
         console.log('🔍 === КОНЕЦ ДИАГНОСТИКИ ===');
     }
+
+    // 🆕 Получить актуальный баланс с сервера (алиас для getBalance)
+    async getActualBalance() {
+        try {
+            console.log('💰 Получение актуального баланса с сервера...');
+            const balance = await this.getBalance(true);
+            if (balance !== null) {
+                console.log(`✅ Актуальный баланс получен: ${balance} STcoin`);
+                return balance;
+            } else {
+                console.warn('⚠️ Не удалось получить актуальный баланс');
+                return this.currentBalance || 50;
+            }
+        } catch (error) {
+            console.error('❌ Ошибка получения актуального баланса:', error);
+            return this.currentBalance || 50;
+        }
+    }
+
+    // 🆕 Синхронизация баланса (алиас для принудительного обновления)
+    async syncBalance() {
+        try {
+            console.log('🔄 Принудительная синхронизация баланса...');
+            const userId = this.getCurrentUserId();
+            if (!userId) {
+                throw new Error('User ID не определен');
+            }
+            const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/balance/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            if (typeof data.balance === 'number') {
+                const oldBalance = this.currentBalance;
+                this.currentBalance = data.balance;
+                this.saveToLocalStorage();
+                this.notifyBalanceChange(data.balance);
+                console.log(`✅ Баланс синхронизирован: ${oldBalance} → ${data.balance}`);
+                return data.balance;
+            } else {
+                throw new Error('Некорректный ответ от сервера');
+            }
+        } catch (error) {
+            console.error('❌ Ошибка синхронизации баланса:', error);
+            return this.currentBalance;
+        }
+    }
+
+    // 🆕 Диагностика состояния UserService
+    diagnose() {
+        console.log('🔍 === ДИАГНОСТИКА USERSERVICE ===');
+        console.log(`   currentUserId: ${this.currentUserId}`);
+        console.log(`   currentBalance: ${this.currentBalance}`);
+        console.log(`   balanceLastUpdate: ${this.balanceLastUpdate ? new Date(this.balanceLastUpdate).toLocaleString() : 'никогда'}`);
+        console.log(`   forceSync: ${this.forceSync}`);
+        console.log(`   API_BASE_URL: ${typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'не установлен'}`);
+        const methods = ['getCurrentUserId', 'getBalance', 'getActualBalance', 'syncBalance'];
+        methods.forEach(method => {
+            const available = typeof this[method] === 'function';
+            console.log(`   ${method}: ${available ? '✅ доступен' : '❌ отсутствует'}`);
+        });
+        console.log('🔍 === КОНЕЦ ДИАГНОСТИКИ ===');
+    }
 }
 
 // Создаем глобальный экземпляр

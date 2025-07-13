@@ -5,7 +5,7 @@ import uuid
 import logging
 import base64
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from contextlib import asynccontextmanager
 import time
 import psutil
@@ -104,6 +104,296 @@ class FeedbackPromptAction(BaseModel):
     consultation_id: int
     action: str  # shown/dismissed/completed
     dismissal_reason: Optional[str] = None
+
+# =================== PYDANTIC MODELS ДЛЯ СИНХРОНИЗАЦИИ ===================
+
+class DeviceInfo(BaseModel):
+    user_agent: str
+    screen_resolution: str
+    timezone: str
+    language: str
+    platform: str
+    viewport: str
+
+class AnonymousUserRequest(BaseModel):
+    device_fingerprint: str
+    device_info: DeviceInfo
+
+class TelegramLinkRequest(BaseModel):
+    anonymous_id: str
+    telegram_id: int
+    telegram_username: Optional[str] = None
+    telegram_first_name: Optional[str] = None
+
+class SyncRequest(BaseModel):
+    source_telegram_id: int
+    target_anonymous_id: str
+
+# =================== SYNC API ENDPOINTS ===================
+
+@app.post("/api/v1/users/anonymous")
+async def create_anonymous_user(request: AnonymousUserRequest, http_request: Request):
+    """
+    Создать анонимного пользователя с device fingerprinting
+    """
+    try:
+        db = MishuraDB()
+        existing_device = db.get_device_user(device_fingerprint=request.device_fingerprint)
+        if existing_device:
+            db.update_device_activity(request.device_fingerprint)
+            return {
+                "status": "success",
+                "message": "Устройство найдено",
+                "data": {
+                    "anonymous_id": existing_device['anonymous_id'],
+                    "device_fingerprint": existing_device['device_fingerprint'],
+                    "is_linked": existing_device['is_linked'],
+                    "telegram_id": existing_device.get('telegram_id'),
+                    "created_at": existing_device['created_at']
+                }
+            }
+        device_info_dict = {
+            "user_agent": request.device_info.user_agent,
+            "screen_resolution": request.device_info.screen_resolution,
+            "timezone": request.device_info.timezone,
+            "language": request.device_info.language,
+            "platform": request.device_info.platform,
+            "viewport": request.device_info.viewport,
+            "ip_address": str(http_request.client.host),
+            "created_from": "webapp"
+        }
+        new_device = db.create_anonymous_user(
+            device_fingerprint=request.device_fingerprint,
+            device_info=device_info_dict
+        )
+        if not new_device:
+            raise HTTPException(status_code=500, detail="Не удалось создать анонимного пользователя")
+        logger.info(f"✅ Создан анонимный пользователь: {new_device['anonymous_id']}")
+        return {
+            "status": "success",
+            "message": "Анонимный пользователь создан",
+            "data": {
+                "anonymous_id": new_device['anonymous_id'],
+                "device_fingerprint": new_device['device_fingerprint'],
+                "is_linked": new_device['is_linked'],
+                "telegram_id": None,
+                "created_at": new_device['created_at']
+            }
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка создания анонимного пользователя: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
+
+@app.post("/api/v1/users/link-telegram")
+async def link_telegram_to_anonymous(request: TelegramLinkRequest):
+    """
+    Привязать Telegram аккаунт к анонимному пользователю
+    """
+    try:
+        db = MishuraDB()
+        device_user = db.get_device_user(anonymous_id=request.anonymous_id)
+        if not device_user:
+            raise HTTPException(status_code=404, detail="Анонимный пользователь не найден")
+        existing_telegram = db.get_device_user_by_telegram(request.telegram_id)
+        if existing_telegram and existing_telegram['anonymous_id'] != request.anonymous_id:
+            sync_success = db.sync_user_data(request.telegram_id, request.anonymous_id)
+            if not sync_success:
+                logger.warning(f"⚠️ Не удалось синхронизировать данные при привязке")
+        link_success = db.link_telegram_to_anonymous(
+            anonymous_id=request.anonymous_id,
+            telegram_id=request.telegram_id,
+            telegram_username=request.telegram_username,
+            telegram_first_name=request.telegram_first_name
+        )
+        if not link_success:
+            raise HTTPException(status_code=500, detail="Не удалось привязать Telegram аккаунт")
+        existing_user = db.get_user(request.telegram_id)
+        if not existing_user:
+            user_id = db.save_user(
+                telegram_id=request.telegram_id,
+                username=request.telegram_username,
+                first_name=request.telegram_first_name
+            )
+            if user_id:
+                logger.info(f"✅ Создан новый пользователь {request.telegram_id} с начальным балансом 50 STcoin")
+        updated_device = db.get_device_user(anonymous_id=request.anonymous_id)
+        logger.info(f"✅ Telegram {request.telegram_id} привязан к {request.anonymous_id}")
+        return {
+            "status": "success",
+            "message": "Telegram аккаунт успешно привязан",
+            "data": {
+                "anonymous_id": updated_device['anonymous_id'],
+                "telegram_id": updated_device['telegram_id'],
+                "telegram_username": updated_device.get('telegram_username'),
+                "is_linked": updated_device['is_linked'],
+                "sync_completed": True
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка привязки Telegram: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
+
+@app.get("/api/v1/users/sync/{device_fingerprint}")
+async def get_user_by_device(device_fingerprint: str):
+    """
+    Получить информацию о пользователе по device fingerprint
+    """
+    try:
+        db = MishuraDB()
+        device_user = db.get_device_user(device_fingerprint=device_fingerprint)
+        if not device_user:
+            return {
+                "status": "not_found",
+                "message": "Устройство не найдено",
+                "data": None
+            }
+        db.update_device_activity(device_fingerprint)
+        user_data = None
+        if device_user.get('telegram_id'):
+            user_data = db.get_user(device_user['telegram_id'])
+        return {
+            "status": "success",
+            "message": "Устройство найдено",
+            "data": {
+                "anonymous_id": device_user['anonymous_id'],
+                "device_fingerprint": device_user['device_fingerprint'],
+                "telegram_id": device_user.get('telegram_id'),
+                "telegram_username": device_user.get('telegram_username'),
+                "telegram_first_name": device_user.get('telegram_first_name'),
+                "is_linked": device_user['is_linked'],
+                "last_active": device_user['last_active'],
+                "user_balance": user_data.get('balance') if user_data else None,
+                "user_created": user_data.get('created_at') if user_data else None
+            }
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения пользователя по устройству: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
+
+@app.post("/api/v1/users/sync")
+async def sync_user_data_endpoint(request: SyncRequest):
+    """
+    Синхронизировать данные пользователя между устройствами
+    """
+    try:
+        db = MishuraDB()
+        sync_success = db.sync_user_data(
+            source_telegram_id=request.source_telegram_id,
+            target_anonymous_id=request.target_anonymous_id
+        )
+        if not sync_success:
+            raise HTTPException(status_code=500, detail="Не удалось синхронизировать данные")
+        target_device = db.get_device_user(anonymous_id=request.target_anonymous_id)
+        return {
+            "status": "success",
+            "message": "Данные успешно синхронизированы",
+            "data": {
+                "target_anonymous_id": request.target_anonymous_id,
+                "source_telegram_id": request.source_telegram_id,
+                "sync_completed": True,
+                "synced_at": datetime.now().isoformat(),
+                "target_device": target_device
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка синхронизации данных: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
+
+@app.get("/api/v1/users/{telegram_id}/devices")
+async def get_user_devices_endpoint(telegram_id: int):
+    """
+    Получить все устройства пользователя
+    """
+    try:
+        db = MishuraDB()
+        devices = db.get_user_devices(telegram_id)
+        return {
+            "status": "success",
+            "message": f"Найдено {len(devices)} устройств",
+            "data": {
+                "telegram_id": telegram_id,
+                "devices": devices,
+                "total_devices": len(devices)
+            }
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения устройств пользователя: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
+
+@app.get("/api/v1/users/detect-user")
+async def detect_user_auto(request: Request):
+    """
+    Автоматическое определение пользователя (универсальный endpoint)
+    """
+    try:
+        telegram_init_data = request.headers.get('X-Telegram-Init-Data')
+        telegram_user_id = request.headers.get('X-Telegram-User-ID')
+        user_id_param = request.query_params.get('user_id')
+        device_fingerprint = request.query_params.get('device_fingerprint')
+        db = MishuraDB()
+        result = {
+            "status": "success",
+            "detection_method": "unknown",
+            "user_id": None,
+            "anonymous_id": None,
+            "is_linked": False,
+            "needs_linking": False,
+            "telegram_detected": False
+        }
+        if telegram_user_id:
+            try:
+                telegram_id = int(telegram_user_id)
+                device_user = db.get_device_user_by_telegram(telegram_id)
+                result.update({
+                    "detection_method": "telegram_webapp",
+                    "user_id": telegram_id,
+                    "anonymous_id": device_user['anonymous_id'] if device_user else None,
+                    "is_linked": True,
+                    "telegram_detected": True
+                })
+                return result
+            except ValueError:
+                pass
+        if user_id_param:
+            try:
+                telegram_id = int(user_id_param)
+                if telegram_id != 5930269100:
+                    device_user = db.get_device_user_by_telegram(telegram_id)
+                    result.update({
+                        "detection_method": "url_parameter",
+                        "user_id": telegram_id,
+                        "anonymous_id": device_user['anonymous_id'] if device_user else None,
+                        "is_linked": bool(device_user),
+                        "telegram_detected": True
+                    })
+                    return result
+            except ValueError:
+                pass
+        if device_fingerprint:
+            device_user = db.get_device_user(device_fingerprint=device_fingerprint)
+            if device_user:
+                result.update({
+                    "detection_method": "device_fingerprint",
+                    "user_id": device_user.get('telegram_id'),
+                    "anonymous_id": device_user['anonymous_id'],
+                    "is_linked": device_user['is_linked'],
+                    "needs_linking": not device_user['is_linked']
+                })
+                return result
+        result.update({
+            "detection_method": "create_anonymous",
+            "needs_creation": True,
+            "anonymous_id": None,
+            "user_id": None
+        })
+        return result
+    except Exception as e:
+        logger.error(f"❌ Ошибка автоматического определения пользователя: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
 
 # Импорт системы уведомлений
 try:

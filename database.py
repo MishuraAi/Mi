@@ -87,14 +87,35 @@ def _add_db_config_property():
 class MishuraDB:
     _db_config = None
     
-    def __init__(self):
-        # Инициализируем конфигурацию только один раз
+    def __init__(self, db_path: str = DB_PATH):
+        """Инициализация базы данных МИШУРА"""
+        self.db_path = db_path
+        self.logger = logger  # ✅ КРИТИЧЕСКИ ВАЖНО: инициализируем logger
+        
+        # Инициализируем конфигурацию только один раз для всех экземпляров
         if MishuraDB._db_config is None:
             MishuraDB._db_config = self._initialize_db_config()
-        
+            
         self.config = MishuraDB._db_config
-        self.logger = logger  # ← ЭТА СТРОКА КРИТИЧЕСКИ ВАЖНА!
-        logger.info(f"✅ MishuraDB инициализирована ({self.config['type']})")
+        
+        # Инициализация БД
+        if self.config['type'] == 'postgresql':
+            self.logger.info(f"🐘 Инициализация PostgreSQL...")
+            self.init_db()
+        else:
+            if not os.path.exists(self.db_path):
+                self.logger.info(f"🆕 SQLite БД не существует, создаем: {self.db_path}")
+                self.init_db()
+            else:
+                self.logger.info(f"✅ SQLite БД существует: {self.db_path}")
+        
+        # Создание таблиц отзывов
+        self.create_feedback_tables()
+        
+        # 🆕 НОВОЕ: Создание таблиц синхронизации
+        self.create_sync_tables()
+        
+        self.logger.info(f"✅ MishuraDB инициализирована ({self.config['type']})")
     
     def _initialize_db_config(self):
         database_url = os.getenv('DATABASE_URL')
@@ -1057,6 +1078,433 @@ class MishuraDB:
         except Exception as e:
             self.logger.error(f"❌ Ошибка получения статистики отзывов: {e}")
             return {}
+
+    # =================== МЕТОДЫ ДЛЯ СИСТЕМЫ СИНХРОНИЗАЦИИ УСТРОЙСТВ ===================
+    
+    def create_sync_tables(self):
+        """Создание таблиц для системы синхронизации устройств"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.config['type'] == 'postgresql':
+                # PostgreSQL схема для синхронизации
+                sync_schema = """
+                -- Таблица устройств пользователей (анонимная идентификация)
+                CREATE TABLE IF NOT EXISTS device_users (
+                    id SERIAL PRIMARY KEY,
+                    device_fingerprint TEXT UNIQUE NOT NULL,
+                    anonymous_id TEXT UNIQUE NOT NULL,
+                    telegram_id BIGINT NULL,
+                    telegram_username TEXT NULL,
+                    telegram_first_name TEXT NULL,
+                    device_info JSONB DEFAULT '{}',
+                    is_linked BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Таблица сессий для синхронизации
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id SERIAL PRIMARY KEY,
+                    device_user_id INTEGER NOT NULL REFERENCES device_users(id) ON DELETE CASCADE,
+                    session_token TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    ip_address INET,
+                    user_agent TEXT,
+                    is_active BOOLEAN DEFAULT TRUE
+                );
+
+                -- Таблица для логирования синхронизации данных
+                CREATE TABLE IF NOT EXISTS sync_operations (
+                    id SERIAL PRIMARY KEY,
+                    source_device_id INTEGER NOT NULL REFERENCES device_users(id),
+                    target_device_id INTEGER REFERENCES device_users(id),
+                    operation_type VARCHAR(50) NOT NULL,
+                    entity_type VARCHAR(50) NOT NULL,
+                    entity_id INTEGER,
+                    data_snapshot JSONB,
+                    sync_status VARCHAR(20) DEFAULT 'pending',
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP
+                );
+
+                -- Таблица привязки анонимных аккаунтов к Telegram
+                CREATE TABLE IF NOT EXISTS telegram_links (
+                    id SERIAL PRIMARY KEY,
+                    anonymous_id TEXT NOT NULL,
+                    telegram_id BIGINT NOT NULL,
+                    linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    link_method VARCHAR(20) DEFAULT 'webapp',
+                    verified BOOLEAN DEFAULT FALSE,
+                    UNIQUE(anonymous_id, telegram_id)
+                );
+
+                -- Индексы для оптимизации
+                CREATE INDEX IF NOT EXISTS idx_device_users_fingerprint ON device_users(device_fingerprint);
+                CREATE INDEX IF NOT EXISTS idx_device_users_anonymous_id ON device_users(anonymous_id);
+                CREATE INDEX IF NOT EXISTS idx_device_users_telegram_id ON device_users(telegram_id);
+                CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
+                CREATE INDEX IF NOT EXISTS idx_user_sessions_device_user ON user_sessions(device_user_id);
+                CREATE INDEX IF NOT EXISTS idx_sync_operations_source ON sync_operations(source_device_id);
+                CREATE INDEX IF NOT EXISTS idx_sync_operations_target ON sync_operations(target_device_id);
+                CREATE INDEX IF NOT EXISTS idx_telegram_links_anonymous ON telegram_links(anonymous_id);
+                CREATE INDEX IF NOT EXISTS idx_telegram_links_telegram ON telegram_links(telegram_id);
+                """
+            else:
+                # SQLite схема для синхронизации (для локальной разработки)
+                sync_schema = """
+                -- Таблица устройств пользователей
+                CREATE TABLE IF NOT EXISTS device_users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    device_fingerprint TEXT UNIQUE NOT NULL,
+                    anonymous_id TEXT UNIQUE NOT NULL,
+                    telegram_id INTEGER NULL,
+                    telegram_username TEXT NULL,
+                    telegram_first_name TEXT NULL,
+                    device_info TEXT DEFAULT '{}',
+                    is_linked INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Таблица сессий
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    device_user_id INTEGER NOT NULL REFERENCES device_users(id) ON DELETE CASCADE,
+                    session_token TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    is_active INTEGER DEFAULT 1
+                );
+
+                -- Таблица синхронизации
+                CREATE TABLE IF NOT EXISTS sync_operations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_device_id INTEGER NOT NULL REFERENCES device_users(id),
+                    target_device_id INTEGER REFERENCES device_users(id),
+                    operation_type TEXT NOT NULL,
+                    entity_type TEXT NOT NULL,
+                    entity_id INTEGER,
+                    data_snapshot TEXT,
+                    sync_status TEXT DEFAULT 'pending',
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP
+                );
+
+                -- Таблица привязки к Telegram
+                CREATE TABLE IF NOT EXISTS telegram_links (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    anonymous_id TEXT NOT NULL,
+                    telegram_id INTEGER NOT NULL,
+                    linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    link_method TEXT DEFAULT 'webapp',
+                    verified INTEGER DEFAULT 0,
+                    UNIQUE(anonymous_id, telegram_id)
+                );
+
+                -- Индексы для SQLite
+                CREATE INDEX IF NOT EXISTS idx_device_users_fingerprint ON device_users(device_fingerprint);
+                CREATE INDEX IF NOT EXISTS idx_device_users_anonymous_id ON device_users(anonymous_id);
+                CREATE INDEX IF NOT EXISTS idx_device_users_telegram_id ON device_users(telegram_id);
+                CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
+                """
+            
+            # Выполняем создание таблиц
+            for statement in sync_schema.split(';'):
+                statement = statement.strip()
+                if statement:
+                    cursor.execute(statement)
+            
+            conn.commit()
+            conn.close()
+            
+            self.logger.info("✅ Таблицы системы синхронизации созданы успешно")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания таблиц синхронизации: {e}")
+            if 'conn' in locals():
+                conn.rollback()
+                conn.close()
+            return False
+
+    def create_anonymous_user(self, device_fingerprint: str, device_info: dict = None) -> Optional[Dict[str, Any]]:
+        """Создать анонимного пользователя с device fingerprint"""
+        try:
+            import uuid
+            import json
+            from datetime import datetime
+            
+            anonymous_id = f"anon_{uuid.uuid4().hex[:12]}"
+            device_info_json = json.dumps(device_info or {})
+            
+            if self.config['type'] == 'postgresql':
+                query = """
+                    INSERT INTO device_users (device_fingerprint, anonymous_id, device_info)
+                    VALUES (%s, %s, %s)
+                    RETURNING id, anonymous_id, created_at
+                """
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                cursor.execute(query, (device_fingerprint, anonymous_id, device_info_json))
+                result = cursor.fetchone()
+                conn.commit()
+                conn.close()
+                
+                return {
+                    'id': result[0],
+                    'anonymous_id': result[1],
+                    'device_fingerprint': device_fingerprint,
+                    'created_at': result[2],
+                    'is_linked': False
+                }
+            else:
+                query = """
+                    INSERT INTO device_users (device_fingerprint, anonymous_id, device_info)
+                    VALUES (?, ?, ?)
+                """
+                device_user_id = self._execute_query(query, (device_fingerprint, anonymous_id, device_info_json))
+                
+                return {
+                    'id': device_user_id,
+                    'anonymous_id': anonymous_id,
+                    'device_fingerprint': device_fingerprint,
+                    'created_at': datetime.now().isoformat(),
+                    'is_linked': False
+                }
+                
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания анонимного пользователя: {e}")
+            return None
+
+    def get_device_user(self, device_fingerprint: str = None, anonymous_id: str = None) -> Optional[Dict[str, Any]]:
+        """Получить информацию об устройстве пользователя"""
+        try:
+            if device_fingerprint:
+                query = """
+                    SELECT id, device_fingerprint, anonymous_id, telegram_id, telegram_username, 
+                           telegram_first_name, is_linked, created_at, last_active
+                    FROM device_users 
+                    WHERE device_fingerprint = ?
+                """
+                params = (device_fingerprint,)
+            elif anonymous_id:
+                query = """
+                    SELECT id, device_fingerprint, anonymous_id, telegram_id, telegram_username, 
+                           telegram_first_name, is_linked, created_at, last_active
+                    FROM device_users 
+                    WHERE anonymous_id = ?
+                """
+                params = (anonymous_id,)
+            else:
+                return None
+            
+            result = self._execute_query(query, params, fetch_one=True)
+            
+            if result:
+                return {
+                    'id': result[0],
+                    'device_fingerprint': result[1],
+                    'anonymous_id': result[2],
+                    'telegram_id': result[3],
+                    'telegram_username': result[4],
+                    'telegram_first_name': result[5],
+                    'is_linked': bool(result[6]) if self.config['type'] == 'sqlite' else result[6],
+                    'created_at': result[7],
+                    'last_active': result[8]
+                }
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения устройства пользователя: {e}")
+            return None
+
+    def link_telegram_to_anonymous(self, anonymous_id: str, telegram_id: int, 
+                                  telegram_username: str = None, telegram_first_name: str = None) -> bool:
+        """Привязать Telegram аккаунт к анонимному пользователю"""
+        try:
+            # Обновляем device_users
+            update_query = """
+                UPDATE device_users 
+                SET telegram_id = ?, telegram_username = ?, telegram_first_name = ?, 
+                    is_linked = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE anonymous_id = ?
+            """
+            
+            is_linked_value = True if self.config['type'] == 'postgresql' else 1
+            
+            self._execute_query(update_query, (
+                telegram_id, telegram_username, telegram_first_name, 
+                is_linked_value, anonymous_id
+            ))
+            
+            # Создаем запись о привязке
+            link_query = """
+                INSERT INTO telegram_links (anonymous_id, telegram_id, link_method, verified)
+                VALUES (?, ?, 'webapp', ?)
+                ON CONFLICT (anonymous_id, telegram_id) DO NOTHING
+            """
+            
+            verified_value = True if self.config['type'] == 'postgresql' else 1
+            
+            try:
+                self._execute_query(link_query, (anonymous_id, telegram_id, 'webapp', verified_value))
+            except:
+                # Для SQLite без ON CONFLICT
+                link_check = """
+                    SELECT id FROM telegram_links 
+                    WHERE anonymous_id = ? AND telegram_id = ?
+                """
+                existing = self._execute_query(link_check, (anonymous_id, telegram_id), fetch_one=True)
+                
+                if not existing:
+                    link_insert = """
+                        INSERT INTO telegram_links (anonymous_id, telegram_id, link_method, verified)
+                        VALUES (?, ?, 'webapp', ?)
+                    """
+                    self._execute_query(link_insert, (anonymous_id, telegram_id, 'webapp', verified_value))
+            
+            self.logger.info(f"✅ Telegram {telegram_id} привязан к анонимному пользователю {anonymous_id}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка привязки Telegram к анонимному пользователю: {e}")
+            return False
+
+    def get_user_devices(self, telegram_id: int) -> List[Dict[str, Any]]:
+        """Получить все устройства пользователя по Telegram ID"""
+        try:
+            query = """
+                SELECT id, device_fingerprint, anonymous_id, last_active, device_info
+                FROM device_users 
+                WHERE telegram_id = ?
+                ORDER BY last_active DESC
+            """
+            
+            results = self._execute_query(query, (telegram_id,), fetch_all=True)
+            
+            devices = []
+            for row in results:
+                devices.append({
+                    'id': row[0],
+                    'device_fingerprint': row[1],
+                    'anonymous_id': row[2],
+                    'last_active': row[3],
+                    'device_info': row[4] if row[4] else '{}'
+                })
+            
+            return devices
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения устройств пользователя {telegram_id}: {e}")
+            return []
+
+    def sync_user_data(self, source_telegram_id: int, target_anonymous_id: str) -> bool:
+        """Синхронизировать данные пользователя между устройствами"""
+        try:
+            # Получаем все данные пользователя по Telegram ID
+            
+            # 1. Синхронизируем баланс
+            balance_query = "SELECT balance FROM users WHERE telegram_id = ?"
+            balance_result = self._execute_query(balance_query, (source_telegram_id,), fetch_one=True)
+            
+            if balance_result:
+                balance = balance_result[0]
+                
+                # Создаем или обновляем пользователя для целевого устройства
+                target_device = self.get_device_user(anonymous_id=target_anonymous_id)
+                if target_device and target_device.get('telegram_id'):
+                    # Обновляем баланс
+                    update_balance_query = """
+                        UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP 
+                        WHERE telegram_id = ?
+                    """
+                    self._execute_query(update_balance_query, (balance, target_device['telegram_id']))
+            
+            # 2. Синхронизируем консультации
+            consultations_query = """
+                SELECT id, occasion, preferences, image_path, advice, created_at
+                FROM consultations c
+                JOIN users u ON c.user_id = u.id
+                WHERE u.telegram_id = ?
+                ORDER BY created_at DESC
+            """
+            
+            consultations = self._execute_query(consultations_query, (source_telegram_id,), fetch_all=True)
+            
+            # 3. Логируем операцию синхронизации
+            sync_log_query = """
+                INSERT INTO sync_operations 
+                (source_device_id, target_device_id, operation_type, entity_type, sync_status)
+                VALUES (?, ?, 'sync_user_data', 'full_profile', 'completed')
+            """
+            
+            source_device = self.get_device_user_by_telegram(source_telegram_id)
+            target_device = self.get_device_user(anonymous_id=target_anonymous_id)
+            
+            if source_device and target_device:
+                self._execute_query(sync_log_query, (source_device['id'], target_device['id']))
+            
+            self.logger.info(f"✅ Данные синхронизированы: {source_telegram_id} → {target_anonymous_id}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка синхронизации данных: {e}")
+            return False
+
+    def get_device_user_by_telegram(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+        """Получить устройство пользователя по Telegram ID"""
+        try:
+            query = """
+                SELECT id, device_fingerprint, anonymous_id, telegram_id, 
+                       telegram_username, is_linked, last_active
+                FROM device_users 
+                WHERE telegram_id = ?
+                ORDER BY last_active DESC
+                LIMIT 1
+            """
+            
+            result = self._execute_query(query, (telegram_id,), fetch_one=True)
+            
+            if result:
+                return {
+                    'id': result[0],
+                    'device_fingerprint': result[1],
+                    'anonymous_id': result[2],
+                    'telegram_id': result[3],
+                    'telegram_username': result[4],
+                    'is_linked': bool(result[5]) if self.config['type'] == 'sqlite' else result[5],
+                    'last_active': result[6]
+                }
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения устройства по Telegram ID {telegram_id}: {e}")
+            return None
+
+    def update_device_activity(self, device_fingerprint: str) -> bool:
+        """Обновить время последней активности устройства"""
+        try:
+            query = """
+                UPDATE device_users 
+                SET last_active = CURRENT_TIMESTAMP 
+                WHERE device_fingerprint = ?
+            """
+            
+            self._execute_query(query, (device_fingerprint,))
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка обновления активности устройства: {e}")
+            return False
 
 
 # === ФУНКЦИИ СОВМЕСТИМОСТИ ===

@@ -16,8 +16,7 @@ from typing import Optional, Dict, Any, List, Union
 
 # PostgreSQL поддержка для продакшена
 try:
-    import psycopg2
-    import psycopg2.extras
+    import psycopg  # ✅ ИСПРАВЛЕНО
     from urllib.parse import urlparse
     POSTGRES_AVAILABLE = True
 except ImportError:
@@ -108,7 +107,7 @@ class MishuraDB:
         if db_config['type'] == 'postgresql':
             # PostgreSQL подключение
             try:
-                conn = psycopg2.connect(db_config['url'])
+                conn = psycopg.connect(db_config['url'])
                 return conn
             except Exception as e:
                 self.logger.error(f"❌ Ошибка подключения к PostgreSQL: {e}")

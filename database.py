@@ -56,21 +56,21 @@ DB_PATH = get_database_path()
 SCHEMA_FILE = "schema.sql"
 
 def get_database_config():
-    """Определить тип базы данных"""
+    """Определить тип базы данных (совместимость с существующим кодом)"""
     database_url = os.getenv('DATABASE_URL')
     
     if database_url and database_url.startswith('postgresql') and POSTGRES_AVAILABLE:
-        logger.info(f"🐘 Используется PostgreSQL для продакшена")
         return {'type': 'postgresql', 'url': database_url}
     else:
-        logger.info(f"🗃️ Используется SQLite для разработки: {DB_PATH}")
         return {'type': 'sqlite', 'path': DB_PATH}
 
-# Глобальная конфигурация БД
-# DB_CONFIG = get_database_config()
-
 def get_current_db_config():
-    """Получить актуальную конфигурацию БД (не кэшированную)"""
+    """Получить актуальную конфигурацию БД (использует кэш если доступен)"""
+    # Если есть экземпляр MishuraDB с кэшированной конфигурацией, используем её
+    if hasattr(MishuraDB, '_db_config') and MishuraDB._db_config is not None:
+        return MishuraDB._db_config
+    
+    # Иначе определяем заново (для backward compatibility)
     return get_database_config()
 
 class MishuraDB:

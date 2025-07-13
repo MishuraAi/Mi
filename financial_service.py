@@ -47,10 +47,14 @@ class FinancialService:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
-            db_type = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'}).get('type', 'sqlite')
+            # Определяем тип БД
+            db_config = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'})
+            if hasattr(self.db, 'get_current_db_config'):
+                db_config = self.db.get_current_db_config()
+            db_type = db_config.get('type', 'sqlite')
             
             if db_type == 'postgresql':
-                # PostgreSQL схема
+                # PostgreSQL схема с BIGSERIAL
                 schema_sql = """
                 -- Таблица для аудита транзакций
                 CREATE TABLE IF NOT EXISTS transaction_log (
@@ -88,7 +92,7 @@ class FinancialService:
                     ON transaction_log (correlation_id);
                 """
             else:
-                # SQLite схема
+                # SQLite схема с AUTOINCREMENT
                 schema_sql = """
                 -- Таблица для аудита транзакций
                 CREATE TABLE IF NOT EXISTS transaction_log (
@@ -125,25 +129,63 @@ class FinancialService:
                 CREATE INDEX IF NOT EXISTS idx_tlog_correlation 
                     ON transaction_log (correlation_id);
                 """
-            
             # Выполняем создание таблиц
             for statement in schema_sql.split(';'):
                 statement = statement.strip()
                 if statement:
                     cursor.execute(statement)
-            
             conn.commit()
             conn.close()
-            
             logger.info("✅ Финансовые таблицы инициализированы")
-            
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации финансовых таблиц: {e}")
             if 'conn' in locals():
                 conn.rollback()
                 conn.close()
             raise
-        
+
+    def _execute_query(self, query: str, params=None, fetch_one=False, fetch_all=False):
+        """Универсальный метод выполнения запросов"""
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            # Определяем тип БД
+            db_config = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'})
+            if hasattr(self.db, 'get_current_db_config'):
+                db_config = self.db.get_current_db_config()
+            db_type = db_config.get('type', 'sqlite')
+            # Адаптируем параметры для PostgreSQL
+            if db_type == 'postgresql' and params:
+                query = query.replace('?', '%s')
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            result = None
+            if fetch_one:
+                result = cursor.fetchone()
+            elif fetch_all:
+                result = cursor.fetchall()
+            if query.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
+                conn.commit()
+                if query.strip().upper().startswith('INSERT') and 'RETURNING' not in query.upper():
+                    if db_type == 'postgresql':
+                        try:
+                            cursor.execute("SELECT LASTVAL()")
+                            result = cursor.fetchone()[0]
+                        except:
+                            result = cursor.lastrowid
+                    else:
+                        result = cursor.lastrowid
+            conn.close()
+            return result
+        except Exception as e:
+            logger.error(f"❌ Ошибка выполнения запроса: {e}")
+            if 'conn' in locals():
+                conn.rollback()
+                conn.close()
+            raise
+
     def generate_operation_id(self, operation_type: str, user_id: int, 
                             extra_context: str = None) -> str:
         """Генерация детерминированного operation_id для idempotency"""
@@ -368,19 +410,18 @@ class FinancialService:
     def _update_balance_with_version_check(self, conn, cursor, telegram_id: int, 
                                          new_balance: int, expected_version: int) -> int:
         """Обновление баланса с проверкой версии (optimistic locking)"""
-        
         new_version = expected_version + 1
-        
-        if self.db.DB_CONFIG['type'] == 'postgresql':
-            # PostgreSQL
+        db_config = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'})
+        if hasattr(self.db, 'get_current_db_config'):
+            db_config = self.db.get_current_db_config()
+        db_type = db_config.get('type', 'sqlite')
+        if db_type == 'postgresql':
             update_user_query = """
                 UPDATE users 
                 SET balance = %s, updated_at = CURRENT_TIMESTAMP
                 WHERE telegram_id = %s
             """
             cursor.execute(update_user_query, (new_balance, telegram_id))
-            
-            # Обновляем версию с проверкой
             upsert_version_query = """
                 INSERT INTO balance_locks (telegram_id, version_number, last_updated)
                 VALUES (%s, %s, CURRENT_TIMESTAMP)
@@ -393,54 +434,45 @@ class FinancialService:
             cursor.execute(upsert_version_query, 
                          (telegram_id, new_version, new_version, expected_version))
             return cursor.rowcount
-            
         else:
-            # SQLite
-            # Обновляем баланс
             cursor.execute("""
                 UPDATE users 
                 SET balance = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE telegram_id = ?
             """, (new_balance, telegram_id))
-            
-            # Проверяем текущую версию и обновляем если совпадает
             cursor.execute("""
                 SELECT version_number FROM balance_locks WHERE telegram_id = ?
             """, (telegram_id,))
-            
             current_version_row = cursor.fetchone()
             current_version = current_version_row[0] if current_version_row else 1
-            
             if current_version != expected_version:
                 return 0  # Version conflict
-            
-            # Обновляем версию
             cursor.execute("""
                 INSERT OR REPLACE INTO balance_locks 
                 (telegram_id, version_number, last_updated)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
             """, (telegram_id, new_version))
-            
             return 1
-    
+
     def _log_transaction(self, conn, cursor, telegram_id: int, operation_type: str,
                        amount: int, balance_before: int, balance_after: int,
                        operation_id: str, correlation_id: str, 
-                       metadata: Dict) -> int:
+                       metadata: dict) -> int:
         """Логирование транзакции"""
-        
-        # Безопасная сериализация metadata (защита от JSON injection)
         safe_metadata = {}
         if metadata:
             for key, value in metadata.items():
                 if isinstance(key, str) and len(key) < 100:
                     if isinstance(value, (str, int, float, bool)) and len(str(value)) < 1000:
                         safe_metadata[key] = value
-        
-        metadata_json = json.dumps(safe_metadata)
         transaction_type = 'credit' if amount > 0 else 'debit'
-        
-        if self.db.DB_CONFIG['type'] == 'postgresql':
+        db_config = getattr(self.db, 'DB_CONFIG', {'type': 'sqlite'})
+        if hasattr(self.db, 'get_current_db_config'):
+            db_config = self.db.get_current_db_config()
+        db_type = db_config.get('type', 'sqlite')
+        import json
+        metadata_json = json.dumps(safe_metadata)
+        if db_type == 'postgresql':
             query = """
                 INSERT INTO transaction_log 
                 (telegram_id, operation_type, transaction_type, amount, 
@@ -464,7 +496,7 @@ class FinancialService:
             """, (telegram_id, operation_type, transaction_type, amount, balance_before, balance_after,
                   operation_id, correlation_id, metadata_json, 'financial_service'))
             return cursor.lastrowid
-    
+
     def _check_operation_exists(self, operation_id: str) -> Optional[Dict]:
         """Быстрая проверка существования операции"""
         try:
@@ -640,3 +672,11 @@ class FinancialService:
         except Exception as e:
             logger.error(f"Error getting financial stats: {e}")
             return {}
+
+    def get_db_config_safe(self):
+        """Безопасное получение конфигурации БД"""
+        if hasattr(self.db, 'get_current_db_config'):
+            return self.db.get_current_db_config()
+        if hasattr(self.db, 'DB_CONFIG'):
+            return self.db.DB_CONFIG
+        return {'type': 'sqlite'}

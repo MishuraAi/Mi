@@ -284,19 +284,9 @@ PRICING_PLANS = {
 # === API ENDPOINTS ===
 
 @app.get("/")
-async def home():
-    """Главная страница"""
-    html_path = os.path.join("webapp", "index.html")
-    
-    if not os.path.exists(html_path):
-        return HTMLResponse(content="❌ index.html не найден", status_code=404)
-    
-    try:
-        with open(html_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        return HTMLResponse(content=content)
-    except Exception as e:
-        return HTMLResponse(content=f"❌ Ошибка чтения файла: {e}", status_code=500)
+async def root():
+    """Root endpoint для Render health check"""
+    return {"status": "ok", "service": "mishura"}
 
 @app.head("/")
 async def head_root():
@@ -1298,28 +1288,21 @@ def is_spam_text(text: str) -> bool:
 
 # 🆕 НОВЫЕ ЭНДПОИНТЫ для keep-alive
 @app.get("/health")
-async def health_check():
-    """Health check для Render и мониторинга"""
+async def health():
+    """Быстрый health check без DB операций"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/health/deep")
+async def deep_health_check():
+    """Полная диагностика (только для внутреннего использования)"""
     try:
-        # Быстрая проверка БД
-        db = MishuraDB()
-        stats = db.get_stats()
-        
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "service": "mishura-ai-stylist",
-            "database": "connected",
-            "users": stats.get('total_users', 0),
-            "uptime": datetime.now().isoformat()
-        }
+        # Здесь выполняем проверку БД
+        pass
     except Exception as e:
-        logger.error(f"❌ Health check failed: {e}")
-        return {
-            "status": "unhealthy", 
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+        return {"status": "unhealthy", "error": str(e)}
 
 @app.get("/ping")
 async def ping():

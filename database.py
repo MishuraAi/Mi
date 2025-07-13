@@ -74,53 +74,31 @@ def get_current_db_config():
     return get_database_config()
 
 class MishuraDB:
-    """
-    🎭 МИШУРА Database Class
-    Универсальный класс для работы с SQLite и PostgreSQL
-    """
+    _db_config = None
     
-    def __init__(self, db_path: str = DB_PATH):
-        """Инициализация базы данных МИШУРА"""
-        self.db_path = db_path
-        self.logger = logger
-        # self.DB_CONFIG = DB_CONFIG  # Удалено
+    def __init__(self):
+        # Инициализируем конфигурацию только один раз
+        if MishuraDB._db_config is None:
+            MishuraDB._db_config = self._initialize_db_config()
         
-        # Инициализация БД
-        if get_current_db_config()['type'] == 'postgresql':
-            self.logger.info(f"🐘 Инициализация PostgreSQL...")
-            self.init_db()
+        self.config = MishuraDB._db_config
+        logger.info(f"✅ MishuraDB инициализирована ({self.config['type']})")
+    
+    def _initialize_db_config(self):
+        database_url = os.getenv('DATABASE_URL')
+        if database_url and database_url.startswith('postgresql') and POSTGRES_AVAILABLE:
+            logger.info("🐘 PostgreSQL конфигурация загружена")
+            return {'type': 'postgresql', 'url': database_url}
         else:
-            if not os.path.exists(self.db_path):
-                self.logger.info(f"🆕 SQLite БД не существует, создаем: {self.db_path}")
-                self.init_db()
-            else:
-                self.logger.info(f"✅ SQLite БД существует: {self.db_path}")
-        
-        # 🆕 СОЗДАНИЕ ТАБЛИЦ ОТЗЫВОВ
-        self.create_feedback_tables()
-        
-        self.logger.info(f"✅ MishuraDB инициализирована")
+            logger.info("🗃️ SQLite конфигурация загружена") 
+            return {'type': 'sqlite', 'path': DB_PATH}
     
     def get_connection(self):
-        """Подключение к базе данных (SQLite или PostgreSQL)"""
-        db_config = get_current_db_config()
-        if db_config['type'] == 'postgresql':
-            # PostgreSQL подключение
-            try:
-                conn = psycopg.connect(db_config['url'])
-                return conn
-            except Exception as e:
-                self.logger.error(f"❌ Ошибка подключения к PostgreSQL: {e}")
-                raise
+        # Используем закэшированную конфигурацию
+        if self.config['type'] == 'postgresql':
+            return psycopg.connect(self.config['url'])
         else:
-            # SQLite подключение (локальная разработка)
-            try:
-                conn = sqlite3.connect(self.db_path, timeout=10)
-                conn.execute("PRAGMA foreign_keys = ON;")
-                return conn
-            except sqlite3.Error as e:
-                self.logger.critical(f"❌ Ошибка подключения к SQLite: {e}")
-                raise
+            return sqlite3.connect(self.config['path'], timeout=10)
     
     def create_postgres_schema(self, conn):
         """Создать схему для PostgreSQL"""

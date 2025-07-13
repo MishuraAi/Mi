@@ -25,6 +25,8 @@ from typing import Optional, List, Tuple, Union, Dict, Any
 import traceback
 import re
 import base64
+import psycopg
+import sqlite3
 
 # Настройка логирования
 logger = logging.getLogger(__name__)

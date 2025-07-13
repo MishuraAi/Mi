@@ -30,6 +30,9 @@ import base64
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# ЭКСТРЕННЫЙ РЕЖИМ - отключаем тестирование моделей при запуске
+EMERGENCY_MODE = os.getenv('EMERGENCY_MODE', 'false').lower() == 'true'
+
 logger.info("🎭 Инициализация модуля Gemini AI для МИШУРА")
 
 # Загрузка переменных окружения

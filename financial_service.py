@@ -55,13 +55,51 @@ class FinancialService:
         self._init_financial_tables()
         
     def _init_financial_tables(self):
-        """HOTFIX: Временное отключение создания таблиц"""
+        """Инициализация финансовых таблиц с поддержкой PostgreSQL и SQLite"""
         try:
-            # ВРЕМЕННО ОТКЛЮЧАЕМ создание таблиц до исправления синтаксиса
-            logger.info("⚠️ HOTFIX: Финансовые таблицы временно отключены")
-            logger.info("✅ Финансовые таблицы инициализированы (режим совместимости)")
+            # Получаем конфигурацию базы данных
+            config = get_db_config_safe()
+            
+            # Определяем синтаксис для автоинкремента в зависимости от типа БД
+            if config['type'] == 'postgresql':
+                id_column = "id BIGSERIAL PRIMARY KEY"
+            else:
+                id_column = "id INTEGER PRIMARY KEY AUTOINCREMENT"
+            
+            # SQL для создания таблицы логов транзакций
+            transaction_log_sql = f"""
+            CREATE TABLE IF NOT EXISTS transaction_log (
+                {id_column},
+                telegram_id BIGINT NOT NULL,
+                operation_type TEXT NOT NULL,
+                transaction_type TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                balance_before INTEGER NOT NULL,
+                balance_after INTEGER NOT NULL,
+                operation_id TEXT UNIQUE,
+                correlation_id TEXT,
+                metadata TEXT,
+                created_by TEXT DEFAULT 'financial_service',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+            
+            # SQL для создания таблицы блокировок баланса
+            balance_locks_sql = f"""
+            CREATE TABLE IF NOT EXISTS balance_locks (
+                telegram_id BIGINT PRIMARY KEY,
+                version_number INTEGER NOT NULL DEFAULT 1,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+            
+            # Выполняем создание таблиц
+            self._execute_query(transaction_log_sql)
+            self._execute_query(balance_locks_sql)
+            
+            logger.info("✅ Финансовые таблицы инициализированы")
             return True
-        
+            
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации финансовых таблиц: {e}")
             return False

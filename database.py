@@ -84,9 +84,6 @@ def _add_db_config_property():
         return self.config
     MishuraDB.DB_CONFIG = property(get_db_config)
 
-# Применяем совместимость ПОСЛЕ определения класса
-_add_db_config_property()
-
 class MishuraDB:
     _db_config = None
     

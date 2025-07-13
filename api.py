@@ -284,9 +284,19 @@ PRICING_PLANS = {
 # === API ENDPOINTS ===
 
 @app.get("/")
-async def root():
-    """Root endpoint для Render health check"""
-    return {"status": "ok", "service": "mishura"}
+async def home():
+    """Главная страница - веб-приложение МИШУРА"""
+    html_path = os.path.join("webapp", "index.html")
+    
+    if not os.path.exists(html_path):
+        return HTMLResponse(content="❌ index.html не найден", status_code=404)
+    
+    try:
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+    except Exception as e:
+        return HTMLResponse(content=f"❌ Ошибка чтения файла: {e}", status_code=500)
 
 @app.head("/")
 async def head_root():
@@ -296,6 +306,19 @@ async def head_root():
 async def webapp_redirect():
     """Редирект веб-приложения с поддержкой параметров"""
     return RedirectResponse(url="/", status_code=307)
+
+@app.get("/api/status")
+async def api_status():
+    """API статус (JSON)"""
+    return {"status": "ok", "service": "mishura"}
+
+@app.get("/health")
+async def simple_health():
+    """Простой health check"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.get("/api/v1/health")
 async def health_check():

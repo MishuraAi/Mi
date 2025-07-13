@@ -38,12 +38,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Глобальные переменные
-db: Optional[MishuraDB] = None
-gemini_ai: Optional[MishuraGeminiAI] = None
-payment_service: Optional[PaymentService] = None
-financial_service: Optional[Any] = None
-
 # Переменные окружения
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')

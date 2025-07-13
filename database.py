@@ -68,7 +68,11 @@ def get_database_config():
         return {'type': 'sqlite', 'path': DB_PATH}
 
 # Глобальная конфигурация БД
-DB_CONFIG = get_database_config()
+# DB_CONFIG = get_database_config()
+
+def get_current_db_config():
+    """Получить актуальную конфигурацию БД (не кэшированную)"""
+    return get_database_config()
 
 class MishuraDB:
     """
@@ -80,10 +84,10 @@ class MishuraDB:
         """Инициализация базы данных МИШУРА"""
         self.db_path = db_path
         self.logger = logger
-        self.DB_CONFIG = DB_CONFIG
+        # self.DB_CONFIG = DB_CONFIG  # Удалено
         
         # Инициализация БД
-        if DB_CONFIG['type'] == 'postgresql':
+        if get_current_db_config()['type'] == 'postgresql':
             self.logger.info(f"🐘 Инициализация PostgreSQL...")
             self.init_db()
         else:
@@ -100,10 +104,11 @@ class MishuraDB:
     
     def get_connection(self):
         """Подключение к базе данных (SQLite или PostgreSQL)"""
-        if DB_CONFIG['type'] == 'postgresql':
+        db_config = get_current_db_config()
+        if db_config['type'] == 'postgresql':
             # PostgreSQL подключение
             try:
-                conn = psycopg2.connect(DB_CONFIG['url'])
+                conn = psycopg2.connect(db_config['url'])
                 return conn
             except Exception as e:
                 self.logger.error(f"❌ Ошибка подключения к PostgreSQL: {e}")
@@ -198,7 +203,7 @@ class MishuraDB:
         try:
             conn = self.get_connection()
             
-            if DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 # PostgreSQL
                 self.create_postgres_schema(conn)
             else:
@@ -224,7 +229,7 @@ class MishuraDB:
             cursor = conn.cursor()
             
             # Адаптируем параметры для PostgreSQL
-            if DB_CONFIG['type'] == 'postgresql' and params:
+            if get_current_db_config()['type'] == 'postgresql' and params:
                 # PostgreSQL использует %s вместо ?
                 query = query.replace('?', '%s')
             
@@ -243,7 +248,7 @@ class MishuraDB:
                 conn.commit()
                 if query.strip().upper().startswith('INSERT') and 'RETURNING' not in query.upper():
                     # Получаем ID последней вставленной записи
-                    if DB_CONFIG['type'] == 'postgresql':
+                    if get_current_db_config()['type'] == 'postgresql':
                         try:
                             cursor.execute("SELECT LASTVAL()")
                             result = cursor.fetchone()[0]
@@ -408,7 +413,7 @@ class MishuraDB:
             
             internal_user_id = user_row[0]
             
-            if DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 consultation_query = '''
                 INSERT INTO consultations (user_id, occasion, preferences, image_path, advice, created_at)
                 VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
@@ -696,7 +701,7 @@ class MishuraDB:
             stats['total_users'] = self._execute_query('SELECT COUNT(*) FROM users', fetch_one=True)[0]
             stats['total_consultations'] = self._execute_query('SELECT COUNT(*) FROM consultations', fetch_one=True)[0]
             
-            if DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 daily_query = "SELECT COUNT(*) FROM consultations WHERE created_at >= NOW() - INTERVAL '1 day'"
             else:
                 daily_query = "SELECT COUNT(*) FROM consultations WHERE created_at >= datetime('now', '-1 day')"
@@ -722,7 +727,7 @@ class MishuraDB:
             conn = self.get_connection()
             cursor = conn.cursor()
             
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 # PostgreSQL схема
                 feedback_schema = """
                 -- Таблица отзывов пользователей
@@ -821,7 +826,7 @@ class MishuraDB:
         try:
             char_count = len(feedback_text.strip())
             
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 query = """
                     INSERT INTO feedback_submissions 
                     (telegram_id, feedback_text, feedback_rating, character_count, 
@@ -864,7 +869,7 @@ class MishuraDB:
     def can_show_feedback_prompt(self, telegram_id: int) -> bool:
         """Проверить можно ли показать форму отзыва (не чаще раза в 10 дней)"""
         try:
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 query = """
                     SELECT prompt_shown_at 
                     FROM feedback_prompts 
@@ -909,7 +914,7 @@ class MishuraDB:
                            action: str = 'shown', dismissal_reason: str = None) -> bool:
         """Записать факт показа/действия с формой отзыва"""
         try:
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 query = """
                     INSERT INTO feedback_prompts 
                     (telegram_id, consultation_id, user_action, dismissal_reason)
@@ -936,7 +941,7 @@ class MishuraDB:
     def get_pending_feedback_sync(self, limit: int = 50) -> List[Dict]:
         """Получить отзывы для синхронизации с Google Sheets"""
         try:
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 query = """
                     SELECT id, telegram_id, feedback_text, feedback_rating, 
                            character_count, created_at, consultation_id
@@ -979,7 +984,7 @@ class MishuraDB:
     def mark_feedback_synced(self, feedback_id: int, sheets_row_id: str = None) -> bool:
         """Отметить отзыв как синхронизированный с Google Sheets"""
         try:
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 query = """
                     UPDATE feedback_submissions 
                     SET google_sheets_synced = TRUE, google_sheets_row_id = %s
@@ -1006,7 +1011,7 @@ class MishuraDB:
     def mark_feedback_bonus_awarded(self, feedback_id: int) -> bool:
         """Отметить что бонус за отзыв начислен"""
         try:
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 query = "UPDATE feedback_submissions SET bonus_awarded = TRUE WHERE id = %s"
             else:
                 query = "UPDATE feedback_submissions SET bonus_awarded = 1 WHERE id = ?"
@@ -1030,7 +1035,7 @@ class MishuraDB:
             stats['total_feedback'] = self._execute_query(total_query, fetch_one=True)[0]
             
             # Отзывы за сегодня
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 today_query = "SELECT COUNT(*) FROM feedback_submissions WHERE created_at >= CURRENT_DATE"
             else:
                 today_query = "SELECT COUNT(*) FROM feedback_submissions WHERE created_at >= date('now')"
@@ -1051,7 +1056,7 @@ class MishuraDB:
                 stats['positive_feedback_percent'] = 0
             
             # Количество начисленных бонусов
-            if self.DB_CONFIG['type'] == 'postgresql':
+            if get_current_db_config()['type'] == 'postgresql':
                 bonus_query = "SELECT COUNT(*) FROM feedback_submissions WHERE bonus_awarded = TRUE"
             else:
                 bonus_query = "SELECT COUNT(*) FROM feedback_submissions WHERE bonus_awarded = 1"

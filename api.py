@@ -283,6 +283,16 @@ PRICING_PLANS = {
 
 # === API ENDPOINTS ===
 
+@app.get("/api/status")
+async def api_status():
+    """API статус (JSON)"""
+    return {"status": "ok", "service": "mishura"}
+
+@app.get("/ping")
+async def ping():
+    """Простой ping для keep-alive"""
+    return {"status": "pong", "timestamp": datetime.now().isoformat()}
+
 @app.get("/")
 async def home():
     """Главная страница - веб-приложение МИШУРА"""
@@ -306,11 +316,6 @@ async def head_root():
 async def webapp_redirect():
     """Редирект веб-приложения с поддержкой параметров"""
     return RedirectResponse(url="/", status_code=307)
-
-@app.get("/api/status")
-async def api_status():
-    """API статус (JSON)"""
-    return {"status": "ok", "service": "mishura"}
 
 @app.get("/health")
 async def simple_health():

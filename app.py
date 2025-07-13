@@ -68,7 +68,7 @@ if __name__ == "__main__":
     
     try:
         uvicorn.run(
-            "app:app",
+            app,  # ← ИСПРАВЛЕНИЕ: прямая ссылка на объект
             host="0.0.0.0", 
             port=PORT,
             log_level="info",

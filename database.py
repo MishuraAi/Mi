@@ -56,7 +56,7 @@ DB_PATH = get_database_path()
 SCHEMA_FILE = "schema.sql"
 
 def get_database_config():
-    """Определить тип базы данных (совместимость с существующим кодом)"""
+    """Определить тип базы данных (для backward compatibility)"""
     database_url = os.getenv('DATABASE_URL')
     
     if database_url and database_url.startswith('postgresql') and POSTGRES_AVAILABLE:
@@ -73,6 +73,20 @@ def get_current_db_config():
     # Иначе определяем заново (для backward compatibility)
     return get_database_config()
 
+# Обновляем переменную для backward compatibility
+DB_CONFIG = get_database_config()
+
+# Добавляем свойство к классу для совместимости с financial_service
+
+def _add_db_config_property():
+    """Добавляет свойство DB_CONFIG к экземплярам MishuraDB"""
+    def get_db_config(self):
+        return self.config
+    MishuraDB.DB_CONFIG = property(get_db_config)
+
+# Применяем совместимость
+_add_db_config_property()
+
 class MishuraDB:
     _db_config = None
     
@@ -82,6 +96,7 @@ class MishuraDB:
             MishuraDB._db_config = self._initialize_db_config()
         
         self.config = MishuraDB._db_config
+        self.logger = logger  # ← ЭТА СТРОКА КРИТИЧЕСКИ ВАЖНА!
         logger.info(f"✅ MishuraDB инициализирована ({self.config['type']})")
     
     def _initialize_db_config(self):

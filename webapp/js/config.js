@@ -11,7 +11,8 @@ const API_VERSION = 'v1';
 
 // Пользовательские данные (получаются из URL параметров)
 const urlParams = new URLSearchParams(window.location.search);
-const USER_ID = parseInt(urlParams.get('user_id')) || 5930269100; // Fallback для тестирования
+// const USER_ID = parseInt(urlParams.get('user_id')) || 5930269100; // Fallback для тестирования
+const USER_ID = window.unifiedBalanceSync.getEffectiveUserId(); // ✅ Новый способ
 
 // Конфигурация загрузки файлов
 const FILE_CONFIG = {

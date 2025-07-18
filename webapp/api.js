@@ -148,18 +148,13 @@ class MishuraAPIService {
     // 🚨 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Надежное получение userId
     getCurrentUserId() {
         try {
-            // НОВОЕ: Используем UserService если доступен
-            if (window.userService) {
-                const userId = window.userService.getCurrentUserId();
-                console.log('🔥 User ID через UserService:', userId);
+            if (window.unifiedBalanceSync && typeof window.unifiedBalanceSync.getEffectiveUserId === 'function') {
+                const userId = window.unifiedBalanceSync.getEffectiveUserId();
+                console.log('🔥 User ID через unifiedBalanceSync:', userId);
                 return userId;
             }
-            
-            console.warn('⚠️ UserService недоступен, используем fallback');
-            
             // Fallback на старую логику
             return this.getFallbackUserId();
-            
         } catch (error) {
             console.error('❌ Ошибка получения user ID:', error);
             return this.getFallbackUserId();

@@ -11,7 +11,7 @@ import time
 import psutil
 import gc
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 import uvicorn
@@ -1991,6 +1991,55 @@ async def full_diagnostic_report():
             }
         }
     }
+
+# =================== WEBSOCKET ENDPOINT ДЛЯ БАЛАНСА ===================
+
+@app.websocket("/ws/balance")
+async def balance_websocket(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            # Ожидаем идентификатор пользователя (user_id) от клиента
+            data = await websocket.receive_json()
+            user_id = data.get("user_id")
+            if not user_id:
+                await websocket.send_json({"error": "user_id required"})
+                continue
+            # Получаем баланс пользователя
+            db = MishuraDB()
+            user = db.get_user(user_id)
+            if user:
+                await websocket.send_json({"balance": user.get("balance", 0)})
+            else:
+                await websocket.send_json({"error": "user not found"})
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+    finally:
+        await websocket.close()
+
+# =================== ENDPOINT ДЛЯ ОБНОВЛЕНИЯ АКТИВНОСТИ УСТРОЙСТВА ===================
+
+from fastapi import Body
+
+@app.post("/api/v1/users/activity")
+async def update_device_activity(data: Dict[str, Any] = Body(...)):
+    """
+    Обновление активности устройства (heartbeat)
+    Ожидает: { device_fingerprint: str }
+    """
+    try:
+        device_fingerprint = data.get("device_fingerprint")
+        if not device_fingerprint:
+            raise HTTPException(status_code=400, detail="device_fingerprint required")
+        db = MishuraDB()
+        success = db.update_device_activity(device_fingerprint)
+        if success:
+            return {"status": "success", "device_fingerprint": device_fingerprint}
+        else:
+            raise HTTPException(status_code=500, detail="Ошибка обновления активности устройства")
+    except Exception as e:
+        logger.error(f"❌ Ошибка обновления активности устройства: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
 
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")

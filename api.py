@@ -408,7 +408,8 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database инициализирована")
         db.init_db()
         logger.info("✅ Таблицы базы данных проверены/созданы")
-        # 🔐 НОВОЕ: АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ФИНАНСОВОЙ БЕЗОПАСНОСТИ
+        
+        # 🔐 ФИНАНСОВАЯ БЕЗОПАСНОСТЬ
         try:
             logger.info("🔐 Инициализация финансовой безопасности...")
             financial_service = getattr(__builtins__, 'GLOBAL_FINANCIAL_SERVICE', None)
@@ -424,16 +425,18 @@ async def lifespan(app: FastAPI):
                     builtins.GLOBAL_FINANCIAL_SERVICE = financial_service
                 except:
                     __builtins__['GLOBAL_FINANCIAL_SERVICE'] = financial_service
-                logger.info("✅ Финансовая безопасность инициализирована и установлена глобально")
+                logger.info("✅ Финансовая безопасность инициализирована")
             else:
-                logger.info("✅ Финансовая безопасность уже загружена из глобальных")
+                logger.info("✅ Финансовая безопасность уже загружена")
             logger.info("✅ Financial service загружен")
         except Exception as e:
-            logger.error(f"❌ Критическая ошибка инициализации финансовой безопасности: {e}")
+            logger.error(f"❌ Ошибка инициализации финансовой безопасности: {e}")
             financial_service = None
-            logger.warning("⚠️ Система запущена БЕЗ финансовой безопасности (fallback режим)")
+            logger.warning("⚠️ Система запущена БЕЗ финансовой безопасности")
+        
         gemini_ai = MishuraGeminiAI()
         logger.info("✅ Gemini AI инициализирован")
+        
         if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
             payment_service = PaymentService(
                 shop_id=YOOKASSA_SHOP_ID,
@@ -443,12 +446,16 @@ async def lifespan(app: FastAPI):
             )
             logger.info("✅ Payment service инициализирован")
         else:
-            logger.warning("⚠️ Payment service НЕ ИНИЦИАЛИЗИРОВАН - отсутствуют настройки ЮKassa")
+            logger.warning("⚠️ Payment service НЕ ИНИЦИАЛИЗИРОВАН")
             payment_service = None
+            
     except Exception as e:
         logger.error(f"❌ Критическая ошибка при запуске: {e}", exc_info=True)
         raise
+    
     yield
+    
+    # Shutdown
     logger.info("🛑 Сервер МИШУРА API остановлен.")
 
 # 🔐 НОВАЯ ФУНКЦИЯ: добавить ПОСЛЕ lifespan
@@ -2040,6 +2047,13 @@ async def update_device_activity(data: Dict[str, Any] = Body(...)):
     except Exception as e:
         logger.error(f"❌ Ошибка обновления активности устройства: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
+
+# ================================================================================
+# 🚀 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ДЛЯ RENDER DEPLOY
+# ================================================================================
+
+# ✅ КРИТИЧЕСКИ ВАЖНО: Убедитесь что app экспортирован в конце файла
+__all__ = ['app']
 
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")

@@ -123,6 +123,16 @@ class SyncRequest(BaseModel):
     source_telegram_id: int
     target_anonymous_id: str
 
+# =================== СОЗДАНИЕ FASTAPI APP ===================
+app = FastAPI(
+    title="🎭 МИШУРА API", 
+    version="2.7.0",
+    lifespan=lifespan
+)
+
+# 🔧 НАСТРОЙКА СТАТИЧЕСКИХ ФАЙЛОВ
+app.mount("/static", StaticFiles(directory="webapp"), name="static")
+
 # =================== SYNC API ENDPOINTS ===================
 
 @app.post("/api/v1/users/anonymous")
@@ -501,14 +511,6 @@ async def _init_balance_locks_for_existing_users(db, financial_service):
     except Exception as e:
         logger.error(f"❌ Ошибка инициализации balance_locks: {e}")
         # НЕ бросаем исключение - это не критично для запуска
-
-# После функции _init_balance_locks_for_existing_users добавить:
-app = FastAPI(
-    title="🎭 МИШУРА API", 
-    version="2.7.0",
-    lifespan=lifespan
-)
-app.mount("/static", StaticFiles(directory="webapp"), name="static")
 
 # 🔧 КРИТИЧЕСКИ ВАЖНО: Настройка статических файлов
 app.mount("/static", StaticFiles(directory="webapp"), name="static")

@@ -123,6 +123,95 @@ class SyncRequest(BaseModel):
     source_telegram_id: int
     target_anonymous_id: str
 
+# =================== LIFESPAN ФУНКЦИИ ===================
+async def _init_balance_locks_for_existing_users(db, financial_service):
+    """Асинхронная инициализация balance_locks для существующих пользователей"""
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT telegram_id FROM users")
+        users = cursor.fetchall()
+        initialized_count = 0
+        for user in users:
+            telegram_id = user[0]
+            try:
+                if db.config['type'] == 'postgresql':
+                    cursor.execute("""
+                        INSERT INTO balance_locks (telegram_id, version_number, last_updated)
+                        VALUES (%s, 1, CURRENT_TIMESTAMP)
+                        ON CONFLICT (telegram_id) DO NOTHING
+                    """, (telegram_id,))
+                else:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO balance_locks (telegram_id, version_number)
+                        VALUES (?, 1)
+                    """, (telegram_id,))
+                if cursor.rowcount > 0:
+                    initialized_count += 1
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось инициализировать balance_lock для {telegram_id}: {e}")
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Balance locks инициализированы для {initialized_count} новых пользователей из {len(users)}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка инициализации balance_locks: {e}")
+        # НЕ бросаем исключение - это не критично для запуска
+
+from contextlib import asynccontextmanager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global db, gemini_ai, payment_service, financial_service
+    # Startup
+    logger.info("🚀 Запуск МИШУРА API Server...")
+    try:
+        db = MishuraDB()
+        logger.info("✅ Database инициализирована")
+        db.init_db()
+        logger.info("✅ Таблицы базы данных проверены/созданы")
+        # 🔐 ФИНАНСОВАЯ БЕЗОПАСНОСТЬ
+        try:
+            logger.info("🔐 Инициализация финансовой безопасности...")
+            financial_service = getattr(__builtins__, 'GLOBAL_FINANCIAL_SERVICE', None)
+            if not financial_service:
+                from financial_service import FinancialService
+                financial_service = FinancialService(db)
+                await _init_balance_locks_for_existing_users(db, financial_service)
+                original_update_balance = db.update_user_balance
+                db.update_user_balance = financial_service.update_user_balance
+                db._original_update_user_balance = original_update_balance
+                try:
+                    import builtins
+                    builtins.GLOBAL_FINANCIAL_SERVICE = financial_service
+                except:
+                    __builtins__['GLOBAL_FINANCIAL_SERVICE'] = financial_service
+                logger.info("✅ Финансовая безопасность инициализирована")
+            else:
+                logger.info("✅ Финансовая безопасность уже загружена")
+            logger.info("✅ Financial service загружен")
+        except Exception as e:
+            logger.error(f"❌ Ошибка инициализации финансовой безопасности: {e}")
+            financial_service = None
+            logger.warning("⚠️ Система запущена БЕЗ финансовой безопасности")
+        gemini_ai = MishuraGeminiAI()
+        logger.info("✅ Gemini AI инициализирован")
+        if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
+            payment_service = PaymentService(
+                shop_id=YOOKASSA_SHOP_ID,
+                secret_key=YOOKASSA_SECRET_KEY,
+                db=db,
+                test_mode=TEST_MODE
+            )
+            logger.info("✅ Payment service инициализирован")
+        else:
+            logger.warning("⚠️ Payment service НЕ ИНИЦИАЛИЗИРОВАН")
+            payment_service = None
+    except Exception as e:
+        logger.error(f"❌ Критическая ошибка при запуске: {e}", exc_info=True)
+        raise
+    yield
+    # Shutdown
+    logger.info("🛑 Сервер МИШУРА API остановлен.")
+
 # =================== СОЗДАНИЕ FASTAPI APP ===================
 app = FastAPI(
     title="🎭 МИШУРА API", 
@@ -407,175 +496,6 @@ try:
 except ImportError as e:
     NOTIFICATIONS_AVAILABLE = False
     logger.warning(f"⚠️ Система уведомлений недоступна: {e}")
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global db, gemini_ai, payment_service, financial_service
-    # Startup
-    logger.info("🚀 Запуск МИШУРА API Server...")
-    try:
-        db = MishuraDB()
-        logger.info("✅ Database инициализирована")
-        db.init_db()
-        logger.info("✅ Таблицы базы данных проверены/созданы")
-        
-        # 🔐 ФИНАНСОВАЯ БЕЗОПАСНОСТЬ
-        try:
-            logger.info("🔐 Инициализация финансовой безопасности...")
-            financial_service = getattr(__builtins__, 'GLOBAL_FINANCIAL_SERVICE', None)
-            if not financial_service:
-                from financial_service import FinancialService
-                financial_service = FinancialService(db)
-                await _init_balance_locks_for_existing_users(db, financial_service)
-                original_update_balance = db.update_user_balance
-                db.update_user_balance = financial_service.update_user_balance
-                db._original_update_user_balance = original_update_balance
-                try:
-                    import builtins
-                    builtins.GLOBAL_FINANCIAL_SERVICE = financial_service
-                except:
-                    __builtins__['GLOBAL_FINANCIAL_SERVICE'] = financial_service
-                logger.info("✅ Финансовая безопасность инициализирована")
-            else:
-                logger.info("✅ Финансовая безопасность уже загружена")
-            logger.info("✅ Financial service загружен")
-        except Exception as e:
-            logger.error(f"❌ Ошибка инициализации финансовой безопасности: {e}")
-            financial_service = None
-            logger.warning("⚠️ Система запущена БЕЗ финансовой безопасности")
-        
-        gemini_ai = MishuraGeminiAI()
-        logger.info("✅ Gemini AI инициализирован")
-        
-        if YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY:
-            payment_service = PaymentService(
-                shop_id=YOOKASSA_SHOP_ID,
-                secret_key=YOOKASSA_SECRET_KEY,
-                db=db,
-                test_mode=TEST_MODE
-            )
-            logger.info("✅ Payment service инициализирован")
-        else:
-            logger.warning("⚠️ Payment service НЕ ИНИЦИАЛИЗИРОВАН")
-            payment_service = None
-            
-    except Exception as e:
-        logger.error(f"❌ Критическая ошибка при запуске: {e}", exc_info=True)
-        raise
-    
-    yield
-    
-    # Shutdown
-    logger.info("🛑 Сервер МИШУРА API остановлен.")
-
-# 🔐 НОВАЯ ФУНКЦИЯ: добавить ПОСЛЕ lifespan
-async def _init_balance_locks_for_existing_users(db, financial_service):
-    """Асинхронная инициализация balance_locks для существующих пользователей"""
-    
-    try:
-        conn = db.get_connection()
-        cursor = conn.cursor()
-        
-        # Получаем всех существующих пользователей
-        cursor.execute("SELECT telegram_id FROM users")
-        users = cursor.fetchall()
-        
-        initialized_count = 0
-        
-        for user in users:
-            telegram_id = user[0]
-            try:
-                if db.DB_CONFIG['type'] == 'postgresql':
-                    cursor.execute("""
-                        INSERT INTO balance_locks (telegram_id, version_number, last_updated)
-                        VALUES (%s, 1, CURRENT_TIMESTAMP)
-                        ON CONFLICT (telegram_id) DO NOTHING
-                    """, (telegram_id,))
-                else:
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO balance_locks (telegram_id, version_number)
-                        VALUES (?, 1)
-                    """, (telegram_id,))
-                
-                if cursor.rowcount > 0:
-                    initialized_count += 1
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ Не удалось инициализировать balance_lock для {telegram_id}: {e}")
-        
-        conn.commit()
-        conn.close()
-        
-        logger.info(f"✅ Balance locks инициализированы для {initialized_count} новых пользователей из {len(users)}")
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка инициализации balance_locks: {e}")
-        # НЕ бросаем исключение - это не критично для запуска
-
-# 🔧 КРИТИЧЕСКИ ВАЖНО: Настройка статических файлов
-app.mount("/static", StaticFiles(directory="webapp"), name="static")
-
-# 🔧 ИСПРАВЛЕНО: Тарифные планы с правильным синтаксисом
-PRICING_PLANS = {
-    "mini": {
-        "name": "🌱 Мини",
-        "description": "Пробный тариф",
-        "consultations": 1,
-        "stcoins": 10,
-        "coins": 10,
-        "price": 20.0,
-        "price_rub": 20,
-        "price_kop": 2000,
-        "discount": 0,
-        "popular": False,
-        "temporary": False,
-        "color": "🟢"
-    },
-    "basic": {
-        "name": "🌟 Базовый",
-        "description": "Стартовый план",
-        "consultations": 10,
-        "stcoins": 100,
-        "coins": 100,
-        "price": 150.0,
-        "price_rub": 150,
-        "price_kop": 15000,
-        "discount": 25,
-        "popular": False,
-        "temporary": False,
-        "color": "🔵"
-    },
-    "standard": {
-        "name": "⭐ Стандарт",
-        "description": "Популярный (ПОПУЛЯРНЫЙ)",
-        "consultations": 30,
-        "stcoins": 300,
-        "coins": 300,
-        "price": 300.0,
-        "price_rub": 300,
-        "price_kop": 30000,
-        "discount": 33,
-        "popular": True,
-        "temporary": False,
-        "color": "🟣"
-    },
-    "premium": {
-        "name": "💎 Премиум",
-        "description": "Выгодный план",
-        "consultations": 100,
-        "stcoins": 1000,
-        "coins": 1000,
-        "price": 800.0,
-        "price_rub": 800,
-        "price_kop": 80000,
-        "discount": 60,
-        "popular": False,
-        "temporary": False,
-        "color": "🟡"
-    }
-}
-
-# === API ENDPOINTS ===
 
 @app.get("/api/status")
 async def api_status():

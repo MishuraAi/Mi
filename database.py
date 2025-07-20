@@ -97,6 +97,7 @@ class MishuraDB:
             MishuraDB._db_config = self._initialize_db_config()
             
         self.config = MishuraDB._db_config
+        self.DB_CONFIG = self.config  # Добавлено для совместимости
         
         # Инициализация БД
         if self.config['type'] == 'postgresql':
@@ -310,24 +311,37 @@ class MishuraDB:
         Сохранение нового пользователя с начальным балансом 50 STcoin
         """
         try:
-            # 🔧 ИСПРАВЛЕНО: Начальный баланс 50 вместо 200
             initial_balance = 50  # Было: 200
-            
-            query = '''
-                INSERT OR REPLACE INTO users 
-                (telegram_id, username, first_name, last_name, balance, created_at)
-                VALUES (?, ?, ?, ?, ?, datetime('now'))
-            '''
-            
-            # ✅ ИСПОЛЬЗУЕМ ПРАВИЛЬНУЮ АРХИТЕКТУРУ
-            user_id = self._execute_query(
-                query, 
-                (telegram_id, username, first_name, last_name, initial_balance)
-            )
-            
+            if self.config['type'] == 'postgresql':
+                query = '''
+                    INSERT INTO users (telegram_id, username, first_name, last_name, balance, created_at)
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (telegram_id) DO UPDATE SET
+                        username = EXCLUDED.username,
+                        first_name = EXCLUDED.first_name,
+                        last_name = EXCLUDED.last_name,
+                        balance = EXCLUDED.balance,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING id
+                '''
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                cursor.execute(query, (telegram_id, username, first_name, last_name, initial_balance))
+                user_id = cursor.fetchone()[0]
+                conn.commit()
+                conn.close()
+            else:
+                query = '''
+                    INSERT OR REPLACE INTO users 
+                    (telegram_id, username, first_name, last_name, balance, created_at)
+                    VALUES (?, ?, ?, ?, ?, datetime('now'))
+                '''
+                user_id = self._execute_query(
+                    query, 
+                    (telegram_id, username, first_name, last_name, initial_balance)
+                )
             self.logger.info(f"Пользователь {telegram_id} сохранен с начальным балансом {initial_balance} STcoin")
             return user_id
-            
         except Exception as e:
             self.logger.error(f"❌ Ошибка сохранения пользователя {telegram_id}: {e}")
             return None

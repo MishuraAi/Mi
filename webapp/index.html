@@ -1851,67 +1851,66 @@
     <input type="file" id="compare-file-input-2" class="hidden-input" accept="image/jpeg,image/png,image/webp">
     <input type="file" id="compare-file-input-3" class="hidden-input" accept="image/jpeg,image/png,image/webp">
 
-    <!-- Обновленная секция баланса -->
-    <section id="balanceSection" class="section" style="display: none;">
-        <div class="section-header">
-            <h2>💰 Баланс</h2>
-            <p>Управляйте своими STcoin для консультаций</p>
-        </div>
-
-        <div class="balance-card">
-            <div class="balance-info">
-                <div class="balance-amount">
-                    <span id="balanceAmount">0</span>
-                    <span class="currency">STcoin</span>
+    <!-- СЕКЦИЯ БАЛАНСА -->
+    <div id="balance-section" class="section" style="display: none;">
+        <div class="container">
+            <h2>💰 Мой баланс</h2>
+            
+            <div class="balance-card" style="
+                background: rgba(26, 26, 26, 0.8);
+                border: 2px solid var(--border-gold);
+                border-radius: 16px;
+                padding: 24px;
+                margin-bottom: 24px;
+                text-align: center;
+            ">
+                <div class="balance-display" style="margin-bottom: 20px;">
+                    <span class="balance-amount" id="balance-display-main" style="
+                        font-size: 2rem;
+                        font-weight: 900;
+                        color: var(--text-gold);
+                    ">50 STcoin</span>
+                    <button class="refresh-btn" onclick="window.app?.refreshBalance()" style="
+                        background: none;
+                        border: 2px solid var(--border-gold);
+                        color: var(--text-gold);
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        margin-left: 12px;
+                        cursor: pointer;
+                        transition: var(--transition);
+                    ">🔄</button>
                 </div>
-                <p class="balance-description">Ваш текущий баланс</p>
+                
+                <div class="balance-actions">
+                    <button class="btn btn-primary" onclick="window.app?.showSection('store')" style="
+                        background: var(--gold-gradient);
+                        color: var(--text-dark);
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        transition: var(--transition);
+                    ">
+                        💎 Пополнить баланс
+                    </button>
+                </div>
             </div>
             
-            <button class="btn btn-primary" onclick="showTopUpModal()">
-                <span class="icon">💳</span>
-                Пополнить баланс
-            </button>
-        </div>
-
-        <!-- Новый блок: История транзакций -->
-        <div class="balance-section-divider">
-            <h3>📋 История пополнений</h3>
-            <div class="transaction-history">
-                <!-- Здесь будет загружаться история транзакций -->
-                <div class="loading-placeholder">
-                    <span class="icon">⏳</span>
-                    Загрузка истории...
+            <div class="transactions-history" id="transactions-container" style="
+                background: rgba(42, 42, 42, 0.6);
+                border: 1px solid var(--border-light);
+                border-radius: 16px;
+                padding: 20px;
+            ">
+                <h3 style="color: var(--text-gold); margin-bottom: 16px;">📊 История операций</h3>
+                <div id="transactions-list">
+                    <p style="color: var(--text-muted); text-align: center;">Загрузка истории...</p>
                 </div>
             </div>
         </div>
-
-        <!-- Информация о тарифах -->
-        <div class="pricing-info">
-            <h3>💎 Тарифные планы</h3>
-            <div class="pricing-grid">
-                <div class="pricing-card basic">
-                    <h4>Базовый</h4>
-                    <div class="price">150₽</div>
-                    <div class="stcoins">100 STcoin</div>
-                    <p>~10 консультаций</p>
-                </div>
-                <div class="pricing-card premium">
-                    <h4>Премиум</h4>
-                    <div class="price">1000₽</div>
-                    <div class="stcoins">1000 STcoin</div>
-                    <p>~100 консультаций</p>
-                    <span class="badge">Популярный</span>
-                </div>
-                <div class="pricing-card pro">
-                    <h4>Профессиональный</h4>
-                    <div class="price">2000₽</div>
-                    <div class="stcoins">2500 STcoin</div>
-                    <p>~250 консультаций</p>
-                    <span class="badge">Выгодно</span>
-                </div>
-            </div>
-        </div>
-    </section>
+    </div>
 
     <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ С ПРАВИЛЬНЫМИ ПУТЯМИ -->
     <script src="/static/logger.js"></script>

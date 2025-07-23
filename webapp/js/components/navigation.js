@@ -200,52 +200,149 @@ window.MishuraApp.components.navigation = (function() {
         return currentPage;
     }
     
-    /**
-     * Показать секцию баланса БЕЗ заголовков + кнопки поддержки и обновления
-     */
-    function showBalanceSection() {
-        console.log('💰 Модульная навигация: Показ секции баланса');
+    function loadTransactionHistory() {
         try {
-            const balanceSection = document.getElementById('balance-section');
-            const sections = ['home-section', 'history-section', 'balance-section'];
+            console.log('📊 Загрузка истории транзакций...');
+            const userId = window.unifiedBalanceSync?.getCurrentUserId() || 
+                          window.userService?.getCurrentUserId() ||
+                          5930269100;
+            if (!userId) {
+                console.warn('⚠️ User ID не определен для загрузки истории');
+                displayNoTransactions();
+                return;
+            }
+            fetch(`/api/v1/users/${userId}/transactions?limit=10`)
+                .then(response => response.ok ? response.json() : Promise.reject(response))
+                .then(data => {
+                    console.log('✅ История транзакций получена:', data);
+                    displayTransactions(data.transactions || []);
+                })
+                .catch(err => {
+                    console.warn('⚠️ Не удалось загрузить историю транзакций:', err);
+                    displayErrorTransactions();
+                });
+        } catch (error) {
+            console.error('❌ Ошибка загрузки истории:', error);
+            displayErrorTransactions();
+        }
+    }
+    function displayTransactions(transactions) {
+        const container = document.getElementById('transactions-list');
+        if (!container) return;
+        if (!transactions || transactions.length === 0) {
+            displayNoTransactions();
+            return;
+        }
+        const html = transactions.map(tx => `
+            <div class="transaction-item" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 0;
+                border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+            ">
+                <div class="transaction-info">
+                    <span class="transaction-type" style="
+                        color: var(--text-light);
+                        font-weight: 600;
+                    ">${getTransactionIcon(tx.operation_type)} ${getTransactionLabel(tx.operation_type)}</span>
+                    <div class="transaction-date" style="
+                        color: var(--text-muted);
+                        font-size: 0.8rem;
+                        margin-top: 2px;
+                    ">${new Date(tx.created_at).toLocaleDateString('ru-RU')}</div>
+                </div>
+                <div class="transaction-amount" style="
+                    font-weight: 700;
+                    color: ${tx.amount > 0 ? '#4CAF50' : '#f44336'};
+                ">
+                    ${tx.amount > 0 ? '+' : ''}${tx.amount} STcoin
+                </div>
+            </div>
+        `).join('');
+        container.innerHTML = html;
+    }
+    function displayNoTransactions() {
+        const container = document.getElementById('transactions-list');
+        if (container) {
+            container.innerHTML = `
+                <p style="
+                    color: var(--text-muted); 
+                    text-align: center;
+                    padding: 20px;
+                    font-style: italic;
+                ">📝 История операций пуста</p>
+            `;
+        }
+    }
+    function displayErrorTransactions() {
+        const container = document.getElementById('transactions-list');
+        if (container) {
+            container.innerHTML = `
+                <p style="
+                    color: #f44336; 
+                    text-align: center;
+                    padding: 20px;
+                ">❌ Ошибка загрузки истории</p>
+            `;
+        }
+    }
+    function getTransactionIcon(type) {
+        const icons = {
+            'consultation_analysis': '🎨',
+            'consultation_compare': '⚖️',
+            'payment_stcoins': '💎',
+            'feedback_bonus': '🎁',
+            'consultation_refund': '🔄',
+            'legacy': '📊'
+        };
+        return icons[type] || '📊';
+    }
+    function getTransactionLabel(type) {
+        const labels = {
+            'consultation_analysis': 'Анализ образа',
+            'consultation_compare': 'Сравнение образов',
+            'payment_stcoins': 'Пополнение баланса',
+            'feedback_bonus': 'Бонус за отзыв',
+            'consultation_refund': 'Возврат средств',
+            'legacy': 'Операция'
+        };
+        return labels[type] || 'Неизвестная операция';
+    }
+    function showBalanceSection() {
+        try {
+            console.log('💰 Модульная навигация: Показ секции баланса');
             // Скрываем все секции
-            sections.forEach(sectionId => {
-                const section = document.getElementById(sectionId);
-                if (section) {
-                    section.style.display = 'none';
-                }
-            });
+            if (typeof hideAllSections === 'function') hideAllSections();
+            else if (this.hideAllSections) this.hideAllSections();
             // Показываем секцию баланса
+            const balanceSection = document.getElementById('balance-section');
             if (balanceSection) {
                 balanceSection.style.display = 'block';
-                // ✅ ИСПРАВЛЕНИЕ: Безопасная проверка logger
-                if (window.logger && typeof window.logger.info === 'function') {
-                    window.logger.info('💰 Секция баланса отображена');
-                } else {
-                    console.log('💰 Секция баланса отображена');
+                // Обновляем баланс
+                if (window.app && window.app.refreshBalance) {
+                    window.app.refreshBalance();
                 }
-                // Обновляем баланс при показе секции
-                if (window.userService && typeof window.userService.syncBalance === 'function') {
-                    window.userService.syncBalance();
-                } else if (window.balanceManager && typeof window.balanceManager.forceSyncWithServer === 'function') {
-                    window.balanceManager.forceSyncWithServer();
-                }
+                // Загружаем историю транзакций
+                loadTransactionHistory();
+            } else {
+                console.error('❌ Секция баланса не найдена! Ожидался элемент #balance-section');
             }
         } catch (error) {
             console.error('❌ Ошибка показа секции баланса:', error);
-            // Fallback - показываем хотя бы элемент
-            const balanceSection = document.getElementById('balance-section');
-            if (balanceSection) {
-                balanceSection.style.display = 'block';
-            }
         }
     }
-    
     // Публичный API
     return {
         init,
         navigateTo,
         getCurrentPage,
-        showBalanceSection
+        showBalanceSection,
+        loadTransactionHistory,
+        displayTransactions,
+        displayNoTransactions,
+        displayErrorTransactions,
+        getTransactionIcon,
+        getTransactionLabel
     };
 })();

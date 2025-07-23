@@ -484,7 +484,7 @@ class FinancialService:
     def _create_user_if_not_exists(self, conn, cursor, telegram_id: int) -> Dict:
         """Создание пользователя если не существует"""
         
-        initial_balance = 200  # Начальный баланс
+        initial_balance = 50  # Начальный баланс (ИСПРАВЛЕНО)
         
         if self.db.DB_CONFIG['type'] == 'postgresql':
             query = """
@@ -517,7 +517,7 @@ class FinancialService:
             cursor.execute("SELECT balance FROM users WHERE telegram_id = ?", (telegram_id,))
         
         result = cursor.fetchone()
-        return result[0] if result else 200
+        return result[0] if result else 50
     
     # BACKWARD COMPATIBILITY: обертки для старых методов
     def update_user_balance(self, telegram_id: int, amount_change: int, 
@@ -546,14 +546,16 @@ class FinancialService:
             return self.db.get_user_balance(telegram_id)
     
     def get_transaction_history(self, telegram_id: int, limit: int = 20) -> list:
-        """Получение истории транзакций пользователя"""
+        """
+        Получение истории транзакций пользователя
+        """
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
             
             if self.db.DB_CONFIG['type'] == 'postgresql':
                 query = """
-                    SELECT operation_type, transaction_type, amount, balance_before, 
+                    SELECT transaction_type, transaction_type, amount, balance_before, 
                            balance_after, created_at, correlation_id
                     FROM transaction_log 
                     WHERE telegram_id = %s 
@@ -563,7 +565,7 @@ class FinancialService:
                 cursor.execute(query, (telegram_id, limit))
             else:
                 cursor.execute("""
-                    SELECT operation_type, transaction_type, amount, balance_before, 
+                    SELECT transaction_type, transaction_type, amount, balance_before, 
                            balance_after, created_at, correlation_id
                     FROM transaction_log 
                     WHERE telegram_id = ? 
@@ -574,8 +576,8 @@ class FinancialService:
             transactions = []
             for row in cursor.fetchall():
                 transactions.append({
-                    'operation_type': row[0],
-                    'transaction_type': row[1],
+                    'operation_type': row[0],  # Это теперь transaction_type
+                    'transaction_type': row[1], # Это тоже transaction_type
                     'amount': row[2],
                     'balance_before': row[3],
                     'balance_after': row[4],

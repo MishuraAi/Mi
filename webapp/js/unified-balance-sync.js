@@ -652,6 +652,35 @@ class UnifiedBalanceSyncSystem {
     }
 
     /**
+     * 🎧 EVENT LISTENERS SETUP
+     */
+    setupEventListeners() {
+        try {
+            // Page visibility events
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    // Page became visible, sync balance
+                    this.performPollingSync();
+                }
+            });
+            
+            // Focus events
+            window.addEventListener('focus', () => {
+                this.performPollingSync();
+            });
+            
+            // Custom events from other parts of the app
+            window.addEventListener('mishura:balance:refresh', () => {
+                this.forceSyncBalance();
+            });
+            
+            this.logger.info('🎧 Event listeners setup complete');
+        } catch (error) {
+            this.logger.warn('⚠️ Event listeners setup failed:', error);
+        }
+    }
+
+    /**
      * 📱 OFFLINE SUPPORT
      */
     setupOfflineSupport() {

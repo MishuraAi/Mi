@@ -11,8 +11,46 @@ const API_VERSION = 'v1';
 
 // Пользовательские данные (получаются из URL параметров)
 const urlParams = new URLSearchParams(window.location.search);
-// const USER_ID = parseInt(urlParams.get('user_id')) || 5930269100; // Fallback для тестирования
-const USER_ID = window.unifiedBalanceSync.getEffectiveUserId(); // ✅ Новый способ
+// Безопасное получение USER_ID с fallback
+function getEffectiveUserId() {
+    try {
+        // Проверяем URL параметры
+        const urlUserId = urlParams.get('user_id');
+        if (urlUserId && urlUserId !== '5930269100') {
+            return parseInt(urlUserId);
+        }
+        
+        // Проверяем unifiedBalanceSync если доступен
+        if (window.unifiedBalanceSync && typeof window.unifiedBalanceSync.getEffectiveUserId === 'function') {
+            return window.unifiedBalanceSync.getEffectiveUserId();
+        }
+        
+        // Проверяем userService если доступен
+        if (window.userService && typeof window.userService.getCurrentUserId === 'function') {
+            return window.userService.getCurrentUserId();
+        }
+        
+        // Fallback
+        return 5930269100;
+    } catch (error) {
+        console.warn('⚠️ Ошибка получения USER_ID:', error);
+        return 5930269100;
+    }
+}
+
+// Инициализируем USER_ID безопасно
+let USER_ID = getEffectiveUserId();
+
+// Обновляем USER_ID когда системы инициализированы
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        const newUserId = getEffectiveUserId();
+        if (newUserId !== USER_ID) {
+            console.log(`🔄 USER_ID обновлен: ${USER_ID} → ${newUserId}`);
+            USER_ID = newUserId;
+        }
+    }, 1000);
+});
 
 // Конфигурация загрузки файлов
 const FILE_CONFIG = {

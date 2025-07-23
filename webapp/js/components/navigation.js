@@ -309,12 +309,48 @@ window.MishuraApp.components.navigation = (function() {
         };
         return labels[type] || 'Неизвестная операция';
     }
+
+    function hideAllSectionsLocal() {
+        console.log('🙈 Скрываем все секции (модульная навигация)');
+        
+        // Скрываем секцию баланса
+        const balanceSection = document.getElementById('balance-section');
+        if (balanceSection) {
+            balanceSection.style.display = 'none';
+        }
+        
+        // Восстанавливаем основной контент если нужно
+        const container = document.querySelector('.container');
+        if (container && !container.querySelector('.action-buttons')) {
+            container.innerHTML = `
+                <header class="header">
+                    <h1>✨ МИШУРА</h1>
+                    <p>Твой личный стилист</p>
+                </header>
+
+                <div class="action-buttons">
+                    <button id="single-mode-btn" class="action-btn">
+                        <span class="icon">📷</span>
+                        Анализ образа
+                    </button>
+                    <button id="compare-mode-btn" class="action-btn">
+                        <span class="icon">🔄</span>
+                        Сравнение образов
+                    </button>
+                </div>
+            `;
+            
+            // Переинициализируем кнопки режимов
+            if (window.app && typeof window.app.fixModeButtons === 'function') {
+                window.app.fixModeButtons();
+            }
+        }
+    }
     function showBalanceSection() {
         try {
             console.log('💰 Модульная навигация: Показ секции баланса');
             // Скрываем все секции
-            if (typeof hideAllSections === 'function') hideAllSections();
-            else if (this.hideAllSections) this.hideAllSections();
+            hideAllSectionsLocal();
             // Показываем секцию баланса
             const balanceSection = document.getElementById('balance-section');
             if (balanceSection) {

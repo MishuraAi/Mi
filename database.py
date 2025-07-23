@@ -210,25 +210,59 @@ class MishuraDB:
     
     def init_db(self, schema_file_path: str = SCHEMA_FILE) -> bool:
         """Инициализация базы данных"""
-        
         try:
             conn = self.get_connection()
-            
+            cursor = conn.cursor()
             if get_current_db_config()['type'] == 'postgresql':
                 # PostgreSQL
                 self.create_postgres_schema(conn)
+                # Создание таблицы transaction_log
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS transaction_log (
+                        id SERIAL PRIMARY KEY,
+                        telegram_id BIGINT NOT NULL,
+                        transaction_type VARCHAR(50) NOT NULL,
+                        amount INTEGER NOT NULL,
+                        balance_before INTEGER NOT NULL,
+                        balance_after INTEGER NOT NULL,
+                        correlation_id VARCHAR(255),
+                        metadata JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_transaction_log_telegram_id 
+                    ON transaction_log(telegram_id)
+                """)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_transaction_log_created_at 
+                    ON transaction_log(created_at DESC)
+                """)
             else:
                 # SQLite (существующий код)
-                cursor = conn.cursor()
                 with open(schema_file_path, 'r', encoding='utf-8') as f:
                     sql_script = f.read()
                 cursor.executescript(sql_script)
-            
+                # Создание таблицы transaction_log
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS transaction_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        telegram_id INTEGER NOT NULL,
+                        transaction_type TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        balance_before INTEGER NOT NULL,
+                        balance_after INTEGER NOT NULL,
+                        correlation_id TEXT,
+                        metadata TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
             conn.commit()
             conn.close()
             self.logger.info("✅ База данных инициализирована")
             return True
-            
         except Exception as e:
             self.logger.error(f"❌ Ошибка инициализации БД: {e}")
             return False

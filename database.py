@@ -1064,6 +1064,390 @@ class MishuraDB:
             self.logger.error(f"❌ Ошибка получения статистики отзывов: {e}")
             return {}
 
+    def create_device_links_table(self):
+        """Создание таблицы связей устройств с пользователями"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS device_links (
+                        id SERIAL PRIMARY KEY,
+                        telegram_id BIGINT NOT NULL,
+                        device_fingerprint VARCHAR(255) NOT NULL,
+                        first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        session_data TEXT,
+                        is_anonymous BOOLEAN DEFAULT FALSE,
+                        user_agent TEXT,
+                        ip_address TEXT,
+                        sync_count INTEGER DEFAULT 0,
+                        UNIQUE(telegram_id, device_fingerprint),
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_links_telegram_id ON device_links(telegram_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_links_device_fingerprint ON device_links(device_fingerprint)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_links_last_seen ON device_links(last_seen DESC)")
+            else:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS device_links (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        telegram_id INTEGER NOT NULL,
+                        device_fingerprint TEXT NOT NULL,
+                        first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        session_data TEXT,
+                        is_anonymous INTEGER DEFAULT 0,
+                        user_agent TEXT,
+                        ip_address TEXT,
+                        sync_count INTEGER DEFAULT 0,
+                        UNIQUE(telegram_id, device_fingerprint),
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_links_telegram_id ON device_links(telegram_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_links_device_fingerprint ON device_links(device_fingerprint)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_links_last_seen ON device_links(last_seen DESC)")
+            conn.commit()
+            conn.close()
+            self.logger.info("✅ Таблица device_links создана успешно")
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания таблицы device_links: {e}")
+            raise
+
+    def create_balance_sync_logs_table(self):
+        """Создание таблицы логов синхронизации балансов"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS balance_sync_logs (
+                        id SERIAL PRIMARY KEY,
+                        telegram_id BIGINT NOT NULL,
+                        device_fingerprint VARCHAR(255),
+                        old_balance INTEGER,
+                        new_balance INTEGER,
+                        sync_type VARCHAR(50) NOT NULL,
+                        sync_source VARCHAR(50),
+                        correlation_id VARCHAR(255),
+                        metadata TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_balance_sync_logs_telegram_id ON balance_sync_logs(telegram_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_balance_sync_logs_created_at ON balance_sync_logs(created_at DESC)")
+            else:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS balance_sync_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        telegram_id INTEGER NOT NULL,
+                        device_fingerprint TEXT,
+                        old_balance INTEGER,
+                        new_balance INTEGER,
+                        sync_type TEXT NOT NULL,
+                        sync_source TEXT,
+                        correlation_id TEXT,
+                        metadata TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_balance_sync_logs_telegram_id ON balance_sync_logs(telegram_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_balance_sync_logs_created_at ON balance_sync_logs(created_at DESC)")
+            # Таблица конфликтов балансов
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS balance_conflicts (
+                        id SERIAL PRIMARY KEY,
+                        telegram_id BIGINT NOT NULL,
+                        device_fingerprint VARCHAR(255),
+                        local_balance INTEGER,
+                        server_balance INTEGER,
+                        conflict_type VARCHAR(50),
+                        resolution VARCHAR(50),
+                        metadata TEXT,
+                        resolved_at TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
+            else:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS balance_conflicts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        telegram_id INTEGER NOT NULL,
+                        device_fingerprint TEXT,
+                        local_balance INTEGER,
+                        server_balance INTEGER,
+                        conflict_type TEXT,
+                        resolution TEXT,
+                        metadata TEXT,
+                        resolved_at TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+                    )
+                """)
+            conn.commit()
+            conn.close()
+            self.logger.info("✅ Таблицы синхронизации балансов созданы успешно")
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания таблиц синхронизации: {e}")
+            raise
+
+    def log_balance_sync(self, telegram_id, device_fingerprint, old_balance, new_balance, sync_type, sync_source=None, correlation_id=None, metadata=None):
+        """Логирование синхронизации баланса"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            # Сериализуем metadata в JSON если передан dict
+            if metadata and isinstance(metadata, dict):
+                import json
+                metadata = json.dumps(metadata)
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    INSERT INTO balance_sync_logs (telegram_id, device_fingerprint, old_balance, new_balance, sync_type, sync_source, correlation_id, metadata)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (telegram_id, device_fingerprint, old_balance, new_balance, sync_type, sync_source, correlation_id, metadata))
+            else:
+                cursor.execute("""
+                    INSERT INTO balance_sync_logs (telegram_id, device_fingerprint, old_balance, new_balance, sync_type, sync_source, correlation_id, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (telegram_id, device_fingerprint, old_balance, new_balance, sync_type, sync_source, correlation_id, metadata))
+            conn.commit()
+            conn.close()
+            self.logger.info(f"📝 Логирована синхронизация баланса: {telegram_id} {old_balance}→{new_balance}")
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка логирования синхронизации: {e}")
+
+    def link_device_to_user(self, telegram_id, device_fingerprint, session_data=None, user_agent=None, ip_address=None):
+        """Связывание устройства с пользователем"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            # Сериализуем session_data в JSON если передан dict
+            if session_data and isinstance(session_data, dict):
+                import json
+                session_data = json.dumps(session_data)
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    INSERT INTO device_links (telegram_id, device_fingerprint, session_data, user_agent, ip_address, sync_count)
+                    VALUES (%s, %s, %s, %s, %s, 1)
+                    ON CONFLICT (telegram_id, device_fingerprint) 
+                    DO UPDATE SET 
+                        last_seen = CURRENT_TIMESTAMP,
+                        session_data = EXCLUDED.session_data,
+                        user_agent = EXCLUDED.user_agent,
+                        ip_address = EXCLUDED.ip_address,
+                        sync_count = device_links.sync_count + 1
+                """, (telegram_id, device_fingerprint, session_data, user_agent, ip_address))
+            else:
+                # Для SQLite используем более простой подход
+                # Сначала пытаемся обновить существующую запись
+                cursor.execute("""
+                    UPDATE device_links 
+                    SET last_seen = CURRENT_TIMESTAMP,
+                        session_data = ?,
+                        user_agent = ?,
+                        ip_address = ?,
+                        sync_count = sync_count + 1
+                    WHERE telegram_id = ? AND device_fingerprint = ?
+                """, (session_data, user_agent, ip_address, telegram_id, device_fingerprint))
+                # Если обновление не затронуло строки, создаем новую запись
+                if cursor.rowcount == 0:
+                    cursor.execute("""
+                        INSERT INTO device_links (telegram_id, device_fingerprint, session_data, user_agent, ip_address, sync_count)
+                        VALUES (?, ?, ?, ?, ?, 1)
+                    """, (telegram_id, device_fingerprint, session_data, user_agent, ip_address))
+            conn.commit()
+            conn.close()
+            self.logger.info(f"🔗 Устройство связано с пользователем: {telegram_id} ↔ {device_fingerprint[:10]}...")
+            return True
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка связывания устройства: {e}")
+            return False
+
+    def find_user_by_device_fingerprint(self, device_fingerprint):
+        """Поиск пользователя по отпечатку устройства"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    SELECT u.telegram_id, u.username, u.first_name, u.balance, dl.last_seen, dl.sync_count
+                    FROM users u
+                    JOIN device_links dl ON u.telegram_id = dl.telegram_id
+                    WHERE dl.device_fingerprint = %s
+                    ORDER BY dl.last_seen DESC
+                    LIMIT 1
+                """, (device_fingerprint,))
+            else:
+                cursor.execute("""
+                    SELECT u.telegram_id, u.username, u.first_name, u.balance, dl.last_seen, dl.sync_count
+                    FROM users u
+                    JOIN device_links dl ON u.telegram_id = dl.telegram_id
+                    WHERE dl.device_fingerprint = ?
+                    ORDER BY dl.last_seen DESC
+                    LIMIT 1
+                """, (device_fingerprint,))
+            user_data = cursor.fetchone()
+            conn.close()
+            if user_data:
+                return {
+                    'telegram_id': user_data[0],
+                    'username': user_data[1],
+                    'first_name': user_data[2],
+                    'balance': user_data[3],
+                    'last_seen': user_data[4],
+                    'sync_count': user_data[5]
+                }
+            return None
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка поиска пользователя по отпечатку устройства: {e}")
+            return None
+
+    def get_user_devices(self, telegram_id):
+        """Получение списка устройств пользователя"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    SELECT device_fingerprint, first_seen, last_seen, is_anonymous, sync_count, session_data
+                    FROM device_links
+                    WHERE telegram_id = %s
+                    ORDER BY last_seen DESC
+                """, (telegram_id,))
+            else:
+                cursor.execute("""
+                    SELECT device_fingerprint, first_seen, last_seen, is_anonymous, sync_count, session_data
+                    FROM device_links
+                    WHERE telegram_id = ?
+                    ORDER BY last_seen DESC
+                """, (telegram_id,))
+            devices = cursor.fetchall()
+            conn.close()
+            device_list = []
+            for device in devices:
+                device_info = {
+                    'device_fingerprint': device[0],
+                    'first_seen': device[1],
+                    'last_seen': device[2],
+                    'is_anonymous': bool(device[3]),
+                    'sync_count': device[4],
+                    'session_data': device[5]
+                }
+                device_list.append(device_info)
+            return device_list
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения устройств пользователя: {e}")
+            return []
+
+    def create_anonymous_user(self, device_fingerprint):
+        """Создание анонимного пользователя"""
+        try:
+            import random
+            import time
+            anonymous_telegram_id = 9000000000 + int(time.time()) % 1000000000
+            existing_user = self.get_user_by_telegram_id(anonymous_telegram_id)
+            while existing_user:
+                anonymous_telegram_id = 9000000000 + random.randint(1, 999999999)
+                existing_user = self.get_user_by_telegram_id(anonymous_telegram_id)
+            user_id = self.save_user(
+                telegram_id=anonymous_telegram_id,
+                username=f"anonymous_{device_fingerprint[:8]}",
+                first_name="Anonymous",
+                last_name="User"
+            )
+            self.update_user_balance(anonymous_telegram_id, 50, "initial_bonus")
+            self.link_device_to_user(
+                telegram_id=anonymous_telegram_id,
+                device_fingerprint=device_fingerprint,
+                session_data={'source': 'anonymous', 'created': time.time()},
+                user_agent=None,
+                ip_address=None
+            )
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if self.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("""
+                    UPDATE device_links 
+                    SET is_anonymous = true 
+                    WHERE telegram_id = %s AND device_fingerprint = %s
+                """, (anonymous_telegram_id, device_fingerprint))
+            else:
+                cursor.execute("""
+                    UPDATE device_links 
+                    SET is_anonymous = 1 
+                    WHERE telegram_id = ? AND device_fingerprint = ?
+                """, (anonymous_telegram_id, device_fingerprint))
+            conn.commit()
+            conn.close()
+            self.logger.info(f"✅ Создан анонимный пользователь: {anonymous_telegram_id}")
+            return {
+                'telegram_id': anonymous_telegram_id,
+                'username': f"anonymous_{device_fingerprint[:8]}",
+                'first_name': "Anonymous",
+                'balance': 50,
+                'is_anonymous': True
+            }
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка создания анонимного пользователя: {e}")
+            return None
+
+    def get_balance_sync_statistics(self, telegram_id=None, days=7):
+        """Получение статистики синхронизации балансов"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if self.DB_CONFIG['type'] == 'postgresql':
+                if telegram_id:
+                    cursor.execute("""
+                        SELECT sync_type, COUNT(*) as count, AVG(ABS(new_balance - old_balance)) as avg_change
+                        FROM balance_sync_logs
+                        WHERE telegram_id = %s AND created_at >= NOW() - INTERVAL '%s days'
+                        GROUP BY sync_type
+                        ORDER BY count DESC
+                    """, (telegram_id, days))
+                else:
+                    cursor.execute("""
+                        SELECT sync_type, COUNT(*) as count, AVG(ABS(new_balance - old_balance)) as avg_change
+                        FROM balance_sync_logs
+                        WHERE created_at >= NOW() - INTERVAL '%s days'
+                        GROUP BY sync_type
+                        ORDER BY count DESC
+                    """, (days,))
+            else:
+                if telegram_id:
+                    cursor.execute("""
+                        SELECT sync_type, COUNT(*) as count, AVG(ABS(new_balance - old_balance)) as avg_change
+                        FROM balance_sync_logs
+                        WHERE telegram_id = ? AND datetime(created_at) >= datetime('now', '-{} days')
+                        GROUP BY sync_type
+                        ORDER BY count DESC
+                    """.format(days), (telegram_id,))
+                else:
+                    cursor.execute("""
+                        SELECT sync_type, COUNT(*) as count, AVG(ABS(new_balance - old_balance)) as avg_change
+                        FROM balance_sync_logs
+                        WHERE datetime(created_at) >= datetime('now', '-{} days')
+                        GROUP BY sync_type
+                        ORDER BY count DESC
+                    """.format(days))
+            stats = cursor.fetchall()
+            conn.close()
+            return [{
+                'sync_type': stat[0],
+                'count': stat[1],
+                'avg_change': round(stat[2] or 0, 2)
+            } for stat in stats]
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка получения статистики синхронизации: {e}")
+            return []
+
 
 # === ФУНКЦИИ СОВМЕСТИМОСТИ ===
 

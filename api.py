@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 import time
 import psutil
 import gc
+import json
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -1696,6 +1697,322 @@ async def full_diagnostic_report():
             }
         }
     }
+
+@app.get("/api/v1/users/device/{device_fingerprint}")
+async def find_user_by_device(device_fingerprint: str):
+    """Поиск пользователя по отпечатку устройства"""
+    try:
+        user_data = db.find_user_by_device_fingerprint(device_fingerprint)
+        
+        if user_data:
+            return {
+                "success": True,
+                "user": {
+                    "telegram_id": user_data['telegram_id'],
+                    "username": user_data.get('username'),
+                    "first_name": user_data.get('first_name'),
+                    "balance": user_data['balance'],
+                    "last_seen": user_data.get('last_seen'),
+                    "sync_count": user_data.get('sync_count', 0)
+                }
+            }
+        else:
+            return {"success": False, "message": "User not found"}
+            
+    except Exception as e:
+        logger.error(f"Error finding user by device fingerprint {device_fingerprint}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/users/anonymous")
+async def create_anonymous_user(request: Request):
+    """Создание анонимного пользователя"""
+    try:
+        data = await request.json()
+        device_fingerprint = data.get('deviceFingerprint')
+        
+        if not device_fingerprint:
+            raise HTTPException(status_code=400, detail="Device fingerprint required")
+        
+        # Проверяем, может уже есть пользователь с таким отпечатком
+        existing_user = db.find_user_by_device_fingerprint(device_fingerprint)
+        if existing_user:
+            logger.info(f"🔍 Найден существующий пользователь для устройства {device_fingerprint}")
+            return {
+                "success": True,
+                "user": {
+                    "telegram_id": existing_user['telegram_id'],
+                    "username": existing_user.get('username'),
+                    "first_name": existing_user.get('first_name'),
+                    "balance": existing_user['balance'],
+                    "is_existing": True
+                }
+            }
+        
+        # Создаем нового анонимного пользователя
+        user_data = db.create_anonymous_user(device_fingerprint)
+        
+        if user_data:
+            logger.info(f"✅ Created anonymous user: {user_data['telegram_id']} with device {device_fingerprint}")
+            return {
+                "success": True,
+                "user": user_data
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create anonymous user")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating anonymous user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/users/device-link")
+async def link_device_to_user(request: Request):
+    """Связывание устройства с пользователем"""
+    try:
+        data = await request.json()
+        telegram_id = data.get('telegramId')
+        device_fingerprint = data.get('deviceFingerprint')
+        session_data = data.get('sessionData', {})
+        
+        # Получаем дополнительную информацию из запроса
+        user_agent = request.headers.get('user-agent', '')
+        ip_address = request.client.host if request.client else None
+        
+        if not telegram_id or not device_fingerprint:
+            raise HTTPException(status_code=400, detail="telegram_id and device_fingerprint required")
+        
+        # Проверяем что пользователь существует
+        user = db.get_user_by_telegram_id(telegram_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Связываем устройство с пользователем
+        success = db.link_device_to_user(
+            telegram_id=telegram_id,
+            device_fingerprint=device_fingerprint,
+            session_data=session_data,
+            user_agent=user_agent,
+            ip_address=ip_address
+        )
+        
+        if success:
+            logger.info(f"✅ Linked device {device_fingerprint[:10]}... to user {telegram_id}")
+            return {
+                "success": True,
+                "message": "Device linked successfully",
+                "telegram_id": telegram_id,
+                "device_fingerprint": device_fingerprint
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to link device")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error linking device to user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/users/{telegram_id}/devices")
+async def get_user_devices(telegram_id: int):
+    """Получение устройств пользователя"""
+    try:
+        devices = db.get_user_devices(telegram_id)
+        
+        return {
+            "telegram_id": telegram_id,
+            "devices": devices,
+            "device_count": len(devices),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting devices for user {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/users/{telegram_id}/balance/force-sync")
+async def force_balance_sync(telegram_id: int, request: Request):
+    """Принудительная синхронизация баланса с очисткой кэша"""
+    try:
+        # Получаем дополнительную информацию из запроса
+        try:
+            data = await request.json()
+            device_fingerprint = data.get('device_fingerprint')
+            force_refresh = data.get('force_refresh', True)
+            clear_cache = data.get('clear_cache', True)
+        except:
+            device_fingerprint = None
+            force_refresh = True
+            clear_cache = True
+        
+        # Получаем текущий баланс
+        old_balance = db.get_user_balance(telegram_id)
+        
+        # Логируем синхронизацию
+        db.log_balance_sync(
+            telegram_id=telegram_id,
+            device_fingerprint=device_fingerprint,
+            old_balance=old_balance,
+            new_balance=old_balance,  # В данном случае баланс не меняется
+            sync_type='force_sync',
+            sync_source='api',
+            correlation_id=str(uuid.uuid4()),
+            metadata=json.dumps({
+                'force_refresh': force_refresh,
+                'clear_cache': clear_cache,
+                'endpoint': '/balance/force-sync'
+            })
+        )
+        
+        logger.info(f"🔄 Force sync balance for {telegram_id}: {old_balance} STcoin")
+        
+        # Если есть financial_service, проверяем integrity баланса
+        integrity_info = {}
+        if financial_service:
+            try:
+                integrity_check = financial_service.verify_balance_integrity(telegram_id)
+                integrity_info = {
+                    'integrity_valid': integrity_check.get('valid', True),
+                    'integrity_details': integrity_check.get('details', {})
+                }
+                if not integrity_check.get('valid', True):
+                    logger.warning(f"⚠️ Balance integrity issue for {telegram_id}: {integrity_check}")
+            except Exception as e:
+                logger.warning(f"Balance integrity check failed: {e}")
+                integrity_info = {'integrity_error': str(e)}
+        
+        return {
+            "telegram_id": telegram_id,
+            "balance": old_balance,
+            "sync_timestamp": datetime.now().isoformat(),
+            "source": "database",
+            "cache_cleared": clear_cache,
+            "force_refresh": force_refresh,
+            **integrity_info
+        }
+        
+    except Exception as e:
+        logger.error(f"Error force syncing balance for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/users/{telegram_id}/sync-stats")
+async def get_user_sync_stats(telegram_id: int, days: int = 7):
+    """Получение статистики синхронизации для пользователя"""
+    try:
+        stats = db.get_balance_sync_statistics(telegram_id=telegram_id, days=days)
+        devices = db.get_user_devices(telegram_id)
+        
+        return {
+            "telegram_id": telegram_id,
+            "period_days": days,
+            "sync_statistics": stats,
+            "total_devices": len(devices),
+            "active_devices": len([d for d in devices if d.get('sync_count', 0) > 0]),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting sync stats for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/admin/sync-overview")
+async def get_sync_overview():
+    """Административный обзор синхронизации (для мониторинга)"""
+    try:
+        # Общая статистика
+        general_stats = db.get_balance_sync_statistics(days=7)
+        
+        # Количество пользователей с устройствами
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        
+        if db.DB_CONFIG['type'] == 'postgresql':
+            cursor.execute("""
+                SELECT 
+                    COUNT(DISTINCT u.telegram_id) as total_users,
+                    COUNT(DISTINCT dl.telegram_id) as users_with_devices,
+                    COUNT(dl.device_fingerprint) as total_devices,
+                    COUNT(CASE WHEN dl.is_anonymous = true THEN 1 END) as anonymous_devices
+                FROM users u
+                LEFT JOIN device_links dl ON u.telegram_id = dl.telegram_id
+            """)
+        else:
+            cursor.execute("""
+                SELECT 
+                    COUNT(DISTINCT u.telegram_id) as total_users,
+                    COUNT(DISTINCT dl.telegram_id) as users_with_devices,
+                    COUNT(dl.device_fingerprint) as total_devices,
+                    COUNT(CASE WHEN dl.is_anonymous = 1 THEN 1 END) as anonymous_devices
+                FROM users u
+                LEFT JOIN device_links dl ON u.telegram_id = dl.telegram_id
+            """)
+        
+        overview_data = cursor.fetchone()
+        conn.close()
+        
+        return {
+            "sync_overview": {
+                "total_users": overview_data[0] or 0,
+                "users_with_devices": overview_data[1] or 0,
+                "total_devices": overview_data[2] or 0,
+                "anonymous_devices": overview_data[3] or 0,
+                "sync_statistics_7_days": general_stats
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting sync overview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/debug/simulate-balance-conflict")
+async def simulate_balance_conflict(request: Request):
+    """🧪 DEBUG: Симуляция конфликта балансов для тестирования"""
+    if ENVIRONMENT == 'production':
+        raise HTTPException(status_code=403, detail="Debug endpoint not available in production")
+    
+    try:
+        data = await request.json()
+        telegram_id = data.get('telegram_id')
+        local_balance = data.get('local_balance', 100)
+        server_balance = data.get('server_balance', 50)
+        
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="telegram_id required")
+        
+        # Создаем запись о конфликте
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        
+        if db.DB_CONFIG['type'] == 'postgresql':
+            cursor.execute("""
+                INSERT INTO balance_conflicts (telegram_id, local_balance, server_balance, conflict_type, metadata)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (telegram_id, local_balance, server_balance, 'simulated', json.dumps({'debug': True, 'created_by': 'api'})))
+        else:
+            cursor.execute("""
+                INSERT INTO balance_conflicts (telegram_id, local_balance, server_balance, conflict_type, metadata)
+                VALUES (?, ?, ?, ?, ?)
+            """, (telegram_id, local_balance, server_balance, 'simulated', json.dumps({'debug': True, 'created_by': 'api'})))
+        
+        conflict_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"🧪 Simulated balance conflict for {telegram_id}: local={local_balance} server={server_balance}")
+        
+        return {
+            "conflict_id": conflict_id,
+            "telegram_id": telegram_id,
+            "local_balance": local_balance,
+            "server_balance": server_balance,
+            "status": "simulated",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error simulating balance conflict: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     logger.info(f"🎭 МИШУРА API Server starting on port {PORT}")

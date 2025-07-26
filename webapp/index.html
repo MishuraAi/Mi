@@ -1926,15 +1926,74 @@
     <script src="/static/js/components/image-upload.js"></script>
     <script src="/static/js/features/consultation.js"></script>
     <script src="/static/js/features/comparison.js"></script>
+    <script src="static/js/unified-user-sync.js"></script>
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM загружен, Unified User Sync System активна');
+    
+    // Подписка на события синхронизации (опционально)
+    if (window.unifiedUserSync) {
+        window.unifiedUserSync.addEventListener('balanceUpdated', function(data) {
+            console.log('💰 Баланс обновлен:', data.balance, 'STcoin');
+        });
+        
+        window.unifiedUserSync.addEventListener('userIdentified', function(data) {
+            console.log('👤 Пользователь определен:', data.telegramId, '(' + data.source + ')');
+        });
+        
+        window.unifiedUserSync.addEventListener('syncFailed', function(data) {
+            console.warn('⚠️ Ошибка синхронизации:', data.error);
+        });
+    }
+    
+    // Добавляем кнопку диагностики (только для разработки)
+    if (window.location.hostname === 'localhost') {
+        const diagButton = document.createElement('button');
+        diagButton.innerHTML = '🔍 Диагностика';
+        diagButton.style.cssText = `
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 10000;
+        `;
+        diagButton.onclick = function() {
+            if (window.unifiedUserSync) {
+                window.unifiedUserSync.diagnose();
+            }
+        };
+        document.body.appendChild(diagButton);
+    }
+});
 
-    <!-- НОВОЕ: UserService -->
-    <script src="/static/js/user-service.js"></script>
+// Глобальная функция для ручной синхронизации
+window.syncBalance = function() {
+    if (window.unifiedUserSync) {
+        return window.unifiedUserSync.forceSyncBalance();
+    }
+};
 
+<<<<<<< HEAD
     <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
     <script src="/static/app.js"></script>
     <script src="/static/js/smart-nav-fix.js"></script>
     <script src="/static/js/consultation-fix.js"></script>
     <script src="/static/js/telegram-cache-fix.js"></script>
     <script src="/static/js/health-check.js"></script>
+=======
+// Глобальная функция для диагностики
+window.diagnoseSync = function() {
+    if (window.unifiedUserSync) {
+        window.unifiedUserSync.diagnose();
+    }
+};
+</script>
+>>>>>>> my-sync-changes
 </body>
 </html>

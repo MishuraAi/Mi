@@ -30,7 +30,7 @@ class MishuraApp {
         };
         
         // Пользовательские данные
-        this.userBalance = 200;
+        this.userBalance = 50;
         this.consultationsHistory = [];
         this.consultationsUsed = 0;
         

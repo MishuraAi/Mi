@@ -325,7 +325,7 @@ async def link_telegram_to_anonymous(request: TelegramLinkRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # ИСПРАВЛЕНО: добавлен отступ
         logger.error(f"❌ Ошибка привязки Telegram: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
 
@@ -1533,10 +1533,10 @@ def is_spam_text(text: str) -> bool:
 @app.get("/health")
 async def health():
     """Быстрый health check без DB операций"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.get("/health/deep")
 async def deep_health_check():

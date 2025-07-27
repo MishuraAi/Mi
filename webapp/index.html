@@ -10,6 +10,104 @@
     <title>✨ МИШУРА - Твой Стилист</title>
     <link rel="stylesheet" href="/static/css/styles.css">
     <style>
+/* КРИТИЧЕСКИЕ ИСПРАВЛЕНИЯ КОНФЛИКТОВ СТИЛЕЙ */
+
+/* Приоритет стилей из index.html над styles.css */
+.modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: none !important;
+    z-index: 2000 !important;
+}
+
+.modal-overlay.active {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Исправление модального контента */
+.modal-content {
+    position: relative !important;
+    background: var(--secondary-black) !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+}
+
+/* Исправление секций внутри модала */
+.upload-mode {
+    display: none !important;
+}
+
+.upload-mode.active {
+    display: block !important;
+}
+
+.consultation-form {
+    display: none !important;
+}
+
+.consultation-form.active {
+    display: block !important;
+}
+
+.loading {
+    display: none !important;
+}
+
+.loading.active {
+    display: block !important;
+}
+
+.result-section {
+    display: none !important;
+}
+
+.result-section.active {
+    display: block !important;
+}
+
+/* Исправление навигации */
+.bottom-nav {
+    position: fixed !important;
+    bottom: 0 !important;
+    z-index: 1000 !important;
+}
+
+/* Исправление секции баланса */
+#balance-section {
+    display: none;
+    padding: 20px;
+}
+
+/* Исправление кнопок истории */
+#toggleHistoryBtn {
+    cursor: pointer !important;
+}
+
+#consultationHistory {
+    display: none;
+}
+
+#consultationHistory.active {
+    display: block !important;
+}
+
+/* Исправление для мобильных */
+@media (max-width: 768px) {
+    .modal-content {
+        margin: 10px !important;
+        max-width: calc(100% - 20px) !important;
+        max-height: calc(100vh - 20px) !important;
+    }
+    
+    .container {
+        padding-bottom: 80px !important;
+    }
+}
         :root {
             /* Luxury Black & Gold Theme */
             --primary-black: #0a0a0a;
@@ -1926,7 +2024,7 @@
     <script src="/static/js/components/image-upload.js"></script>
     <script src="/static/js/features/consultation.js"></script>
     <script src="/static/js/features/comparison.js"></script>
-    <script src="static/js/unified-user-sync.js"></script>
+    <!-- <script src="static/js/unified-user-sync.js"></script> -->
     <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM загружен, Unified User Sync System активна');
@@ -1971,29 +2069,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(diagButton);
     }
 });
-
-// Глобальная функция для ручной синхронизации
-window.syncBalance = function() {
-    if (window.unifiedUserSync) {
-        return window.unifiedUserSync.forceSyncBalance();
-    }
-};
-
-<<<<<<< HEAD
-    <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
-    <script src="/static/app.js"></script>
-    <script src="/static/js/smart-nav-fix.js"></script>
-    <script src="/static/js/consultation-fix.js"></script>
-    <script src="/static/js/telegram-cache-fix.js"></script>
-    <script src="/static/js/health-check.js"></script>
-=======
-// Глобальная функция для диагностики
-window.diagnoseSync = function() {
-    if (window.unifiedUserSync) {
-        window.unifiedUserSync.diagnose();
-    }
-};
 </script>
->>>>>>> my-sync-changes
 </body>
 </html>

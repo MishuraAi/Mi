@@ -1,6 +1,12 @@
- ﻿// 🎭 МИШУРА - Твой Стилист
+// 🎭 МИШУРА - Твой Стилист
 // Главный файл приложения - app.js (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 // Версия: 2.6.1 - КРИТИЧЕСКИЕ ИСПРАВЛЕНИЯ ПЛАТЕЖЕЙ И СИНХРОНИЗАЦИИ
+
+// Инициализация для Telegram
+if (window.Telegram?.WebApp) {
+    window.Telegram.WebApp.ready();
+    window.Telegram.WebApp.expand();
+}
 
 class MishuraApp {
     constructor() {

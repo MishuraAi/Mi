@@ -1,9 +1,12 @@
 // 🔧 СОЗДАТЬ НОВЫЙ ФАЙЛ: webapp/js/user-service.js
 // Унифицированная система управления пользователем
 
+const FALLBACK_USER_ID = 5930269100;
+
 class UserService {
     constructor() {
         this.currentUserId = null;
+        this.currentUserSource = 'unknown';
         this.userInfo = null;
         this.balanceCache = new Map();
         this.syncInProgress = false;
@@ -14,69 +17,149 @@ class UserService {
     /**
      * Получение текущего пользователя (единая точка истины)
      */
-    getCurrentUserId() {
-        if (this.currentUserId) {
+    getCurrentUserId(options = {}) {
+        const { forceRefresh = false } = options;
+
+        if (!forceRefresh && this.currentUserId && !this.isFallbackSource(this.currentUserSource)) {
             return this.currentUserId;
         }
 
         try {
-            let userId = null;
-            let source = 'unknown';
+            const { userId, source } = this.detectUserIdFromSources();
 
-            // 1. Проверяем Telegram WebApp (высший приоритет)
-            if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-                userId = parseInt(window.Telegram.WebApp.initDataUnsafe.user.id);
-                source = 'telegram_webapp';
-            }
-            
-            // 2. URL параметры
-            else if (!userId) {
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('user_id')) {
-                    const urlUserId = parseInt(urlParams.get('user_id'));
-                    if (!isNaN(urlUserId)) {
-                        userId = urlUserId;
-                        source = 'url_params';
-                    }
-                }
-            }
-            
-            // 3. localStorage с актуальной сессией
-            else if (!userId) {
-                const stored = localStorage.getItem('current_user_session');
-                if (stored) {
-                    try {
-                        const session = JSON.parse(stored);
-                        if (this.isValidSession(session)) {
-                            userId = parseInt(session.user_id);
-                            source = 'stored_session';
-                        }
-                    } catch (e) {
-                        console.warn('⚠️ Некорректная сессия в localStorage');
-                    }
-                }
-            }
-            
-            // 4. Fallback ID
-            if (!userId) {
-                userId = 5930269100; // Известный рабочий ID
-                source = 'fallback';
-                console.warn('⚠️ Используется fallback user ID');
+            if (!forceRefresh && this.currentUserId !== null && this.isFallbackSource(source) && this.isFallbackSource(this.currentUserSource)) {
+                return this.currentUserId;
             }
 
-            // Сохраняем и кэшируем
+            const hasChanged = userId !== this.currentUserId || source !== this.currentUserSource;
+
             this.currentUserId = userId;
-            this.saveUserSession(userId, source);
-            
-            console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
+            this.currentUserSource = source;
+
+            if (hasChanged) {
+                if (this.isFallbackSource(source)) {
+                    console.warn('⚠️ Используется fallback user ID');
+                }
+
+                this.saveUserSession(userId, source);
+                console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
+            }
+
             return userId;
 
         } catch (error) {
             console.error('❌ Ошибка получения user ID:', error);
-            const emergencyId = 5930269100;
-            this.currentUserId = emergencyId;
-            return emergencyId;
+            this.currentUserId = FALLBACK_USER_ID;
+            this.currentUserSource = 'fallback';
+            return FALLBACK_USER_ID;
         }
+    }
+
+    isFallbackSource(source) {
+        return source === 'fallback' || source === 'stored_session_fallback';
+    }
+
+    detectUserIdFromSources() {
+        const telegramResult = this.getUserIdFromTelegram();
+        if (telegramResult) {
+            return telegramResult;
+        }
+
+        const urlResult = this.getUserIdFromUrl();
+        if (urlResult) {
+            return urlResult;
+        }
+
+        const storedSessionResult = this.getUserIdFromStoredSession();
+        if (storedSessionResult) {
+            return storedSessionResult;
+        }
+
+        return {
+            userId: FALLBACK_USER_ID,
+            source: 'fallback'
+        };
+    }
+
+    getUserIdFromTelegram() {
+        const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        const parsedTelegramId = this.parseValidUserId(telegramRawId);
+
+        if (parsedTelegramId !== null) {
+            return {
+                userId: parsedTelegramId,
+                source: 'telegram_webapp'
+            };
+        }
+
+        return null;
+    }
+
+    getUserIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (!urlParams.has('user_id')) {
+            return null;
+        }
+
+        const urlUserId = this.parseValidUserId(urlParams.get('user_id'));
+
+        if (urlUserId !== null) {
+            return {
+                userId: urlUserId,
+                source: 'url_params'
+            };
+        }
+
+        return null;
+    }
+
+    getUserIdFromStoredSession() {
+        const stored = localStorage.getItem('current_user_session');
+
+        if (!stored) {
+            return null;
+        }
+
+        try {
+            const session = JSON.parse(stored);
+
+            if (!this.isValidSession(session)) {
+                return null;
+            }
+
+            const storedId = this.parseValidUserId(session.user_id);
+
+            if (storedId === null) {
+                return null;
+            }
+
+            const storedSource = session.source || 'stored_session';
+            const normalizedSource = this.isFallbackSource(storedSource) ? 'stored_session_fallback' : storedSource;
+
+            return {
+                userId: storedId,
+                source: normalizedSource
+            };
+        } catch (error) {
+            console.warn('⚠️ Некорректная сессия в localStorage', error);
+        }
+
+        return null;
+    }
+
+    parseValidUserId(rawValue) {
+        if (rawValue === undefined || rawValue === null) {
+            return null;
+        }
+
+        const parsed = Number.parseInt(rawValue, 10);
+
+        if (Number.isNaN(parsed) || parsed <= 0) {
+            return null;
+        }
+
+        return parsed;
     }
 
     /**
@@ -84,6 +167,25 @@ class UserService {
      */
     saveUserSession(userId, source) {
         try {
+            if (!userId) {
+                return;
+            }
+
+            if (this.isFallbackSource(source)) {
+                const existingRaw = localStorage.getItem('current_user_session');
+                if (existingRaw) {
+                    try {
+                        const existingSession = JSON.parse(existingRaw);
+                        if (existingSession && !this.isFallbackSource(existingSession.source)) {
+                            console.log('ℹ️ Пропускаем перезапись fallback-сессией, используется более точный идентификатор');
+                            return;
+                        }
+                    } catch (parseError) {
+                        console.warn('⚠️ Не удалось прочитать текущую сессию при сохранении fallback:', parseError);
+                    }
+                }
+            }
+
             const session = {
                 user_id: userId,
                 source: source,
@@ -93,11 +195,14 @@ class UserService {
             };
 
             localStorage.setItem('current_user_session', JSON.stringify(session));
-            
+
             // Синхронизируем старые ключи для совместимости
             localStorage.setItem('user_id', userId.toString());
-            localStorage.setItem('telegram_user_id', userId.toString());
-            
+
+            if (!this.isFallbackSource(source)) {
+                localStorage.setItem('telegram_user_id', userId.toString());
+            }
+
             console.log('💾 Сессия пользователя сохранена:', session);
 
         } catch (error) {
@@ -117,7 +222,9 @@ class UserService {
         const sessionAge = Date.now() - session.timestamp;
         const maxAge = 24 * 60 * 60 * 1000; // 24 часа
 
-        return sessionAge < maxAge && !isNaN(parseInt(session.user_id));
+        const parsedId = Number.parseInt(session.user_id, 10);
+
+        return sessionAge < maxAge && !Number.isNaN(parsedId) && parsedId > 0;
     }
 
     /**
@@ -300,10 +407,11 @@ class UserService {
      */
     async diagnose() {
         console.log('🔍 === ДИАГНОСТИКА USER SERVICE ===');
-        
+
         const userId = this.getCurrentUserId();
         console.log(`👤 Текущий User ID: ${userId}`);
-        
+        console.log(`📦 Источник User ID: ${this.currentUserSource}`);
+
         // Проверяем localStorage
         const session = localStorage.getItem('current_user_session');
         console.log('💾 Сессия в localStorage:', session ? JSON.parse(session) : null);
@@ -343,29 +451,46 @@ console.log('✅ UserService готов к использованию');
 
 class BalanceManager {
     constructor() {
-        this.telegramId = null;
+        this.userService = window.userService || new UserService();
+        this.userId = null;
         this.currentBalance = 0;
         this.lastSyncTime = 0;
         this.syncInProgress = false;
+        this.autoSyncInterval = null;
         this.init();
     }
 
-    init() {
-        // Получаем telegram_id из Telegram WebApp
-        if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-            this.telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
-            console.log(`🚀 BalanceManager инициализирован для пользователя ${this.telegramId}`);
-            
-            // Принудительная синхронизация при загрузке
-            this.forceSyncWithServer();
-            
-            // Создаем кнопку принудительной синхронизации
-            this.createSyncButton();
-            
-        } else {
-            console.warn('⚠️ Telegram WebApp не доступен, используем fallback');
-            this.telegramId = this.getTelegramIdFromUrl() || this.promptForTelegramId();
+    resolveUserId() {
+        try {
+            if (this.userService?.getCurrentUserId) {
+                const resolvedId = this.userService.getCurrentUserId();
+                const parsedId = Number.parseInt(resolvedId, 10);
+                if (!Number.isNaN(parsedId) && parsedId > 0) {
+                    return parsedId;
+                }
+            }
+        } catch (error) {
+            console.error('❌ Не удалось определить user ID через UserService:', error);
         }
+
+        return null;
+    }
+
+    init() {
+        this.userId = this.resolveUserId();
+
+        if (!this.userId) {
+            this.showSyncStatus('❌ Не удалось определить пользователя для синхронизации. Откройте ссылку из Telegram или авторизуйтесь заново.', 'error');
+            return;
+        }
+
+        console.log(`🚀 BalanceManager инициализирован для пользователя ${this.userId}`);
+
+        // Принудительная синхронизация при загрузке
+        this.forceSyncWithServer();
+
+        // Создаем кнопку принудительной синхронизации
+        this.createSyncButton();
     }
 
     /**
@@ -377,8 +502,14 @@ class BalanceManager {
             return;
         }
 
-        if (!this.telegramId) {
-            console.error('❌ Telegram ID не найден для синхронизации');
+        const resolvedId = this.resolveUserId();
+        if (resolvedId) {
+            this.userId = resolvedId;
+        }
+
+        if (!this.userId) {
+            console.error('❌ Пользователь не определен для синхронизации');
+            this.showSyncStatus('❌ Не удалось определить пользователя. Попробуйте обновить страницу через Telegram.', 'error');
             return;
         }
 
@@ -386,13 +517,13 @@ class BalanceManager {
         this.showSyncStatus('🔄 Синхронизация баланса...');
 
         try {
-            console.log(`🔄 Начинаем принудительную синхронизацию для ${this.telegramId}`);
+            console.log(`🔄 Начинаем принудительную синхронизацию для ${this.userId}`);
 
             // 1. Очищаем весь localStorage
             this.clearAllBalanceCache();
 
             // 2. Запрашиваем актуальный баланс с сервера
-            const response = await fetch(`/api/v1/users/${this.telegramId}/balance/sync`, {
+            const response = await fetch(`/api/v1/users/${this.userId}/balance/sync`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -417,8 +548,31 @@ class BalanceManager {
             // 3. Обновляем интерфейс
             this.updateBalanceEverywhere(serverBalance);
 
+            if (this.userService?.notifyBalanceChange) {
+                try {
+                    this.userService.notifyBalanceChange(serverBalance);
+                } catch (notifyError) {
+                    console.warn('⚠️ Не удалось отправить уведомление о новом балансе через UserService:', notifyError);
+                }
+            }
+
             // 4. Сохраняем в localStorage с меткой "синхронизировано"
             this.saveBalanceToCache(serverBalance, true);
+
+            if (this.userService) {
+                this.userService.currentUserId = this.userId;
+
+                if (typeof this.userService.isFallbackSource === 'function' && this.userService.isFallbackSource(this.userService.currentUserSource)) {
+                    this.userService.currentUserSource = 'balance_manager';
+                }
+
+                if (this.userService.balanceCache) {
+                    this.userService.balanceCache.set(this.userId, {
+                        balance: serverBalance,
+                        timestamp: Date.now()
+                    });
+                }
+            }
 
             this.showSyncStatus(`✅ Баланс синхронизирован: ${serverBalance} STcoin`, 'success');
             this.lastSyncTime = Date.now();
@@ -440,14 +594,17 @@ class BalanceManager {
     clearAllBalanceCache() {
         const keysToRemove = [
             'user_balance',
-            'balance_timestamp', 
+            'balance_timestamp',
             'last_balance_sync',
             'cached_balance',
             'balance_cache',
             'stcoin_balance',
-            `balance_${this.telegramId}`,
             'mishura_balance'
         ];
+
+        if (this.userId) {
+            keysToRemove.push(`balance_${this.userId}`);
+        }
 
         keysToRemove.forEach(key => {
             try {
@@ -457,6 +614,10 @@ class BalanceManager {
             }
         });
 
+        if (this.userService?.balanceCache && this.userId) {
+            this.userService.balanceCache.delete(this.userId);
+        }
+
         console.log('🧹 Весь кэш баланса очищен');
     }
 
@@ -465,7 +626,7 @@ class BalanceManager {
      */
     saveBalanceToCache(balance, synced = false) {
         const cacheData = {
-            telegramId: this.telegramId,
+            userId: this.userId,
             balance: balance,
             timestamp: Date.now(),
             synced: synced,
@@ -477,6 +638,9 @@ class BalanceManager {
             localStorage.setItem('user_balance', JSON.stringify(cacheData));
             localStorage.setItem('balance_timestamp', Date.now().toString());
             localStorage.setItem('last_balance_sync', Date.now().toString());
+            if (this.userId) {
+                localStorage.setItem(`balance_${this.userId}`, JSON.stringify(cacheData));
+            }
             console.log(`💾 Баланс сохранен в кэш: ${balance} STcoin (synced: ${synced})`);
         } catch (error) {
             console.error('❌ Ошибка сохранения в кэш:', error);
@@ -510,7 +674,12 @@ class BalanceManager {
                 if (element) {
                     element.textContent = `${balance} STcoin`;
                     element.setAttribute('data-balance', balance);
-                    
+                    if (this.userId) {
+                        element.setAttribute('data-user-id', this.userId);
+                    } else {
+                        element.removeAttribute('data-user-id');
+                    }
+
                     // Визуальная анимация обновления
                     element.classList.add('balance-updated');
                     setTimeout(() => {
@@ -537,7 +706,7 @@ class BalanceManager {
 
         // Триггерим событие для других компонентов
         window.dispatchEvent(new CustomEvent('balanceUpdated', {
-            detail: { balance, telegramId: this.telegramId }
+            detail: { balance, userId: this.userId }
         }));
     }
 
@@ -620,22 +789,6 @@ class BalanceManager {
                 setTimeout(() => notification.remove(), 300);
             }
         }, hideDelay);
-    }
-
-    /**
-     * 🔍 Получение telegram_id из URL (fallback)
-     */
-    getTelegramIdFromUrl() {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('telegram_id') || urlParams.get('user_id');
-    }
-
-    /**
-     * ❓ Запрос telegram_id у пользователя (последний fallback)
-     */
-    promptForTelegramId() {
-        const id = prompt('Введите ваш Telegram ID для синхронизации баланса:');
-        return id ? parseInt(id) : null;
     }
 
     /**

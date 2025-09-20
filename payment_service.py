@@ -57,7 +57,7 @@ class PaymentService:
             # 2. Подготовка данных для ЮKassa с обязательным чеком
             payment_data = {
                 "amount": {
-                    "value": f"{amount:.1f}",
+                    "value": f"{amount:.2f}",
                     "currency": "RUB"
                 },
                 "confirmation": {

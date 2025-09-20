@@ -492,7 +492,7 @@ class FinancialService:
     def _create_user_if_not_exists(self, conn, cursor, telegram_id: int) -> Dict:
         """Создание пользователя если не существует"""
         
-        initial_balance = 200  # Начальный баланс
+        initial_balance = 50  # Начальный баланс совпадает с бизнес-логикой
         
         if self.db.DB_CONFIG['type'] == 'postgresql':
             query = """
@@ -525,7 +525,7 @@ class FinancialService:
             cursor.execute("SELECT balance FROM users WHERE telegram_id = ?", (telegram_id,))
         
         result = cursor.fetchone()
-        return result[0] if result else 200
+        return result[0] if result else 50
     
     # BACKWARD COMPATIBILITY: обертки для старых методов
     def update_user_balance(self, telegram_id: int, amount_change: int, 

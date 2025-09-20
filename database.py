@@ -293,29 +293,90 @@ class MishuraDB:
     def save_user(self, telegram_id, username=None, first_name=None, last_name=None):
         """
         Сохранение нового пользователя с начальным балансом 50 STcoin
+
+        Используем безопасную вставку с обновлением только необходимых полей, чтобы
+        избежать потери связанных записей (consultations, payments и т.д.).
         """
+        conn = None
         try:
-            # 🔧 ИСПРАВЛЕНО: Начальный баланс 50 вместо 200
-            initial_balance = 50  # Было: 200
-            
-            query = '''
-                INSERT OR REPLACE INTO users 
-                (telegram_id, username, first_name, last_name, balance, created_at)
-                VALUES (?, ?, ?, ?, ?, datetime('now'))
-            '''
-            
-            # ✅ ИСПОЛЬЗУЕМ ПРАВИЛЬНУЮ АРХИТЕКТУРУ
-            user_id = self._execute_query(
-                query, 
-                (telegram_id, username, first_name, last_name, initial_balance)
+            initial_balance = 50
+
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            placeholder = '%s' if self.DB_CONFIG['type'] == 'postgresql' else '?'
+            timestamp_sql = 'CURRENT_TIMESTAMP' if self.DB_CONFIG['type'] == 'postgresql' else "datetime('now')"
+
+            cursor.execute(
+                f"SELECT id FROM users WHERE telegram_id = {placeholder}",
+                (telegram_id,)
             )
-            
-            self.logger.info(f"Пользователь {telegram_id} сохранен с начальным балансом {initial_balance} STcoin")
+            existing = cursor.fetchone()
+
+            if existing is None:
+                insert_query = (
+                    "INSERT INTO users "
+                    "(telegram_id, username, first_name, last_name, balance) "
+                    f"VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})"
+                )
+                params = (telegram_id, username, first_name, last_name, initial_balance)
+
+                if self.DB_CONFIG['type'] == 'postgresql':
+                    insert_query += " RETURNING id"
+                    cursor.execute(insert_query, params)
+                    result = cursor.fetchone()
+                    user_id = result[0] if result else None
+                else:
+                    cursor.execute(insert_query, params)
+                    user_id = cursor.lastrowid
+
+                conn.commit()
+                self.logger.info(
+                    f"Пользователь {telegram_id} создан с начальным балансом {initial_balance} STcoin"
+                )
+            else:
+                user_id = existing[0]
+
+                update_clauses = []
+                update_params = []
+
+                if username is not None:
+                    update_clauses.append(f"username = {placeholder}")
+                    update_params.append(username)
+                if first_name is not None:
+                    update_clauses.append(f"first_name = {placeholder}")
+                    update_params.append(first_name)
+                if last_name is not None:
+                    update_clauses.append(f"last_name = {placeholder}")
+                    update_params.append(last_name)
+
+                if update_clauses:
+                    update_clauses.append(f"updated_at = {timestamp_sql}")
+                    update_query = (
+                        "UPDATE users SET " + ", ".join(update_clauses) +
+                        f" WHERE telegram_id = {placeholder}"
+                    )
+                    update_params.append(telegram_id)
+                    cursor.execute(update_query, tuple(update_params))
+                    conn.commit()
+                    self.logger.info(
+                        f"Пользователь {telegram_id} обновлен без изменения баланса"
+                    )
+                else:
+                    self.logger.info(
+                        f"Пользователь {telegram_id} уже существует, данные не требуют обновления"
+                    )
+
             return user_id
-            
+
         except Exception as e:
+            if conn:
+                conn.rollback()
             self.logger.error(f"❌ Ошибка сохранения пользователя {telegram_id}: {e}")
             return None
+        finally:
+            if conn:
+                conn.close()
 
     def get_user(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         """Получает информацию о пользователе по его telegram_id"""

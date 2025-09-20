@@ -4,6 +4,8 @@
 class UserService {
     constructor() {
         this.currentUserId = null;
+        this.currentUserSource = null;
+        this.fallbackUserId = 5930269100;
         this.userInfo = null;
         this.balanceCache = new Map();
         this.syncInProgress = false;
@@ -16,12 +18,17 @@ class UserService {
      */
     getCurrentUserId() {
         if (this.currentUserId) {
-            return this.currentUserId;
+            if (this.currentUserSource === 'fallback') {
+                console.log('🔄 Обнаружен fallback ID. Пытаемся найти актуальный идентификатор...');
+            } else {
+                return this.currentUserId;
+            }
         }
 
         try {
             let userId = null;
             let source = 'unknown';
+            const fallbackId = this.fallbackUserId;
 
             // 1. Проверяем Telegram WebApp (высший приоритет)
             const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
@@ -66,22 +73,29 @@ class UserService {
 
             // 4. Fallback ID
             if (userId === null) {
-                userId = 5930269100; // Известный рабочий ID
+                userId = fallbackId; // Известный рабочий ID
                 source = 'fallback';
                 console.warn('⚠️ Используется fallback user ID');
             }
 
-            // Сохраняем и кэшируем
+            const previousId = this.currentUserId;
+            const previousSource = this.currentUserSource;
+
             this.currentUserId = userId;
-            this.saveUserSession(userId, source);
-            
-            console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
+            this.currentUserSource = source;
+
+            if (previousId !== userId || previousSource !== source) {
+                this.saveUserSession(userId, source);
+                console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
+            }
+
             return userId;
 
         } catch (error) {
             console.error('❌ Ошибка получения user ID:', error);
-            const emergencyId = 5930269100;
+            const emergencyId = this.fallbackUserId;
             this.currentUserId = emergencyId;
+            this.currentUserSource = 'fallback';
             return emergencyId;
         }
     }
@@ -90,6 +104,7 @@ class UserService {
      * Сохранение сессии пользователя
      */
     saveUserSession(userId, source) {
+        this.currentUserSource = source;
         try {
             const session = {
                 user_id: userId,
@@ -293,6 +308,7 @@ class UserService {
      */
     reset() {
         this.currentUserId = null;
+        this.currentUserSource = null;
         this.userInfo = null;
         this.balanceCache.clear();
         
@@ -462,6 +478,12 @@ class BalanceManager {
 
             if (this.userService) {
                 this.userService.currentUserId = this.userId;
+                const fallbackId = this.userService?.fallbackUserId ?? 5930269100;
+                const isFallbackUser = this.userId === fallbackId || this.userService.currentUserSource === 'fallback';
+
+                if (!isFallbackUser) {
+                    this.userService.currentUserSource = 'balance_manager';
+                }
 
                 if (this.userService.balanceCache) {
                     this.userService.balanceCache.set(this.userId, {

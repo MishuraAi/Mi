@@ -24,41 +24,48 @@ class UserService {
             let source = 'unknown';
 
             // 1. Проверяем Telegram WebApp (высший приоритет)
-            if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-                userId = parseInt(window.Telegram.WebApp.initDataUnsafe.user.id);
-                source = 'telegram_webapp';
+            const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+            if (telegramRawId !== undefined && telegramRawId !== null) {
+                const parsedTelegramId = Number.parseInt(telegramRawId, 10);
+                if (!Number.isNaN(parsedTelegramId) && parsedTelegramId > 0) {
+                    userId = parsedTelegramId;
+                    source = 'telegram_webapp';
+                }
             }
-            
+
             // 2. URL параметры
-            else if (!userId) {
+            if (userId === null) {
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.has('user_id')) {
-                    const urlUserId = parseInt(urlParams.get('user_id'));
-                    if (!isNaN(urlUserId)) {
+                    const urlUserId = Number.parseInt(urlParams.get('user_id'), 10);
+                    if (!Number.isNaN(urlUserId) && urlUserId > 0) {
                         userId = urlUserId;
                         source = 'url_params';
                     }
                 }
             }
-            
+
             // 3. localStorage с актуальной сессией
-            else if (!userId) {
+            if (userId === null) {
                 const stored = localStorage.getItem('current_user_session');
                 if (stored) {
                     try {
                         const session = JSON.parse(stored);
                         if (this.isValidSession(session)) {
-                            userId = parseInt(session.user_id);
-                            source = 'stored_session';
+                            const storedId = Number.parseInt(session.user_id, 10);
+                            if (!Number.isNaN(storedId) && storedId > 0) {
+                                userId = storedId;
+                                source = 'stored_session';
+                            }
                         }
-                    } catch (e) {
+                    } catch (error) {
                         console.warn('⚠️ Некорректная сессия в localStorage');
                     }
                 }
             }
-            
+
             // 4. Fallback ID
-            if (!userId) {
+            if (userId === null) {
                 userId = 5930269100; // Известный рабочий ID
                 source = 'fallback';
                 console.warn('⚠️ Используется fallback user ID');
@@ -117,7 +124,9 @@ class UserService {
         const sessionAge = Date.now() - session.timestamp;
         const maxAge = 24 * 60 * 60 * 1000; // 24 часа
 
-        return sessionAge < maxAge && !isNaN(parseInt(session.user_id));
+        const parsedId = Number.parseInt(session.user_id, 10);
+
+        return sessionAge < maxAge && !Number.isNaN(parsedId) && parsedId > 0;
     }
 
     /**

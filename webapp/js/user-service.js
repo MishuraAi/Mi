@@ -17,131 +17,14 @@ class UserService {
     /**
      * Получение текущего пользователя (единая точка истины)
      */
-    getCurrentUserId(options = {}) {
-        const { forceRefresh = false } = options;
 
-        if (!forceRefresh && this.currentUserId && !this.isFallbackSource(this.currentUserSource)) {
-            return this.currentUserId;
-        }
-
-        try {
-            const { userId, source } = this.detectUserIdFromSources();
-
-            if (!forceRefresh && this.currentUserId !== null && this.isFallbackSource(source) && this.isFallbackSource(this.currentUserSource)) {
-                return this.currentUserId;
-            }
-
-            const hasChanged = userId !== this.currentUserId || source !== this.currentUserSource;
-
-            this.currentUserId = userId;
-            this.currentUserSource = source;
-
-            if (hasChanged) {
-                if (this.isFallbackSource(source)) {
-                    console.warn('⚠️ Используется fallback user ID');
-                }
-
-                this.saveUserSession(userId, source);
-                console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
-            }
-
-            return userId;
-
-        } catch (error) {
-            console.error('❌ Ошибка получения user ID:', error);
-            this.currentUserId = FALLBACK_USER_ID;
-            this.currentUserSource = 'fallback';
-            return FALLBACK_USER_ID;
-        }
-    }
-
-    isFallbackSource(source) {
-        return source === 'fallback' || source === 'stored_session_fallback';
-    }
-
-    detectUserIdFromSources() {
-        const telegramResult = this.getUserIdFromTelegram();
-        if (telegramResult) {
-            return telegramResult;
-        }
-
-        const urlResult = this.getUserIdFromUrl();
-        if (urlResult) {
-            return urlResult;
-        }
-
-        const storedSessionResult = this.getUserIdFromStoredSession();
-        if (storedSessionResult) {
-            return storedSessionResult;
-        }
-
-        return {
-            userId: FALLBACK_USER_ID,
-            source: 'fallback'
-        };
-    }
-
-    getUserIdFromTelegram() {
-        const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-        const parsedTelegramId = this.parseValidUserId(telegramRawId);
-
-        if (parsedTelegramId !== null) {
-            return {
-                userId: parsedTelegramId,
-                source: 'telegram_webapp'
-            };
-        }
-
-        return null;
-    }
-
-    getUserIdFromUrl() {
-        const urlParams = new URLSearchParams(window.location.search);
-
-        if (!urlParams.has('user_id')) {
-            return null;
-        }
-
-        const urlUserId = this.parseValidUserId(urlParams.get('user_id'));
-
-        if (urlUserId !== null) {
-            return {
-                userId: urlUserId,
-                source: 'url_params'
-            };
-        }
-
-        return null;
-    }
-
-    getUserIdFromStoredSession() {
-        const stored = localStorage.getItem('current_user_session');
-
-        if (!stored) {
-            return null;
-        }
-
-        try {
-            const session = JSON.parse(stored);
-
-            if (!this.isValidSession(session)) {
-                return null;
-            }
-
-            const storedId = this.parseValidUserId(session.user_id);
-
-            if (storedId === null) {
-                return null;
-            }
-
-            const storedSource = session.source || 'stored_session';
-            const normalizedSource = this.isFallbackSource(storedSource) ? 'stored_session_fallback' : storedSource;
 
             return {
                 userId: storedId,
                 source: normalizedSource
             };
         } catch (error) {
+
             console.warn('⚠️ Некорректная сессия в localStorage', error);
         }
 
@@ -188,7 +71,7 @@ class UserService {
 
             const session = {
                 user_id: userId,
-                source: source,
+                source: normalizedSource,
                 timestamp: Date.now(),
                 platform: this.getPlatformInfo(),
                 telegram_info: this.getTelegramInfo()
@@ -391,6 +274,7 @@ class UserService {
      */
     reset() {
         this.currentUserId = null;
+        this.currentUserSource = null;
         this.userInfo = null;
         this.balanceCache.clear();
         
@@ -562,13 +446,6 @@ class BalanceManager {
             if (this.userService) {
                 this.userService.currentUserId = this.userId;
 
-                if (
-                    typeof this.userService.isFallbackSource === 'function' &&
-                    this.userService.isFallbackSource(this.userService.currentUserSource)
-                ) {
-                    if (this.userId !== FALLBACK_USER_ID) {
-                        this.userService.currentUserSource = 'balance_manager';
-                    }
                 }
 
                 if (this.userService.balanceCache) {

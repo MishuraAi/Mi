@@ -17,12 +17,6 @@ class UserService {
      * Получение текущего пользователя (единая точка истины)
      */
     getCurrentUserId() {
-        if (this.currentUserId) {
-            if (this.currentUserSource === 'fallback') {
-                console.log('🔄 Обнаружен fallback ID. Пытаемся найти актуальный идентификатор...');
-            } else {
-                return this.currentUserId;
-            }
         }
 
         try {
@@ -62,7 +56,12 @@ class UserService {
                             const storedId = Number.parseInt(session.user_id, 10);
                             if (!Number.isNaN(storedId) && storedId > 0) {
                                 userId = storedId;
-                                source = 'stored_session';
+                                const storedSource = typeof session.source === 'string' ? session.source : 'stored_session';
+                                if (storedId === fallbackId) {
+                                    source = 'fallback';
+                                } else {
+                                    source = storedSource || 'stored_session';
+                                }
                             }
                         }
                     } catch (error) {
@@ -77,7 +76,6 @@ class UserService {
                 source = 'fallback';
                 console.warn('⚠️ Используется fallback user ID');
             }
-
             const previousId = this.currentUserId;
             const previousSource = this.currentUserSource;
 
@@ -104,11 +102,10 @@ class UserService {
      * Сохранение сессии пользователя
      */
     saveUserSession(userId, source) {
-        this.currentUserSource = source;
         try {
             const session = {
                 user_id: userId,
-                source: source,
+                source: normalizedSource,
                 timestamp: Date.now(),
                 platform: this.getPlatformInfo(),
                 telegram_info: this.getTelegramInfo()

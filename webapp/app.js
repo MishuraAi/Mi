@@ -1003,17 +1003,22 @@ class MishuraApp {
             if (result.payment_url) {
                 this.showNotification('🚀 Переходим к оплате...', 'success');
                 console.log('🔗 Переходим на страницу оплаты ЮKassa:', result.payment_url);
-                
+
                 // Закрываем модал платежей
                 const paymentModal = document.getElementById('payment-modal');
                 if (paymentModal) {
                     paymentModal.remove();
                 }
-                
+
                 // Переходим на страницу оплаты ЮKassa
-                window.location.href = result.payment_url;
-                
-        } else {
+                if (window.Telegram?.WebApp?.openLink) {
+                    console.log('📲 Открываем ссылку оплаты через Telegram WebApp');
+                    window.Telegram.WebApp.openLink(result.payment_url, { try_instant_view: false });
+                } else {
+                    window.location.href = result.payment_url;
+                }
+
+            } else {
                 throw new Error('Не получен URL для оплаты');
             }
 

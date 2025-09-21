@@ -1,11 +1,11 @@
 // 🔧 СОЗДАТЬ НОВЫЙ ФАЙЛ: webapp/js/user-service.js
 // Унифицированная система управления пользователем
 
+const FALLBACK_USER_ID = 5930269100;
+
 class UserService {
     constructor() {
         this.currentUserId = null;
-        this.currentUserSource = null;
-        this.fallbackUserId = 5930269100;
         this.userInfo = null;
         this.balanceCache = new Map();
         this.syncInProgress = false;
@@ -16,86 +16,103 @@ class UserService {
     /**
      * Получение текущего пользователя (единая точка истины)
      */
-    getCurrentUserId() {
-        }
-
-        try {
-            let userId = null;
-            let source = 'unknown';
-            const fallbackId = this.fallbackUserId;
-
-            // 1. Проверяем Telegram WebApp (высший приоритет)
-            const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-            if (telegramRawId !== undefined && telegramRawId !== null) {
-                const parsedTelegramId = Number.parseInt(telegramRawId, 10);
-                if (!Number.isNaN(parsedTelegramId) && parsedTelegramId > 0) {
-                    userId = parsedTelegramId;
-                    source = 'telegram_webapp';
-                }
-            }
-
-            // 2. URL параметры
-            if (userId === null) {
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('user_id')) {
-                    const urlUserId = Number.parseInt(urlParams.get('user_id'), 10);
-                    if (!Number.isNaN(urlUserId) && urlUserId > 0) {
-                        userId = urlUserId;
-                        source = 'url_params';
-                    }
-                }
-            }
-
-            // 3. localStorage с актуальной сессией
-            if (userId === null) {
-                const stored = localStorage.getItem('current_user_session');
-                if (stored) {
-                    try {
-                        const session = JSON.parse(stored);
-                        if (this.isValidSession(session)) {
-                            const storedId = Number.parseInt(session.user_id, 10);
-                            if (!Number.isNaN(storedId) && storedId > 0) {
-                                userId = storedId;
-                                const storedSource = typeof session.source === 'string' ? session.source : 'stored_session';
-                                if (storedId === fallbackId) {
-                                    source = 'fallback';
-                                } else {
-                                    source = storedSource || 'stored_session';
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        console.warn('⚠️ Некорректная сессия в localStorage');
-                    }
-                }
-            }
-
-            // 4. Fallback ID
-            if (userId === null) {
-                userId = fallbackId; // Известный рабочий ID
-                source = 'fallback';
-                console.warn('⚠️ Используется fallback user ID');
             }
             const previousId = this.currentUserId;
             const previousSource = this.currentUserSource;
 
-            this.currentUserId = userId;
-            this.currentUserSource = source;
-
-            if (previousId !== userId || previousSource !== source) {
-                this.saveUserSession(userId, source);
-                console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
-            }
 
             return userId;
 
         } catch (error) {
             console.error('❌ Ошибка получения user ID:', error);
-            const emergencyId = this.fallbackUserId;
-            this.currentUserId = emergencyId;
-            this.currentUserSource = 'fallback';
-            return emergencyId;
+
         }
+
+        return {
+            userId: FALLBACK_USER_ID,
+            source: 'fallback'
+        };
+    }
+
+    getUserIdFromTelegram() {
+        const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        const parsedTelegramId = this.parseValidUserId(telegramRawId);
+
+        if (parsedTelegramId !== null) {
+            return {
+                userId: parsedTelegramId,
+                source: 'telegram_webapp'
+            };
+        }
+
+        return null;
+    }
+
+    getUserIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (!urlParams.has('user_id')) {
+            return null;
+        }
+
+        const urlUserId = this.parseValidUserId(urlParams.get('user_id'));
+
+        if (urlUserId !== null) {
+            return {
+                userId: urlUserId,
+                source: 'url_params'
+            };
+        }
+
+        return null;
+    }
+
+    getUserIdFromStoredSession() {
+        const stored = localStorage.getItem('current_user_session');
+
+        if (!stored) {
+            return null;
+        }
+
+        try {
+            const session = JSON.parse(stored);
+
+            if (!this.isValidSession(session)) {
+                return null;
+            }
+
+            const storedId = this.parseValidUserId(session.user_id);
+
+            if (storedId === null) {
+                return null;
+            }
+
+            const storedSource = session.source || 'stored_session';
+            const normalizedSource = this.isFallbackSource(storedSource) ? 'stored_session_fallback' : storedSource;
+
+            return {
+                userId: storedId,
+                source: normalizedSource
+            };
+        } catch (error) {
+            console.warn('⚠️ Некорректная сессия в localStorage', error);
+        }
+
+        return null;
+    }
+
+    parseValidUserId(rawValue) {
+        if (rawValue === undefined || rawValue === null) {
+            return null;
+        }
+
+        const parsed = Number.parseInt(rawValue, 10);
+
+        if (Number.isNaN(parsed) || parsed <= 0) {
+            return null;
+        }
+
+        return parsed;
     }
 
     /**
@@ -103,6 +120,25 @@ class UserService {
      */
     saveUserSession(userId, source) {
         try {
+            if (!userId) {
+                return;
+            }
+
+            if (this.isFallbackSource(source)) {
+                const existingRaw = localStorage.getItem('current_user_session');
+                if (existingRaw) {
+                    try {
+                        const existingSession = JSON.parse(existingRaw);
+                        if (existingSession && !this.isFallbackSource(existingSession.source)) {
+                            console.log('ℹ️ Пропускаем перезапись fallback-сессией, используется более точный идентификатор');
+                            return;
+                        }
+                    } catch (parseError) {
+                        console.warn('⚠️ Не удалось прочитать текущую сессию при сохранении fallback:', parseError);
+                    }
+                }
+            }
+
             const session = {
                 user_id: userId,
                 source: normalizedSource,
@@ -112,11 +148,14 @@ class UserService {
             };
 
             localStorage.setItem('current_user_session', JSON.stringify(session));
-            
+
             // Синхронизируем старые ключи для совместимости
             localStorage.setItem('user_id', userId.toString());
-            localStorage.setItem('telegram_user_id', userId.toString());
-            
+
+            if (!this.isFallbackSource(source)) {
+                localStorage.setItem('telegram_user_id', userId.toString());
+            }
+
             console.log('💾 Сессия пользователя сохранена:', session);
 
         } catch (error) {
@@ -322,10 +361,11 @@ class UserService {
      */
     async diagnose() {
         console.log('🔍 === ДИАГНОСТИКА USER SERVICE ===');
-        
+
         const userId = this.getCurrentUserId();
         console.log(`👤 Текущий User ID: ${userId}`);
-        
+        console.log(`📦 Источник User ID: ${this.currentUserSource}`);
+
         // Проверяем localStorage
         const session = localStorage.getItem('current_user_session');
         console.log('💾 Сессия в localStorage:', session ? JSON.parse(session) : null);
@@ -475,10 +515,6 @@ class BalanceManager {
 
             if (this.userService) {
                 this.userService.currentUserId = this.userId;
-                const fallbackId = this.userService?.fallbackUserId ?? 5930269100;
-                const isFallbackUser = this.userId === fallbackId || this.userService.currentUserSource === 'fallback';
-
-                if (!isFallbackUser) {
                     this.userService.currentUserSource = 'balance_manager';
                 }
 

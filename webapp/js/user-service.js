@@ -4,6 +4,8 @@
 class UserService {
     constructor() {
         this.currentUserId = null;
+        this.currentUserSource = null;
+        this.fallbackUserId = 5930269100;
         this.userInfo = null;
         this.balanceCache = new Map();
         this.syncInProgress = false;
@@ -15,8 +17,18 @@ class UserService {
      * Получение текущего пользователя (единая точка истины)
      */
     getCurrentUserId() {
-        if (this.currentUserId) {
-            return this.currentUserId;
+        const fallbackId = this.fallbackUserId;
+        const currentId = this.currentUserId;
+        const matchesFallbackId = currentId !== null && currentId !== undefined
+            && Number.parseInt(currentId, 10) === fallbackId;
+        const isCurrentFallback = matchesFallbackId || this.currentUserSource === 'fallback';
+
+        if (currentId && !isCurrentFallback) {
+            return currentId;
+        }
+
+        if (isCurrentFallback && currentId) {
+            console.log('🔄 Обнаружен fallback ID. Пытаемся найти актуальный идентификатор...');
         }
 
         try {
@@ -55,7 +67,12 @@ class UserService {
                             const storedId = Number.parseInt(session.user_id, 10);
                             if (!Number.isNaN(storedId) && storedId > 0) {
                                 userId = storedId;
-                                source = 'stored_session';
+                                const storedSource = typeof session.source === 'string' ? session.source : 'stored_session';
+                                if (storedId === fallbackId) {
+                                    source = 'fallback';
+                                } else {
+                                    source = storedSource || 'stored_session';
+                                }
                             }
                         }
                     } catch (error) {
@@ -66,22 +83,33 @@ class UserService {
 
             // 4. Fallback ID
             if (userId === null) {
-                userId = 5930269100; // Известный рабочий ID
+                userId = fallbackId; // Известный рабочий ID
                 source = 'fallback';
                 console.warn('⚠️ Используется fallback user ID');
             }
 
-            // Сохраняем и кэшируем
+            if (userId === fallbackId && source !== 'fallback') {
+                source = 'fallback';
+            }
+
+            const previousId = this.currentUserId;
+            const previousSource = this.currentUserSource;
+
             this.currentUserId = userId;
-            this.saveUserSession(userId, source);
-            
-            console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
+            this.currentUserSource = source;
+
+            if (previousId !== userId || previousSource !== source) {
+                this.saveUserSession(userId, source);
+                console.log(`✅ User ID определен: ${userId} (источник: ${source})`);
+            }
+
             return userId;
 
         } catch (error) {
             console.error('❌ Ошибка получения user ID:', error);
-            const emergencyId = 5930269100;
+            const emergencyId = this.fallbackUserId;
             this.currentUserId = emergencyId;
+            this.currentUserSource = 'fallback';
             return emergencyId;
         }
     }
@@ -90,10 +118,16 @@ class UserService {
      * Сохранение сессии пользователя
      */
     saveUserSession(userId, source) {
+        const fallbackId = this.fallbackUserId;
+        const normalizedSource = userId === fallbackId && source !== 'fallback'
+            ? 'fallback'
+            : source;
+
+        this.currentUserSource = normalizedSource;
         try {
             const session = {
                 user_id: userId,
-                source: source,
+                source: normalizedSource,
                 timestamp: Date.now(),
                 platform: this.getPlatformInfo(),
                 telegram_info: this.getTelegramInfo()
@@ -293,6 +327,7 @@ class UserService {
      */
     reset() {
         this.currentUserId = null;
+        this.currentUserSource = null;
         this.userInfo = null;
         this.balanceCache.clear();
         
@@ -462,6 +497,12 @@ class BalanceManager {
 
             if (this.userService) {
                 this.userService.currentUserId = this.userId;
+                const fallbackId = this.userService?.fallbackUserId ?? 5930269100;
+                const isFallbackUser = this.userId === fallbackId || this.userService.currentUserSource === 'fallback';
+
+                if (!isFallbackUser) {
+                    this.userService.currentUserSource = 'balance_manager';
+                }
 
                 if (this.userService.balanceCache) {
                     this.userService.balanceCache.set(this.userId, {

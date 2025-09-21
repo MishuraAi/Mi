@@ -17,23 +17,12 @@ class UserService {
      * Получение текущего пользователя (единая точка истины)
      */
     getCurrentUserId() {
-        const fallbackId = this.fallbackUserId;
-        const currentId = this.currentUserId;
-        const matchesFallbackId = currentId !== null && currentId !== undefined
-            && Number.parseInt(currentId, 10) === fallbackId;
-        const isCurrentFallback = matchesFallbackId || this.currentUserSource === 'fallback';
-
-        if (currentId && !isCurrentFallback) {
-            return currentId;
-        }
-
-        if (isCurrentFallback && currentId) {
-            console.log('🔄 Обнаружен fallback ID. Пытаемся найти актуальный идентификатор...');
         }
 
         try {
             let userId = null;
             let source = 'unknown';
+            const fallbackId = this.fallbackUserId;
 
             // 1. Проверяем Telegram WebApp (высший приоритет)
             const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
@@ -87,11 +76,6 @@ class UserService {
                 source = 'fallback';
                 console.warn('⚠️ Используется fallback user ID');
             }
-
-            if (userId === fallbackId && source !== 'fallback') {
-                source = 'fallback';
-            }
-
             const previousId = this.currentUserId;
             const previousSource = this.currentUserSource;
 
@@ -118,12 +102,6 @@ class UserService {
      * Сохранение сессии пользователя
      */
     saveUserSession(userId, source) {
-        const fallbackId = this.fallbackUserId;
-        const normalizedSource = userId === fallbackId && source !== 'fallback'
-            ? 'fallback'
-            : source;
-
-        this.currentUserSource = normalizedSource;
         try {
             const session = {
                 user_id: userId,

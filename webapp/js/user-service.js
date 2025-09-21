@@ -6,6 +6,7 @@ const FALLBACK_USER_ID = 5930269100;
 class UserService {
     constructor() {
         this.currentUserId = null;
+        this.currentUserSource = 'unknown';
         this.userInfo = null;
         this.balanceCache = new Map();
         this.syncInProgress = false;
@@ -16,85 +17,14 @@ class UserService {
     /**
      * Получение текущего пользователя (единая точка истины)
      */
-            }
-            const previousId = this.currentUserId;
-            const previousSource = this.currentUserSource;
 
-
-            return userId;
-
-        } catch (error) {
-            console.error('❌ Ошибка получения user ID:', error);
-
-        }
-
-        return {
-            userId: FALLBACK_USER_ID,
-            source: 'fallback'
-        };
-    }
-
-    getUserIdFromTelegram() {
-        const telegramRawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-        const parsedTelegramId = this.parseValidUserId(telegramRawId);
-
-        if (parsedTelegramId !== null) {
-            return {
-                userId: parsedTelegramId,
-                source: 'telegram_webapp'
-            };
-        }
-
-        return null;
-    }
-
-    getUserIdFromUrl() {
-        const urlParams = new URLSearchParams(window.location.search);
-
-        if (!urlParams.has('user_id')) {
-            return null;
-        }
-
-        const urlUserId = this.parseValidUserId(urlParams.get('user_id'));
-
-        if (urlUserId !== null) {
-            return {
-                userId: urlUserId,
-                source: 'url_params'
-            };
-        }
-
-        return null;
-    }
-
-    getUserIdFromStoredSession() {
-        const stored = localStorage.getItem('current_user_session');
-
-        if (!stored) {
-            return null;
-        }
-
-        try {
-            const session = JSON.parse(stored);
-
-            if (!this.isValidSession(session)) {
-                return null;
-            }
-
-            const storedId = this.parseValidUserId(session.user_id);
-
-            if (storedId === null) {
-                return null;
-            }
-
-            const storedSource = session.source || 'stored_session';
-            const normalizedSource = this.isFallbackSource(storedSource) ? 'stored_session_fallback' : storedSource;
 
             return {
                 userId: storedId,
                 source: normalizedSource
             };
         } catch (error) {
+
             console.warn('⚠️ Некорректная сессия в localStorage', error);
         }
 
@@ -515,7 +445,7 @@ class BalanceManager {
 
             if (this.userService) {
                 this.userService.currentUserId = this.userId;
-                    this.userService.currentUserSource = 'balance_manager';
+
                 }
 
                 if (this.userService.balanceCache) {

@@ -344,6 +344,7 @@ class BalanceManager {
         this.init();
     }
 
+<<<<<<< Updated upstream
     resolveUserId() {
         try {
             if (this.userService?.getCurrentUserId) {
@@ -355,6 +356,34 @@ class BalanceManager {
             }
         } catch (error) {
             console.error('❌ Не удалось определить user ID через UserService:', error);
+=======
+    init() {
+        // Получаем telegram_id из Telegram WebApp
+        if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+            this.telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
+            console.log(`🚀 BalanceManager инициализирован для пользователя ${this.telegramId}`);
+            
+            // Принудительная синхронизация при загрузке
+            this.forceSyncWithServer();
+            
+            // Создаем кнопку принудительной синхронизации
+            this.createSyncButton();
+            
+        } else {
+            console.warn('⚠️ Telegram WebApp не доступен, используем fallback без запроса у пользователя');
+            try {
+                // Используем унифицированный сервис пользователя без каких‑либо prompt
+                if (window.userService && typeof window.userService.getCurrentUserId === 'function') {
+                    this.telegramId = window.userService.getCurrentUserId();
+                } else {
+                    // Пытаемся взять из URL, затем из localStorage, затем дефолт
+                    this.telegramId = this.getTelegramIdFromUrl() || parseInt(localStorage.getItem('user_id')) || 5930269100;
+                }
+            } catch (e) {
+                console.warn('⚠️ Fallback до дефолтного ID из‑за ошибки определения:', e);
+                this.telegramId = 5930269100;
+            }
+>>>>>>> Stashed changes
         }
 
         return null;
@@ -674,6 +703,25 @@ class BalanceManager {
     }
 
     /**
+<<<<<<< Updated upstream
+=======
+     * 🔍 Получение telegram_id из URL (fallback)
+     */
+    getTelegramIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('telegram_id') || urlParams.get('user_id');
+    }
+
+    /**
+     * ❓ Запрос telegram_id у пользователя (последний fallback)
+     */
+    promptForTelegramId() {
+        // Больше не запрашиваем ID у пользователя во избежание плохого UX
+        return null;
+    }
+
+    /**
+>>>>>>> Stashed changes
      * 📊 Получение текущего баланса
      */
     getCurrentBalance() {

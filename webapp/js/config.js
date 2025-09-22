@@ -233,9 +233,9 @@ async function purchasePlan(planId) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                user_id: USER_ID,
+                telegram_id: USER_ID,
                 plan_id: planId,
-                return_url: window.location.href
+                // return_url формируется на сервере из WEBAPP_URL
             })
         });
         
@@ -484,7 +484,7 @@ async function checkPaymentStatus() {
     
     try {
         const payment = JSON.parse(pendingPayment);
-        const response = await fetch(`${API_BASE_URL}/api/v1/payments/status/${payment.payment_id}`);
+        const response = await fetch(`${API_BASE_URL}/api/v1/payments/${payment.payment_id}/status?telegram_id=${encodeURIComponent(USER_ID)}`);
         
         if (response.ok) {
             const data = await response.json();

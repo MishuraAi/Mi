@@ -101,7 +101,8 @@ window.MishuraApp.components.imageUpload = (function() {
     function initSingleMode() {
         logger.debug("Инициализация single режима");
         
-        const uploadArea = document.querySelector('#single-upload-area');
+        // Поддерживаем оба варианта ID
+        const uploadArea = document.querySelector('#single-upload-area') || document.querySelector('#single-preview');
         if (!uploadArea) {
             logger.warn("Single режим: область загрузки не найдена");
             return;
@@ -241,14 +242,22 @@ window.MishuraApp.components.imageUpload = (function() {
     function initCompareMode() {
         logger.debug("Инициализация compare режима");
         
-        const imageSlotsContainer = document.querySelector('#compare-analysis-mode .image-slots');
+        const imageSlotsContainer = document.querySelector('#compare-mode .compare-slots');
+        if (!imageSlotsContainer) {
+            logger.warn('Compare режим: контейнер .compare-slots не найден');
+            return;
+        }
         
         if (!imageSlotsContainer) {
             logger.warn("Compare режим: контейнер слотов не найден");
             return;
         }
         
-        const compareSlots = imageSlotsContainer.querySelectorAll('.image-slot');
+        const compareSlots = imageSlotsContainer.querySelectorAll('.compare-slot');
+        if (!compareSlots || compareSlots.length === 0) {
+            logger.warn('Compare режим: слоты .compare-slot не найдены');
+            return;
+        }
         logger.debug(`Compare режим: найдено ${compareSlots.length} слотов`);
 
         compareSlots.forEach((slot, index) => {
@@ -503,9 +512,9 @@ window.MishuraApp.components.imageUpload = (function() {
         
         const reader = new FileReader();
         reader.onload = function(e) {
-            const previewContainer = document.querySelector('#single-preview-container');
-            const previewImage = document.querySelector('#single-preview-image');
-            const uploadArea = document.querySelector('#single-upload-area');
+            const previewContainer = document.querySelector('#single-preview-container') || document.querySelector('#single-preview');
+            const previewImage = document.querySelector('#single-preview-image') || document.querySelector('#single-preview img');
+            const uploadArea = document.querySelector('#single-upload-area') || document.querySelector('#single-preview');
             
             if (previewImage && previewContainer) {
                 previewImage.src = e.target.result;
@@ -547,7 +556,7 @@ window.MishuraApp.components.imageUpload = (function() {
         
         const reader = new FileReader();
         reader.onload = function(e) {
-            const slot = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
+            const slot = document.querySelector(`.compare-slot[data-slot="${slotIndex}"]`);
             if (!slot) {
                 logger.error(`Слот ${slotIndex} не найден`);
                 return;
@@ -639,6 +648,7 @@ window.MishuraApp.components.imageUpload = (function() {
     }
     
     function showFormElements() {
+        // Совместимость со старой и новой разметкой
         const selectors = [
             '#consultation-overlay .occasion-selector',
             '#consultation-overlay .preferences-input',
@@ -656,7 +666,6 @@ window.MishuraApp.components.imageUpload = (function() {
                 if (element) {
                     element.classList.remove('hidden');
                     element.style.display = element.tagName === 'BUTTON' ? 'flex' : 'block';
-                    
                     if (element.tagName === 'BUTTON') {
                         element.disabled = false;
                         element.classList.remove('disabled');
@@ -665,11 +674,33 @@ window.MishuraApp.components.imageUpload = (function() {
             });
         });
         
-        logger.debug("Элементы формы показаны");
+        // Новая разметка: активируем форму, показываем поля и кнопку
+        const form = document.getElementById('consultation-form');
+        if (form) {
+            form.classList.add('active');
+            form.style.display = 'block';
+        }
+        const occasionInput = document.getElementById('occasion');
+        if (occasionInput) {
+            occasionInput.parentElement?.classList?.remove('hidden');
+            occasionInput.style.display = 'block';
+        }
+        const preferencesInput = document.getElementById('preferences');
+        if (preferencesInput) {
+            preferencesInput.parentElement?.classList?.remove('hidden');
+            preferencesInput.style.display = 'block';
+        }
+        const submitBtn = document.getElementById('form-submit');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('disabled');
+            submitBtn.style.display = 'flex';
+        }
+        
+        logger.debug("Элементы формы показаны (совместимость с новой разметкой)");
     }
     
     function hideFormElements() {
-        // Код скрытия элементов формы (без изменений)
         const selectors = [
             '#consultation-overlay .occasion-selector',
             '#consultation-overlay .preferences-input',
@@ -687,7 +718,6 @@ window.MishuraApp.components.imageUpload = (function() {
                 if (element) {
                     element.classList.add('hidden');
                     element.style.display = 'none';
-                    
                     if (element.tagName === 'BUTTON') {
                         element.disabled = true;
                         element.classList.add('disabled');
@@ -695,6 +725,18 @@ window.MishuraApp.components.imageUpload = (function() {
                 }
             });
         });
+        // Новая разметка
+        const form = document.getElementById('consultation-form');
+        if (form) {
+            form.classList.remove('active');
+            form.style.display = 'none';
+        }
+        const submitBtn = document.getElementById('form-submit');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('disabled');
+            submitBtn.style.display = 'none';
+        }
     }
     
     function resetSingleMode() {
@@ -731,7 +773,7 @@ window.MishuraApp.components.imageUpload = (function() {
     function resetCompareSlot(slotIndex) {
         logger.debug(`Сброс compare слота ${slotIndex}`);
         
-        const slot = document.querySelector(`.image-slot[data-slot="${slotIndex}"]`);
+        const slot = document.querySelector(`.compare-slot[data-slot="${slotIndex}"]`);
         if (!slot) return;
         
         // Очищаем слот

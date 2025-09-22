@@ -31,7 +31,22 @@ window.MishuraApp.components.modals = (function() {
         
         // Получаем ссылки на модальные окна
         consultationOverlay = document.getElementById('consultation-overlay');
+        // Создаем results-overlay, если отсутствует
         resultsOverlay = document.getElementById('results-overlay');
+        if (!resultsOverlay) {
+            resultsOverlay = document.createElement('div');
+            resultsOverlay.id = 'results-overlay';
+            resultsOverlay.className = 'modal-overlay';
+            resultsOverlay.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Результат</h2>
+                        <button id="results-close" class="close-btn">&times;</button>
+                    </div>
+                    <div id="results-container" class="modal-body" style="max-height:60vh; overflow:auto;"></div>
+                </div>`;
+            document.body.appendChild(resultsOverlay);
+        }
         
         // Проверяем наличие основных модальных окон
         if (!consultationOverlay || !resultsOverlay) {

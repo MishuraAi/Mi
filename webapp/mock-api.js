@@ -8,7 +8,12 @@
  */
 class MockMishuraAPIService {
     constructor() {
-        this.baseURL = '/api/v1';
+        // Используем same-origin базу для избежания CORS
+        try {
+            this.baseURL = `${window.location.origin}/api/v1`;
+        } catch {
+            this.baseURL = '/api/v1';
+        }
         this.timeout = 90000; // 90 секунд как в патчах V2
         this.retryCount = 3;
         this.retryDelay = 1000;
@@ -596,5 +601,38 @@ window.restoreOriginalAPI = function() {
         }
     }
 };
+
+// Мост: гарантируем наличие MishuraApp.api для потребителей (consultation.js)
+(function ensureApiBridge(){
+    try {
+        window.MishuraApp = window.MishuraApp || {};
+        if (!window.MishuraApp.api) {
+            const ApiClass = window.MishuraAPIService || window.MockMishuraAPIService;
+            if (ApiClass) {
+                const apiInstance = new ApiClass();
+                window.mishuraApiService = apiInstance;
+                window.MishuraApp.api = {
+                    analyzeImage: async (file, { occasion, preferences }) => {
+                        const userId = (window.userService && window.userService.getCurrentUserId && window.userService.getCurrentUserId()) || null;
+                        if (typeof apiInstance.analyzeSingle === 'function') {
+                            return await apiInstance.analyzeSingle(file, occasion, preferences, userId);
+                        }
+                        throw new Error('API клиент не инициализирован');
+                    },
+                    compareImages: async (files, { occasion, preferences }) => {
+                        const userId = (window.userService && window.userService.getCurrentUserId && window.userService.getCurrentUserId()) || null;
+                        if (typeof apiInstance.analyzeCompare === 'function') {
+                            return await apiInstance.analyzeCompare(files, occasion, preferences, userId);
+                        }
+                        throw new Error('API клиент не инициализирован');
+                    }
+                };
+                console.log('✅ API bridge для MishuraApp.api создан');
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ Не удалось создать API bridge:', e);
+    }
+})();
 
 // this.log('✅ Резервный Mock API для МИШУРЫ готов к использованию!'); // удалено для оптимизации

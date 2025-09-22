@@ -393,7 +393,8 @@ class MishuraApp {
         try {
             // Получаем актуальный баланс с сервера через UserService
             if (window.userService) {
-                const serverBalance = await window.userService.getActualBalance();
+                // Используем существующий метод получения баланса
+                const serverBalance = await window.userService.getBalance(true);
                 
                 // Если есть расхождение - исправляем автоматически
                 if (Math.abs(this.userBalance - serverBalance) > 0.01) {
@@ -556,6 +557,15 @@ class MishuraApp {
         }
         
         console.log('📊 Отображение баланса обновлено:', this.userBalance);
+    }
+
+    // Безопасное обновление интерфейса, вызывается на ранних этапах
+    updateUI() {
+        try {
+            this.updateBalanceDisplay();
+        } catch (e) {
+            console.warn('⚠️ updateUI: временно недоступно', e);
+        }
     }
 
     setupBasicEventHandlers() {

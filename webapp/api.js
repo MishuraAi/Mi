@@ -53,24 +53,10 @@ class MishuraAPIService {
     }
 
     detectBaseURL() {
-        const currentHost = window.location.hostname;
-        const currentProtocol = window.location.protocol;
-        
-        // Определяем среду и правильный URL
-        if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-            // 🚨 ИСПРАВЛЕНО: Локальная разработка - ваш api.py на порту 8001 (НЕ 8000!)
-            this.baseURL = `${currentProtocol}//localhost:8001/api/v1`;
-            console.log('🏠 Локальная разработка - API на порту 8001');
-        } else if (currentHost.includes('onrender.com') || currentHost.includes('render.com')) {
-            // Render.com - api.py обслуживает всё на том же домене
-            this.baseURL = `${currentProtocol}//${currentHost}/api/v1`;
-            console.log('☁️ Render.com - единое приложение');
-        } else {
-            // Другие продакшн среды
-            this.baseURL = `${currentProtocol}//${currentHost}/api/v1`;
-            console.log('🌐 Production environment');
-        }
-        console.log('🔍 Базовый URL API установлен:', this.baseURL);
+        // Всегда используем текущее происхождение, чтобы избежать CORS (127.0.0.1 vs localhost)
+        const origin = window.location.origin; // включает протокол, хост и порт
+        this.baseURL = `${origin}/api/v1`;
+        console.log('🔍 Базовый URL API установлен (same-origin):', this.baseURL);
     }
 
     async makeRequest(endpoint, options = {}) {
@@ -100,7 +86,21 @@ class MishuraAPIService {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                // Пытаемся извлечь детали ошибки из JSON
+                let errorDetail = null;
+                try {
+                    const maybeJson = await response.clone().json();
+                    errorDetail = maybeJson?.detail || maybeJson?.message || null;
+                } catch (_) {
+                    try {
+                        const text = await response.text();
+                        errorDetail = text?.slice(0, 200) || null;
+                    } catch (_) {}
+                }
+                const err = new Error(errorDetail ? `HTTP ${response.status}: ${errorDetail}` : `HTTP ${response.status}: ${response.statusText}`);
+                err.status = response.status;
+                if (errorDetail) err.detail = errorDetail;
+                throw err;
             }
 
             const contentType = response.headers.get('content-type');
@@ -443,3 +443,34 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 console.log('✅ ИСПРАВЛЕННЫЙ MishuraAPIService доступен в window - userId проблема РЕШЕНА!');
+
+// Мост: после загрузки реального API переопределяем MishuraApp.api на реальную реализацию
+(function ensureRealApiBridge(){
+    try {
+        const ApiClass = window.MishuraAPIService;
+        if (!ApiClass) return; // подождем, если класс не доступен
+
+        const apiInstance = new ApiClass();
+        window.mishuraApiService = apiInstance;
+        window.MishuraApp = window.MishuraApp || {};
+        window.MishuraApp.api = {
+            analyzeImage: async (file, { occasion, preferences }) => {
+                const userId = (window.userService && window.userService.getCurrentUserId && window.userService.getCurrentUserId()) || null;
+                if (typeof apiInstance.analyzeSingle === 'function') {
+                    return await apiInstance.analyzeSingle(file, occasion, preferences, userId);
+                }
+                throw new Error('API клиент не инициализирован');
+            },
+            compareImages: async (files, { occasion, preferences }) => {
+                const userId = (window.userService && window.userService.getCurrentUserId && window.userService.getCurrentUserId()) || null;
+                if (typeof apiInstance.analyzeCompare === 'function') {
+                    return await apiInstance.analyzeCompare(files, occasion, preferences, userId);
+                }
+                throw new Error('API клиент не инициализирован');
+            }
+        };
+        console.log('✅ API bridge переключен на реальный MishuraAPIService');
+    } catch (e) {
+        console.warn('⚠️ Не удалось переключить API bridge на реальный сервис:', e);
+    }
+})();

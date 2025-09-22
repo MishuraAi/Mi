@@ -308,7 +308,7 @@ async def webapp_redirect():
     return RedirectResponse(url="/", status_code=307)
 
 @app.get("/api/v1/health")
-async def health_check():
+async def health_check_v1():
     """Проверка состояния API"""
     try:
         # Тест Gemini AI
@@ -1298,7 +1298,7 @@ def is_spam_text(text: str) -> bool:
 
 # 🆕 НОВЫЕ ЭНДПОИНТЫ для keep-alive
 @app.get("/health")
-async def health_check():
+async def health_ping():
     """Health check для Render и мониторинга"""
     try:
         # Быстрая проверка БД

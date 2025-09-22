@@ -51,8 +51,7 @@ class DummyCacheManager:
 API_CONFIGURED_SUCCESSFULLY = False
 
 if not GEMINI_API_KEY:
-    logger.error("❌ GEMINI_API_KEY не найден в переменных окружения")
-    raise ValueError("GEMINI_API_KEY не найден в .env файле или переменных окружения")
+    logger.warning("⚠️ GEMINI_API_KEY не найден. Модуль запустится в демо-режиме без вызовов API")
 
 try:
     # Конфигурируем API
@@ -86,11 +85,12 @@ try:
         API_CONFIGURED_SUCCESSFULLY = True
         logger.info(f"✅ Gemini API успешно сконфигурирован с моделью: {VISION_MODEL}")
     else:
-        raise RuntimeError("Ни одна из моделей Gemini не доступна")
+        logger.warning("⚠️ Ни одна из моделей Gemini не доступна. Переходим в демо-режим")
+        API_CONFIGURED_SUCCESSFULLY = False
         
 except Exception as e:
-    logger.error(f"❌ КРИТИЧЕСКАЯ ОШИБКА при конфигурации Gemini API: {str(e)}")
-    raise RuntimeError(f"Не удалось сконфигурировать Gemini API: {str(e)}")
+    logger.error(f"❌ Ошибка конфигурации Gemini API: {str(e)}. Переходим в демо-режим")
+    API_CONFIGURED_SUCCESSFULLY = False
 
 # Параметры повторных запросов
 MAX_RETRIES = 3
@@ -109,7 +109,7 @@ async def test_gemini_connection() -> bool:
     logger.info("🧪 Тестирование соединения с Gemini API...")
     
     if not API_CONFIGURED_SUCCESSFULLY:
-        logger.error("❌ Gemini API не сконфигурирован")
+        logger.warning("⚠️ Gemini API не сконфигурирован (демо-режим)")
         return False
     
     try:
@@ -337,6 +337,13 @@ async def analyze_clothing_image(image_data: bytes, occasion: str = "повсе�
     """Анализ одежды на изображении с чистым ответом без комментариев"""
     try:
         logger.info(f"🎨 Начало анализа образа для: {occasion}")
+        if not API_CONFIGURED_SUCCESSFULLY:
+            # Демо-ответ без внешнего API
+            return (
+                f"🎨 Анализ образа (демо)\n\n"
+                f"Повод: {occasion}\n"
+                f"Рекомендации: Подчеркните силуэт аксессуаром, добавьте контрастный акцент."
+            )
         # Оптимизируем изображение
         optimized_image = optimize_image(Image.open(BytesIO(image_data)))
         logger.info("✅ Изображение оптимизировано")
@@ -375,6 +382,13 @@ async def compare_clothing_images(image_data_list: list, occasion: str = "пов
     if len(image_data_list) > 4:
         raise ValueError("Максимум 4 изображения для сравнения")
     try:
+        if not API_CONFIGURED_SUCCESSFULLY:
+            return (
+                f"🏆 Сравнение образов (демо)\n\n"
+                f"Повод: {occasion}\n"
+                f"Лучший образ: №1 — более гармоничная палитра.\n"
+                f"Советы: добавьте акцент и следите за посадкой."
+            )
         logger.info(f"⚖️ Начало сравнения {len(image_data_list)} образов для: {occasion}")
         optimized_images = []
         for i, image_data in enumerate(image_data_list):
@@ -464,8 +478,7 @@ class MishuraGeminiAI:
         self.api_configured = API_CONFIGURED_SUCCESSFULLY
         
         if not self.api_configured:
-            logger.error("❌ Gemini API не сконфигурирован при инициализации класса")
-            raise RuntimeError("Gemini API не сконфигурирован")
+            logger.warning("⚠️ Gemini API не сконфигурирован — используется демо-режим")
         
         logger.info(f"✅ MishuraGeminiAI инициализирован с моделью: {self.model_name}")
     

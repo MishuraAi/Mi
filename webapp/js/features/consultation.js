@@ -108,6 +108,19 @@ window.MishuraApp.features.consultation = (function() {
                     await handleCompareConsultationSubmit();
                 }
             });
+            // Поддержка кнопки отправки вне <form>
+            const submitBtn = document.querySelector('#form-submit') || document.querySelector('#submit-consultation');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    logger.debug("📤 Клик по кнопке отправки консультации");
+                    if (currentMode === 'single') {
+                        await handleSingleConsultationSubmit();
+                    } else if (currentMode === 'compare') {
+                        await handleCompareConsultationSubmit();
+                    }
+                });
+            }
         }
         
         // Кнопки отмены
@@ -155,7 +168,8 @@ window.MishuraApp.features.consultation = (function() {
     }
     
     function updateSubmitButton() {
-        const submitButton = document.querySelector('#submit-consultation');
+        // Поддерживаем актуальную разметку с кнопкой id="form-submit"
+        const submitButton = document.querySelector('#form-submit') || document.querySelector('#submit-consultation');
         if (!submitButton) return;
         
         let canSubmit = false;
@@ -183,8 +197,8 @@ window.MishuraApp.features.consultation = (function() {
             return;
         }
         
-        const occasionSelect = document.getElementById('occasion-selector');
-        const preferencesInput = document.getElementById('preferences-input');
+        const occasionSelect = document.getElementById('occasion') || document.getElementById('occasion-selector');
+        const preferencesInput = document.getElementById('preferences') || document.getElementById('preferences-input');
         
         const occasion = occasionSelect ? occasionSelect.value : '';
         const preferences = preferencesInput ? preferencesInput.value : '';
@@ -212,7 +226,12 @@ window.MishuraApp.features.consultation = (function() {
             
         } catch (error) {
             logger.error("❌ Ошибка при анализе:", error);
-            displayError("Произошла ошибка при анализе изображения. Попробуйте еще раз.");
+            const message = (error && error.message) ? error.message : "Произошла ошибка при анализе изображения. Попробуйте еще раз.";
+            displayError(message);
+            if (message.toLowerCase().includes('недостаточно stcoins')) {
+                const pricing = document.getElementById('pricing-modal');
+                if (pricing) pricing.classList.add('active');
+            }
         } finally {
             if (uiHelpers) {
                 uiHelpers.hideLoading();
@@ -226,8 +245,8 @@ window.MishuraApp.features.consultation = (function() {
             return;
         }
         
-        const occasionSelect = document.getElementById('occasion-selector');
-        const preferencesInput = document.getElementById('preferences-input');
+        const occasionSelect = document.getElementById('occasion') || document.getElementById('occasion-selector');
+        const preferencesInput = document.getElementById('preferences') || document.getElementById('preferences-input');
         
         const occasion = occasionSelect ? occasionSelect.value : '';
         const preferences = preferencesInput ? preferencesInput.value : '';
@@ -256,7 +275,12 @@ window.MishuraApp.features.consultation = (function() {
             
         } catch (error) {
             logger.error("❌ Ошибка при сравнении:", error);
-            displayError("Произошла ошибка при сравнении изображений. Попробуйте еще раз.");
+            const message = (error && error.message) ? error.message : "Произошла ошибка при сравнении изображений. Попробуйте еще раз.";
+            displayError(message);
+            if (message.toLowerCase().includes('недостаточно stcoins')) {
+                const pricing = document.getElementById('pricing-modal');
+                if (pricing) pricing.classList.add('active');
+            }
         } finally {
             if (uiHelpers) {
                 uiHelpers.hideLoading();

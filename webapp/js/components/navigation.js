@@ -211,7 +211,7 @@ window.MishuraApp.components.navigation = (function() {
         
         // Получаем данные из app.js если доступно
         const mishuraApp = window.mishuraApp;
-        const userBalance = mishuraApp ? mishuraApp.userBalance : 200;
+        const userBalance = mishuraApp ? mishuraApp.userBalance : 50;
         const consultationsHistory = mishuraApp ? mishuraApp.consultationsHistory : [];
         const consultationsUsed = mishuraApp ? mishuraApp.consultationsUsed : 0;
         const consultationsRemaining = Math.floor(userBalance / 10);

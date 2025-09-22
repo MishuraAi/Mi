@@ -138,5 +138,5 @@ CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 CREATE INDEX IF NOT EXISTS idx_wardrobe_user_id ON wardrobe(user_id);
 
 -- Демонстрационные данные (создаются только если таблицы пустые)
-INSERT OR IGNORE INTO users (telegram_id, username, first_name, last_name, balance) 
-VALUES (12345, 'demo_user', 'Демо', 'Пользователь', 200);
+INSERT OR IGNORE INTO users (telegram_id, username, first_name, last_name, balance)
+VALUES (12345, 'demo_user', 'Демо', 'Пользователь', 50);

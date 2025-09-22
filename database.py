@@ -13,6 +13,7 @@ import os
 from datetime import datetime
 import logging
 from typing import Optional, Dict, Any, List, Union
+from settings import get_initial_balance, get_balance_override, DEFAULT_START_BALANCE
 
 # PostgreSQL поддержка для продакшена
 try:
@@ -299,7 +300,9 @@ class MishuraDB:
         """
         conn = None
         try:
-            initial_balance = 50
+            # Определяем стартовый баланс из единого источника настроек
+            override_balance = get_balance_override(telegram_id)
+            initial_balance = override_balance if override_balance is not None else get_initial_balance(telegram_id)
 
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -419,14 +422,17 @@ class MishuraDB:
                 self.logger.info(f"Баланс для пользователя telegram_id={telegram_id} составляет: {balance}")
                 return balance
             else:
-                # 🔧 ИСПРАВЛЕНО: Создаем нового пользователя с балансом 50
-                self.logger.info(f"Пользователь {telegram_id} не найден, создаем с начальным балансом 50 STcoin")
+                # Создаем нового пользователя со стартовым балансом из настроек
+                start_balance = get_initial_balance(telegram_id)
+                self.logger.info(
+                    f"Пользователь {telegram_id} не найден, создаем с начальным балансом {start_balance} STcoin"
+                )
                 self.save_user(telegram_id)
-                return 50  # Было: 200
+                return start_balance
                 
         except Exception as e:
             self.logger.error(f"❌ Ошибка получения баланса для {telegram_id}: {e}")
-            return 50  # Возвращаем стандартный баланс при ошибке
+            return DEFAULT_START_BALANCE  # Возвращаем стандартный баланс при ошибке
 
     def update_user_balance(self, telegram_id: int, amount_change: int, operation_type="manual") -> int:
         """Обновляет баланс пользователя на указанную величину"""

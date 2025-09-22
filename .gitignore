@@ -139,3 +139,6 @@ credentials.json
 *token*
 *key*
 nul
+
+# Whitelist DB schema file for tooling access
+!schema.sql

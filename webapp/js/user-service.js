@@ -45,6 +45,30 @@ class UserService {
                 this.saveUserSession(parsedUrl, 'url');
                 return parsedUrl;
             }
+            // Попытка определить по username (?username= или ?tg_username=)
+            const username = (params.get('username') || params.get('tg_username') || '').replace(/^@+/, '');
+            if (username) {
+                // Разрешаем через backend
+                // ВАЖНО: синхронно здесь нельзя, поэтому вернём fallback, а асинхронно сохраним
+                // Мы попробуем синхронно через XHR с keepalive=false для упрощения
+                try {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', `${API_BASE_URL}/api/v1/users/resolve?username=${encodeURIComponent(username)}`, false);
+                    xhr.send(null);
+                    if (xhr.status === 200) {
+                        const data = JSON.parse(xhr.responseText);
+                        const resolvedId = this.parseValidUserId(data.telegram_id);
+                        if (resolvedId) {
+                            this.currentUserId = resolvedId;
+                            this.currentUserSource = 'username';
+                            this.saveUserSession(resolvedId, 'username');
+                            return resolvedId;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Не удалось разрешить пользователя по username:', e);
+                }
+            }
         } catch (_) {}
 
         // 3) Сохранённая сессия
@@ -229,6 +253,13 @@ class UserService {
         }
 
         try {
+            // Гарантируем, что пользователь существует (создастся со стартовым балансом 50 при первом заходе)
+            try {
+                await fetch(`${API_BASE_URL}/api/v1/users/${userId}/ensure`, { method: 'POST' });
+            } catch (ensureErr) {
+                console.warn('⚠️ ensure_user_exists: не удалось гарантировать создание пользователя:', ensureErr);
+            }
+
             const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}/balance?_t=${Date.now()}`);
             
             if (!response.ok) {
@@ -257,7 +288,8 @@ class UserService {
                 return cached.balance;
             }
             
-            return 0;
+            // ВАЖНО: не затираем баланс на фронтенде
+            return null;
         }
     }
 

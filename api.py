@@ -374,6 +374,61 @@ async def get_user_balance(telegram_id: int):
         logger.error(f"Ошибка получения баланса для {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/v1/users/resolve")
+async def resolve_user_by_username(username: str):
+    """Разрешить пользователя по Telegram username (без @). Возвращает telegram_id и баланс."""
+    try:
+        if not username:
+            raise HTTPException(status_code=400, detail="username обязателен")
+
+        # Нормализация: удаляем ведущий '@'
+        normalized = username.lstrip('@')
+
+        # Ищем пользователя по username
+        try:
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            if db.DB_CONFIG['type'] == 'postgresql':
+                cursor.execute("SELECT telegram_id, balance FROM users WHERE username = %s LIMIT 1", (normalized,))
+            else:
+                cursor.execute("SELECT telegram_id, balance FROM users WHERE username = ? LIMIT 1", (normalized,))
+            row = cursor.fetchone()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Ошибка поиска пользователя по username={normalized}: {e}")
+            raise HTTPException(status_code=500, detail="DB error")
+
+        if not row:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        return {
+            "username": normalized,
+            "telegram_id": row[0],
+            "balance": row[1]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка resolve_user_by_username: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
+
+@app.post("/api/v1/users/{telegram_id}/ensure")
+async def ensure_user_exists(telegram_id: int):
+    """Гарантирует наличие пользователя в БД. Если не существует — создаёт со стартовым балансом."""
+    try:
+        user = db.get_user_by_telegram_id(telegram_id)
+        if not user:
+            user_id = db.save_user(telegram_id=telegram_id, username=None, first_name=None, last_name=None)
+            if not user_id:
+                raise HTTPException(status_code=500, detail="Не удалось создать пользователя")
+        balance = db.get_user_balance(telegram_id)
+        return {"telegram_id": telegram_id, "balance": balance}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка ensure_user_exists для {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
+
 @app.post("/api/v1/users/{telegram_id}/balance/sync")
 async def sync_user_balance(telegram_id: int):
     """Принудительная синхронизация баланса"""

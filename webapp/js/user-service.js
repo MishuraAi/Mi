@@ -17,18 +17,70 @@ class UserService {
     /**
      * Получение текущего пользователя (единая точка истины)
      */
-
-
-            return {
-                userId: storedId,
-                source: normalizedSource
-            };
-        } catch (error) {
-
-            console.warn('⚠️ Некорректная сессия в localStorage', error);
+    getCurrentUserId() {
+        // 0) Кэш в памяти
+        if (this.currentUserId && Number.isInteger(this.currentUserId) && this.currentUserId > 0) {
+            return this.currentUserId;
         }
 
-        return null;
+        // 1) Telegram WebApp
+        try {
+            const tgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+            const parsedTg = this.parseValidUserId(tgId);
+            if (parsedTg) {
+                this.currentUserId = parsedTg;
+                this.currentUserSource = 'telegram';
+                this.saveUserSession(parsedTg, 'telegram');
+                return parsedTg;
+            }
+        } catch (_) {}
+
+        // 2) URL параметры (user_id или telegram_id)
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const parsedUrl = this.parseValidUserId(params.get('user_id') || params.get('telegram_id'));
+            if (parsedUrl) {
+                this.currentUserId = parsedUrl;
+                this.currentUserSource = 'url';
+                this.saveUserSession(parsedUrl, 'url');
+                return parsedUrl;
+            }
+        } catch (_) {}
+
+        // 3) Сохранённая сессия
+        try {
+            const raw = localStorage.getItem('current_user_session');
+            if (raw) {
+                const session = JSON.parse(raw);
+                if (this.isValidSession(session)) {
+                    const parsedSession = this.parseValidUserId(session.user_id);
+                    if (parsedSession) {
+                        this.currentUserId = parsedSession;
+                        this.currentUserSource = session.source || 'session';
+                        return parsedSession;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Некорректная сессия в localStorage', e);
+        }
+
+        // 4) Legacy ключи localStorage
+        try {
+            const legacy = this.parseValidUserId(localStorage.getItem('user_id') || localStorage.getItem('telegram_user_id'));
+            if (legacy) {
+                this.currentUserId = legacy;
+                this.currentUserSource = 'localStorage';
+                this.saveUserSession(legacy, 'localStorage');
+                return legacy;
+            }
+        } catch (_) {}
+
+        // 5) Fallback
+        this.currentUserId = FALLBACK_USER_ID;
+        this.currentUserSource = 'fallback';
+        this.saveUserSession(FALLBACK_USER_ID, 'fallback');
+        return FALLBACK_USER_ID;
     }
 
     parseValidUserId(rawValue) {
@@ -69,6 +121,7 @@ class UserService {
                 }
             }
 
+            const normalizedSource = this.normalizeSource(source);
             const session = {
                 user_id: userId,
                 source: normalizedSource,
@@ -91,6 +144,17 @@ class UserService {
         } catch (error) {
             console.error('❌ Ошибка сохранения сессии:', error);
         }
+    }
+
+    normalizeSource(source) {
+        const s = (source || '').toString().toLowerCase();
+        if (['telegram', 'url', 'session', 'localstorage', 'fallback'].includes(s)) return s;
+        return 'unknown';
+    }
+
+    isFallbackSource(source) {
+        const s = this.normalizeSource(source);
+        return s === 'fallback' || s === 'localstorage';
     }
 
     /**
@@ -344,7 +408,6 @@ class BalanceManager {
         this.init();
     }
 
-<<<<<<< Updated upstream
     resolveUserId() {
         try {
             if (this.userService?.getCurrentUserId) {
@@ -356,36 +419,7 @@ class BalanceManager {
             }
         } catch (error) {
             console.error('❌ Не удалось определить user ID через UserService:', error);
-=======
-    init() {
-        // Получаем telegram_id из Telegram WebApp
-        if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-            this.telegramId = window.Telegram.WebApp.initDataUnsafe.user.id;
-            console.log(`🚀 BalanceManager инициализирован для пользователя ${this.telegramId}`);
-            
-            // Принудительная синхронизация при загрузке
-            this.forceSyncWithServer();
-            
-            // Создаем кнопку принудительной синхронизации
-            this.createSyncButton();
-            
-        } else {
-            console.warn('⚠️ Telegram WebApp не доступен, используем fallback без запроса у пользователя');
-            try {
-                // Используем унифицированный сервис пользователя без каких‑либо prompt
-                if (window.userService && typeof window.userService.getCurrentUserId === 'function') {
-                    this.telegramId = window.userService.getCurrentUserId();
-                } else {
-                    // Пытаемся взять из URL, затем из localStorage, затем дефолт
-                    this.telegramId = this.getTelegramIdFromUrl() || parseInt(localStorage.getItem('user_id')) || 5930269100;
-                }
-            } catch (e) {
-                console.warn('⚠️ Fallback до дефолтного ID из‑за ошибки определения:', e);
-                this.telegramId = 5930269100;
-            }
->>>>>>> Stashed changes
         }
-
         return null;
     }
 
@@ -474,8 +508,6 @@ class BalanceManager {
 
             if (this.userService) {
                 this.userService.currentUserId = this.userId;
-
-                }
 
                 if (this.userService.balanceCache) {
                     this.userService.balanceCache.set(this.userId, {
@@ -703,8 +735,6 @@ class BalanceManager {
     }
 
     /**
-<<<<<<< Updated upstream
-=======
      * 🔍 Получение telegram_id из URL (fallback)
      */
     getTelegramIdFromUrl() {
@@ -721,7 +751,6 @@ class BalanceManager {
     }
 
     /**
->>>>>>> Stashed changes
      * 📊 Получение текущего баланса
      */
     getCurrentBalance() {

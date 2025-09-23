@@ -12,6 +12,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from telegram.constants import ParseMode
+from urllib.parse import urlencode
 
 # Настройка логирования
 logging.basicConfig(
@@ -49,8 +50,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 👇 Нажмите кнопку ниже для запуска:
 """
     
+    # Формируем URL с параметрами пользователя, чтобы веб-приложение использовало тот же telegram_id
+    params = {
+        'telegram_id': user.id,
+        'username': (user.username or '').lstrip('@'),
+        'first_name': user.first_name or '',
+        'last_name': user.last_name or ''
+    }
+    webapp_with_params = f"{WEBAPP_URL}?{urlencode(params)}"
+
     keyboard = [
-        [InlineKeyboardButton("🚀 Открыть МИШУРА", url=WEBAPP_URL)]
+        [InlineKeyboardButton("🚀 Открыть МИШУРА", url=webapp_with_params)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     

@@ -9,9 +9,33 @@
 const API_BASE_URL = window.location.origin;
 const API_VERSION = 'v1';
 
-// Пользовательские данные (получаются из URL параметров)
+// Пользовательские данные (получаются из Telegram WebApp / userService / URL параметров)
 const urlParams = new URLSearchParams(window.location.search);
-const USER_ID = parseInt(urlParams.get('user_id')) || 5930269100; // Fallback для тестирования
+let USER_ID = null;
+try {
+    if (window.userService?.getCurrentUserId) {
+        const fromService = window.userService.getCurrentUserId();
+        if (fromService && !Number.isNaN(parseInt(fromService))) {
+            USER_ID = parseInt(fromService);
+        }
+    }
+} catch (e) {
+    console.warn('⚠️ config.js: не удалось получить USER_ID из userService:', e);
+}
+if (!USER_ID) {
+    const fromUrl = urlParams.get('user_id') || urlParams.get('telegram_id');
+    if (fromUrl && !Number.isNaN(parseInt(fromUrl))) {
+        USER_ID = parseInt(fromUrl);
+    } else {
+        // Пробуем достать из Telegram WebApp
+        try {
+            const tgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+            if (tgId && !Number.isNaN(parseInt(tgId))) {
+                USER_ID = parseInt(tgId);
+            }
+        } catch (_) {}
+    }
+}
 
 // Конфигурация загрузки файлов
 const FILE_CONFIG = {
@@ -455,6 +479,30 @@ function hideLoadingSpinner() {
 
 async function updateUserBalance() {
     try {
+        // Резолвим USER_ID на лету, если ещё не установлен
+        if (!USER_ID) {
+            try {
+                if (window.userService?.getCurrentUserId) {
+                    const cid = window.userService.getCurrentUserId();
+                    if (cid && !Number.isNaN(parseInt(cid))) {
+                        USER_ID = parseInt(cid);
+                    }
+                }
+            } catch (_) {}
+        }
+
+        if (!USER_ID) {
+            console.warn('⚠️ updateUserBalance: USER_ID не определён, пропускаем запрос баланса');
+            return null;
+        }
+
+        // Гарантируем создание пользователя перед запросом баланса
+        try {
+            await fetch(`${API_BASE_URL}/api/v1/users/${USER_ID}/ensure`, { method: 'POST' });
+        } catch (e) {
+            console.warn('⚠️ ensure в config.js не удался:', e);
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/v1/users/${USER_ID}/balance`);
         if (response.ok) {
             const data = await response.json();

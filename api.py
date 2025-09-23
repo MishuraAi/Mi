@@ -374,6 +374,46 @@ async def get_user_balance(telegram_id: int):
         logger.error(f"Ошибка получения баланса для {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/v1/users/upsert-from-telegram")
+async def upsert_user_from_telegram(request: Request):
+    """Создать или обновить пользователя по данным из Telegram WebApp и вернуть актуальный баланс.
+    Ожидает JSON: { telegram_id: int, username?: str, first_name?: str, last_name?: str }
+    """
+    try:
+        data = await request.json()
+        telegram_id = data.get('telegram_id')
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="telegram_id обязателен")
+
+        username = data.get('username')
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+
+        # Гарантируем наличие/обновление полей без изменения баланса у существующих
+        created_or_id = db.save_user(
+            telegram_id=telegram_id,
+            username=username,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        # Гарантируем существование и корректный стартовый баланс, если нужно
+        await ensure_user_exists(telegram_id)
+
+        balance = db.get_user_balance(telegram_id)
+        return {
+            "telegram_id": telegram_id,
+            "username": username,
+            "first_name": first_name,
+            "last_name": last_name,
+            "balance": balance
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка upsert-from-telegram: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
+
 @app.get("/api/v1/users/resolve")
 async def resolve_user_by_username(username: str):
     """Разрешить пользователя по Telegram username (без @). Возвращает telegram_id и баланс."""
@@ -414,13 +454,68 @@ async def resolve_user_by_username(username: str):
 
 @app.post("/api/v1/users/{telegram_id}/ensure")
 async def ensure_user_exists(telegram_id: int):
-    """Гарантирует наличие пользователя в БД. Если не существует — создаёт со стартовым балансом."""
+    """Гарантирует наличие пользователя в БД. Если не существует — создаёт со стартовым балансом.
+    Если существует, но явно некорректно инициализирован (нет платежей и консультаций, баланс < DEFAULT_START_BALANCE) —
+    выполняет одноразовую коррекцию до DEFAULT_START_BALANCE.
+    """
     try:
+        from settings import DEFAULT_START_BALANCE
+
         user = db.get_user_by_telegram_id(telegram_id)
         if not user:
             user_id = db.save_user(telegram_id=telegram_id, username=None, first_name=None, last_name=None)
             if not user_id:
                 raise HTTPException(status_code=500, detail="Не удалось создать пользователя")
+        else:
+            # Одноразовая коррекция для ранее созданных с нулевым балансом без активностей
+            try:
+                conn = db.get_connection()
+                cursor = conn.cursor()
+                # Считаем операции
+                if db.DB_CONFIG['type'] == 'postgresql':
+                    cursor.execute("SELECT balance FROM users WHERE telegram_id = %s", (telegram_id,))
+                else:
+                    cursor.execute("SELECT balance FROM users WHERE telegram_id = ?", (telegram_id,))
+                row = cursor.fetchone()
+                current_balance = row[0] if row else None
+
+                # Платежи
+                if db.DB_CONFIG['type'] == 'postgresql':
+                    cursor.execute("SELECT COUNT(*) FROM payments WHERE telegram_id = %s", (telegram_id,))
+                else:
+                    cursor.execute("SELECT COUNT(*) FROM payments WHERE telegram_id = ?", (telegram_id,))
+                payments_count = cursor.fetchone()[0]
+
+                # Консультации: по внутреннему user_id
+                internal_id = None
+                if db.DB_CONFIG['type'] == 'postgresql':
+                    cursor.execute("SELECT id FROM users WHERE telegram_id = %s", (telegram_id,))
+                else:
+                    cursor.execute("SELECT id FROM users WHERE telegram_id = ?", (telegram_id,))
+                id_row = cursor.fetchone()
+                if id_row:
+                    internal_id = id_row[0]
+
+                consultations_count = 0
+                if internal_id is not None:
+                    if db.DB_CONFIG['type'] == 'postgresql':
+                        cursor.execute("SELECT COUNT(*) FROM consultations WHERE user_id = %s", (internal_id,))
+                    else:
+                        cursor.execute("SELECT COUNT(*) FROM consultations WHERE user_id = ?", (internal_id,))
+                    consultations_count = cursor.fetchone()[0]
+
+                if (current_balance is not None) and (current_balance < DEFAULT_START_BALANCE) and payments_count == 0 and consultations_count == 0:
+                    # Корректируем до DEFAULT_START_BALANCE
+                    if db.DB_CONFIG['type'] == 'postgresql':
+                        cursor.execute("UPDATE users SET balance = %s, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = %s", (DEFAULT_START_BALANCE, telegram_id))
+                    else:
+                        cursor.execute("UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?", (DEFAULT_START_BALANCE, telegram_id))
+                    conn.commit()
+                    logger.info(f"🔧 Коррекция стартового баланса для {telegram_id}: {current_balance} -> {DEFAULT_START_BALANCE}")
+                conn.close()
+            except Exception as corr_err:
+                logger.warning(f"⚠️ Не удалось выполнить коррекцию стартового баланса для {telegram_id}: {corr_err}")
+
         balance = db.get_user_balance(telegram_id)
         return {"telegram_id": telegram_id, "balance": balance}
     except HTTPException:

@@ -139,6 +139,15 @@ class MishuraApp {
         try {
             console.log('👤 Инициализация UserService...');
             
+            // Сначала пытаемся инициализироваться из Telegram WebApp (особенно важно для мобильного клиента)
+            if (window.userService?.initFromTelegram) {
+                try {
+                    await window.userService.initFromTelegram();
+                } catch (e) {
+                    console.warn('⚠️ initFromTelegram завершился с предупреждением:', e);
+                }
+            }
+
             // Получаем актуального пользователя
             const userId = window.userService.getCurrentUserId();
             console.log(`✅ Пользователь определен: ${userId}`);

@@ -15,6 +15,61 @@ class UserService {
     }
 
     /**
+     * Инициализация из Telegram WebApp: сохраняем пользователя на сервере и локально
+     * Вызывается при старте, чтобы на мобильном Telegram и десктопе был один и тот же ID
+     */
+    async initFromTelegram() {
+      try {
+        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        if (!tgUser || !tgUser.id) {
+          // Пытаемся вызвать ready и прочитать повторно (на некоторых клиентах данные приходят позже)
+          try { window.Telegram?.WebApp?.ready?.(); } catch (_) {}
+          const retryUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+          if (!retryUser || !retryUser.id) {
+            return null;
+          }
+        }
+
+        const user = window.Telegram.WebApp.initDataUnsafe.user;
+        const telegramId = this.parseValidUserId(user.id);
+        if (!telegramId) return null;
+
+        // Сохранение сессии локально
+        this.currentUserId = telegramId;
+        this.currentUserSource = 'telegram';
+        this.saveUserSession(telegramId, 'telegram');
+
+        // Обновляем профиль и баланс на сервере
+        try {
+          await fetch(`${API_BASE_URL}/api/v1/users/upsert-from-telegram`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: telegramId,
+              username: (user.username || '').toString().replace(/^@+/, ''),
+              first_name: user.first_name || '',
+              last_name: user.last_name || ''
+            })
+          });
+        } catch (e) {
+          console.warn('⚠️ Не удалось выполнить upsert-from-telegram:', e);
+        }
+
+        // Гарантируем наличие пользователя (создание со стартовым балансом 50 при первом входе)
+        try {
+          await fetch(`${API_BASE_URL}/api/v1/users/${telegramId}/ensure`, { method: 'POST' });
+        } catch (e) {
+          console.warn('⚠️ ensure при initFromTelegram не удался:', e);
+        }
+
+        return telegramId;
+      } catch (e) {
+        console.warn('⚠️ initFromTelegram: не удалось инициализировать пользователя из Telegram:', e);
+        return null;
+      }
+    }
+
+    /**
      * Получение текущего пользователя (единая точка истины)
      */
     getCurrentUserId() {

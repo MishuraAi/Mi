@@ -144,18 +144,29 @@ class UserService {
             console.warn('⚠️ Некорректная сессия в localStorage', e);
         }
 
-        // 4) Legacy ключи localStorage
+        // 4) Legacy ключи localStorage (не используем в Telegram WebApp, чтобы не перепутать аккаунт)
         try {
-            const legacy = this.parseValidUserId(localStorage.getItem('user_id') || localStorage.getItem('telegram_user_id'));
-            if (legacy) {
-                this.currentUserId = legacy;
-                this.currentUserSource = 'localStorage';
-                this.saveUserSession(legacy, 'localStorage');
-                return legacy;
+            const isTelegramWebApp = !!(window.Telegram?.WebApp);
+            if (!isTelegramWebApp) {
+                const legacy = this.parseValidUserId(localStorage.getItem('user_id') || localStorage.getItem('telegram_user_id'));
+                if (legacy) {
+                    this.currentUserId = legacy;
+                    this.currentUserSource = 'localStorage';
+                    this.saveUserSession(legacy, 'localStorage');
+                    return legacy;
+                }
             }
         } catch (_) {}
 
         // 5) Fallback
+        // В Telegram WebApp НЕ используем fallback, чтобы не показывать чужие данные / не дергать тестовый ID
+        const isTelegramWebApp = !!(window.Telegram?.WebApp);
+        if (isTelegramWebApp) {
+            console.warn('⚠️ Telegram WebApp: ID пользователя пока недоступен. Возвращаем null без fallback.');
+            return null;
+        }
+
+        // Для обычного веба допустим fallback (режим разработки)
         this.currentUserId = FALLBACK_USER_ID;
         this.currentUserSource = 'fallback';
         this.saveUserSession(FALLBACK_USER_ID, 'fallback');

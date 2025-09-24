@@ -1913,26 +1913,32 @@
         </div>
     </section>
 
-    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ С ПРАВИЛЬНЫМИ ПУТЯМИ -->
+    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ С ПРАВИЛЬНЫМИ ПУТЯМИ (cache-busting) -->
+    <script>
+      // Простая версия для busting кэша (меняйте вручную при релизе)
+      window.APP_VERSION = '2.7.1';
+      window.__v = `?v=${window.APP_VERSION}-${Date.now()}`;
+    </script>
     <script src="/static/logger.js"></script>
     <script src="/static/mock-api.js"></script>
     <script src="/static/api.js"></script>
     <script src="/static/js/config.js"></script>
 
-    <!-- МОДУЛИ -->
-    <script src="/static/js/utils/logger.js"></script>
-    <script src="/static/js/utils/ui-helpers.js"></script>
-    <script src="/static/js/components/navigation.js"></script>
-    <script src="/static/js/components/modals.js"></script>
-    <script src="/static/js/components/image-upload.js"></script>
-    <script src="/static/js/features/consultation.js"></script>
-    <script src="/static/js/features/comparison.js"></script>
+    <!-- МОДУЛИ (cache-busting через параметр версии) -->
+    <script>document.write(`<script src="/static/js/utils/logger.js${window.__v}"><\/script>`)</script>
+    <script>document.write(`<script src="/static/js/utils/ui-helpers.js${window.__v}"><\/script>`)</script>
+    <script>document.write(`<script src="/static/js/components/navigation.js${window.__v}"><\/script>`)</script>
+    <script>document.write(`<script src="/static/js/components/modals.js${window.__v}"><\/script>`)</script>
+    <script>document.write(`<script src="/static/js/components/image-upload.js${window.__v}"><\/script>`)</script>
+    <script>document.write(`<script src="/static/js/features/consultation.js${window.__v}"><\/script>`)</script>
+    <script>document.write(`<script src="/static/js/features/comparison.js${window.__v}"><\/script>`)</script>
 
     <!-- НОВОЕ: UserService -->
-    <script src="/static/js/user-service.js"></script>
+    <script>document.write(`<script src="/static/js/user-service.js${window.__v}"><\/script>`)</script>
 
     <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
-    <script src="/static/app.js"></script>
-    <script src="/static/js/balance-fix.js"></script>
+    <script>document.write(`<script src="/static/app.js${window.__v}"><\/script>`)</script>
+    <script>document.write(`<script src="/static/js/balance-fix.js${window.__v}"><\/script>`)</script>
+
 </body>
 </html>

@@ -111,7 +111,7 @@ class MishuraApp {
             this.setupNavigation();
             this.fixModeButtons();
             this.setupBasicEventHandlers();
-            this.loadUserData();
+            await this.loadUserData();
             
             this.initFeedbackSystem();
             
@@ -373,18 +373,37 @@ class MishuraApp {
     }
 
     // ОБНОВЛЕНИЕ метода загрузки пользовательских данных
-    loadUserData() {
+    async loadUserData() {
         try {
             const data = JSON.parse(localStorage.getItem('mishura_user_data') || '{}');
-            
-            // 🔧 ИСПРАВЛЕНО: Начальный баланс 50 вместо 200
-            this.userBalance = data.balance || 50; // Было: || 200
-            this.consultationsHistory = data.consultations || [];
-            this.lastSyncTimestamp = data.lastSync || 0;
-            
-            // 🆕 НОВОЕ: Автоматическая валидация и синхронизация баланса
-            this.validateAndSyncBalance();
-            
+
+            const isTelegramWebApp = !!(window.Telegram?.WebApp);
+
+            // Если открыто в Telegram WebApp (особенно на мобильном), не показываем устаревший кэш
+            if (isTelegramWebApp) {
+                // Дополнительно очищаем явные артефакты старых версий (например, 200)
+                if (data && (data.balance === 200 || data.balance === '200')) {
+                    try { localStorage.removeItem('mishura_user_data'); } catch (_) {}
+                }
+                // Ставим временное значение и сразу синхронизируемся с сервером до отрисовки
+                this.userBalance = 50;
+                this.consultationsHistory = [];
+                this.lastSyncTimestamp = Date.now();
+
+                try {
+                    await this.forceBalanceUpdate();
+                } catch (e) {
+                    console.warn('⚠️ Не удалось выполнить мгновенную синхронизацию баланса:', e);
+                }
+            } else {
+                // Для обычного веба используем кэш как раньше
+                this.userBalance = data.balance || 50; // Было: || 200
+                this.consultationsHistory = data.consultations || [];
+                this.lastSyncTimestamp = data.lastSync || 0;
+                // Параллельная проверка с сервером
+                this.validateAndSyncBalance();
+            }
+
             this.updateUI();
             console.log('📊 Данные пользователя загружены:', {
                 balance: this.userBalance,
@@ -393,7 +412,7 @@ class MishuraApp {
             });
         } catch (error) {
             console.error('❌ Ошибка загрузки данных пользователя:', error);
-            this.initializeUserData();
+            await this.initializeUserData();
         }
     }
 

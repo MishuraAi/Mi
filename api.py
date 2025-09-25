@@ -55,6 +55,7 @@ DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 TEST_MODE = os.getenv('TEST_MODE', 'false').lower() == 'true'
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
 ADMIN_TELEGRAM_ID = os.getenv('ADMIN_TELEGRAM_ID')  # ID админа для уведомлений
+ADMIN_TOKEN = os.getenv('ADMIN_TOKEN')  # Секрет для админ-эндпоинтов
 
 # Логирование конфигурации
 logger.info("🔧 Конфигурация МИШУРА API:")
@@ -373,6 +374,52 @@ async def get_user_balance(telegram_id: int):
     except Exception as e:
         logger.error(f"Ошибка получения баланса для {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class AdminSetBalanceRequest(BaseModel):
+    balance: int
+
+@app.post("/api/v1/admin/users/{telegram_id}/balance")
+async def admin_set_user_balance(telegram_id: int, request: Request):
+    """Админ: установить точный баланс пользователя по telegram_id.
+    Требует заголовок X-Admin-Token == ADMIN_TOKEN.
+    Тело: {"balance": <int>=0}
+    """
+    try:
+        if not ADMIN_TOKEN:
+            raise HTTPException(status_code=503, detail="ADMIN_TOKEN не настроен на сервере")
+
+        token = request.headers.get('X-Admin-Token')
+        if token != ADMIN_TOKEN:
+            raise HTTPException(status_code=401, detail="Недостаточно прав")
+
+        data = await request.json()
+        try:
+            new_balance = int(data.get('balance', -1))
+        except Exception:
+            new_balance = -1
+        if new_balance < 0:
+            raise HTTPException(status_code=400, detail="Некорректный баланс")
+
+        # Убедимся, что пользователь существует
+        await ensure_user_exists(telegram_id)
+
+        # Обновляем баланс атомарно
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        if db.DB_CONFIG['type'] == 'postgresql':
+            cursor.execute("UPDATE users SET balance = %s, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = %s", (new_balance, telegram_id))
+        else:
+            cursor.execute("UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?", (new_balance, telegram_id))
+        conn.commit()
+        conn.close()
+
+        logger.info(f"🔐 ADMIN: баланс пользователя {telegram_id} установлен на {new_balance}")
+        return {"telegram_id": telegram_id, "balance": new_balance}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка admin_set_user_balance: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
 
 @app.post("/api/v1/users/upsert-from-telegram")
 async def upsert_user_from_telegram(request: Request):

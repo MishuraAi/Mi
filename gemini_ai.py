@@ -24,6 +24,7 @@ from io import BytesIO
 from typing import Optional, List, Tuple, Union, Dict, Any
 import traceback
 import re
+import base64
 # Настройка логирования
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

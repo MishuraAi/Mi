@@ -1247,8 +1247,10 @@ class MishuraApp {
     }
 
     showResult(result) {
-        // Сохраняем ID консультации для системы отзывов
-        this.lastConsultationId = result.consultation_id || Date.now();
+        // Сохраняем ID консультации для системы отзывов (только реальный ID от сервера)
+        this.lastConsultationId = (result && typeof result.consultation_id === 'number' && result.consultation_id > 0)
+            ? result.consultation_id
+            : null;
         console.log('💾 Сохранен ID консультации для отзыва:', this.lastConsultationId);
         // ... остальной код метода ...
         this.isLoading = false;
@@ -1346,24 +1348,15 @@ class MishuraApp {
             }, 2000);
         }
         
-        if (consultation && consultation.id) {
+        if (consultation && consultation.id && this.lastConsultationId) {
             setTimeout(() => {
-                this.checkAndShowFeedbackPrompt(consultation.id);
+                this.checkAndShowFeedbackPrompt(this.lastConsultationId);
             }, Math.random() * 120000 + 60000); // 1-3 минуты
         } else {
-            // Если нет ID консультации, используем timestamp как ID
-            const mockConsultationId = Date.now();
-            setTimeout(() => {
-                this.checkAndShowFeedbackPrompt(mockConsultationId);
-            }, Math.random() * 120000 + 60000);
+            // Если нет реального ID консультации — не показываем форму отзыва, чтобы не ломать FK
         }
         
-        // Запускаем проверку отзыва через 2 минуты после показа результата
-        setTimeout(() => {
-            const mockConsultationId = Date.now();
-            console.log('⏰ Автоматический запуск проверки отзыва через 2 минуты');
-            this.checkAndShowFeedbackPrompt(mockConsultationId);
-        }, 120000); // 2 минуты для тестирования
+        // Ранее здесь был автозапуск с mock ID — отключено, чтобы не нарушать целостность БД
     }
 
     normalizeAPIResponse(response) {

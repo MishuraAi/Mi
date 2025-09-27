@@ -1922,9 +1922,9 @@
     <script src="/static/logger.js"></script>
     <script src="/static/mock-api.js"></script>
     <script src="/static/api.js"></script>
-    <!-- НОВОЕ: UserService должен быть загружен до config.js -->
-    <script>document.write(`<script src="/static/js/user-service.js${window.__v}"><\/script>`)</script>
     <script src="/static/js/config.js"></script>
+    <!-- UserService загружается после config.js, как было изначально -->
+    <script>document.write(`<script src="/static/js/user-service.js${window.__v}"><\/script>`)</script>
 
     <!-- МОДУЛИ (cache-busting через параметр версии) -->
     <script>document.write(`<script src="/static/js/utils/logger.js${window.__v}"><\/script>`)</script>
@@ -1935,8 +1935,7 @@
     <script>document.write(`<script src="/static/js/features/consultation.js${window.__v}"><\/script>`)</script>
     <script>document.write(`<script src="/static/js/features/comparison.js${window.__v}"><\/script>`)</script>
 
-    <!-- UserService уже загружен выше до config.js -->
-
+    <!-- UserService загружен выше -->
     <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
     <script>document.write(`<script src="/static/app.js${window.__v}"><\/script>`)</script>
     <script>document.write(`<script src="/static/js/balance-fix.js${window.__v}"><\/script>`)</script>

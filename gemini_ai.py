@@ -24,46 +24,39 @@ from io import BytesIO
 from typing import Optional, List, Tuple, Union, Dict, Any
 import traceback
 import re
-import base64
-
 # Настройка логирования
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-logger.info("🎭 Инициализация модуля Gemini AI для МИШУРА")
+logger.info("Инициализация модуля Gemini AI для МИШУРА")
 
 # Загрузка переменных окружения
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 # Простой заглушка кеш-менеджера
 class DummyCacheManager:
     def __init__(self):
         logger.info("DummyCacheManager инициализирован")
-    
-    def get_from_cache(self, *args, **kwargs):
-        return None
-    
-    def save_to_cache(self, *args, **kwargs):
-        pass
 
 # Конфигурация Gemini API
 API_CONFIGURED_SUCCESSFULLY = False
 
 if not GEMINI_API_KEY:
-    logger.warning("⚠️ GEMINI_API_KEY не найден. Модуль запустится в демо-режиме без вызовов API")
+    logger.warning("GEMINI_API_KEY не найден. Модуль запустится в демо-режиме без вызовов API")
 
 try:
     # Конфигурируем API
     genai.configure(api_key=GEMINI_API_KEY)
     
     # Проверяем доступные модели
-    logger.info("🔍 Проверка доступных моделей Gemini...")
+    logger.info("Проверка доступных моделей Gemini...")
     
-    # Список моделей для тестирования
+    # Список моделей для тестирования (без -latest). Можно задать через GEMINI_MODEL
     models_to_try = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash", 
+        GEMINI_MODEL,
+        "gemini-1.5-flash",
         "gemini-pro-vision",
         "gemini-pro"
     ]
@@ -75,10 +68,10 @@ try:
             # Создаем модель для проверки
             test_model = genai.GenerativeModel(model_name)
             VISION_MODEL = model_name
-            logger.info(f"✅ Модель {model_name} доступна")
+            logger.info(f"Модель {model_name} доступна и будет использована")
             break
         except Exception as model_error:
-            logger.warning(f"⚠️ Модель {model_name} недоступна: {str(model_error)}")
+            logger.warning(f"Модель {model_name} недоступна: {str(model_error)}")
             continue
     
     if VISION_MODEL:

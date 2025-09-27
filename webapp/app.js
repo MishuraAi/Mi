@@ -1302,6 +1302,15 @@ class MishuraApp {
             resultSection.appendChild(navButtons);
         }
         
+        // Обновляем баланс по ответу сервера, если пришёл
+        if (typeof result.balance === 'number' && !isNaN(result.balance)) {
+            const old = this.userBalance;
+            this.userBalance = result.balance;
+            this.saveUserData();
+            this.updateBalanceDisplay();
+            console.log(`💰 Баланс обновлён по ответу API: ${old} → ${this.userBalance}`);
+        }
+
         const consultation = {
             id: Date.now(),
             type: this.currentMode,
@@ -1314,7 +1323,19 @@ class MishuraApp {
             metadata: normalizedResult.metadata || {}
         };
         
-        this.deductConsultation(10);
+        // Безопасное локальное списание: только если сервер не вернул баланс и операция платная
+        const hasServerBalance = (typeof result.balance === 'number' && !isNaN(result.balance));
+        const cost = (typeof result.cost === 'number') ? result.cost : 10;
+        const shouldDeductLocally = !hasServerBalance && ((result.status === 'success' && cost > 0) || (result.cost === undefined));
+
+        if (shouldDeductLocally) {
+            this.deductConsultation(cost);
+        } else {
+            console.log('🛡️ Локальное списание отключено (используем баланс с сервера или cost=0)');
+        }
+
+        // Быстрая сверка с сервером для полного выравнивания состояния
+        setTimeout(() => { this.forceBalanceUpdate(); }, 500);
         this.consultationsHistory.push(consultation);
         this.saveUserData();
         

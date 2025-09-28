@@ -1,7 +1,10 @@
 // 🔧 СОЗДАТЬ НОВЫЙ ФАЙЛ: webapp/js/user-service.js
 // Унифицированная система управления пользователем
 
-const FALLBACK_USER_ID = 5930269100;
+// В продакшне НЕ используем общий fallback ID, только для локальной разработки
+const FALLBACK_USER_ID = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 5930269100
+    : null;
 
 class UserService {
     constructor() {
@@ -159,14 +162,14 @@ class UserService {
         } catch (_) {}
 
         // 5) Fallback
-        // В Telegram WebApp НЕ используем fallback, чтобы не показывать чужие данные / не дергать тестовый ID
+        // В Telegram WebApp и ПРОДАКШНЕ fallback НЕ используем. Разрешаем только на localhost/127.0.0.1
         const isTelegramWebApp = !!(window.Telegram?.WebApp);
-        if (isTelegramWebApp) {
-            console.warn('⚠️ Telegram WebApp: ID пользователя пока недоступен. Возвращаем null без fallback.');
+        if (isTelegramWebApp || !FALLBACK_USER_ID) {
+            console.warn('⚠️ Fallback ID отключен. Требуется авторизация через Telegram или корректный параметр в URL.');
             return null;
         }
 
-        // Для обычного веба допустим fallback (режим разработки)
+        // Разрешен только в локальной разработке
         this.currentUserId = FALLBACK_USER_ID;
         this.currentUserSource = 'fallback';
         this.saveUserSession(FALLBACK_USER_ID, 'fallback');
@@ -678,13 +681,11 @@ class BalanceManager {
         };
 
         try {
-            localStorage.setItem('user_balance', JSON.stringify(cacheData));
-            localStorage.setItem('balance_timestamp', Date.now().toString());
-            localStorage.setItem('last_balance_sync', Date.now().toString());
+            // Пишем только в user-неймспейс, без глобальных ключей
             if (this.userId) {
                 localStorage.setItem(`balance_${this.userId}`, JSON.stringify(cacheData));
             }
-            console.log(`💾 Баланс сохранен в кэш: ${balance} STcoin (synced: ${synced})`);
+            console.log(`💾 Баланс сохранен в кэш пользователя ${this.userId}: ${balance} STcoin (synced: ${synced})`);
         } catch (error) {
             console.error('❌ Ошибка сохранения в кэш:', error);
         }

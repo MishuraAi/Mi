@@ -816,6 +816,9 @@ class MishuraApp {
                     Связаться с поддержкой
                 </button>
             </div>
+            
+            <!-- Нижний спейсер для safe-area / нижнего тулбара -->
+            <div style="height: calc(90px + env(safe-area-inset-bottom)); pointer-events: none;"></div>
         `;
     }
 

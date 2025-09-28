@@ -384,6 +384,7 @@ class UserService {
             return null;
         } finally {
             this.syncInProgress = false;
+            this.setSyncIndicatorActive(false);
         }
     }
 
@@ -534,8 +535,8 @@ class BalanceManager {
         // Принудительная синхронизация при загрузке
         this.forceSyncWithServer();
 
-        // Создаем кнопку принудительной синхронизации
-        this.createSyncButton();
+        // Создаем крошечный индикатор синхронизации
+        this.createSyncIndicator();
     }
 
     /**
@@ -560,6 +561,7 @@ class BalanceManager {
 
         this.syncInProgress = true;
         this.showSyncStatus('🔄 Синхронизация баланса...');
+        this.setSyncIndicatorActive(true);
 
         try {
             console.log(`🔄 Начинаем принудительную синхронизацию для ${this.userId}`);
@@ -754,82 +756,68 @@ class BalanceManager {
     /**
      * 📱 Создание кнопки принудительной синхронизации
      */
-    createSyncButton() {
-        // Проверяем, есть ли уже кнопка
-        if (document.getElementById('force-sync-button')) {
-            return;
+    createSyncIndicator() {
+        // Уже создан
+        if (document.getElementById('sync-indicator')) return;
+
+        // Вставляем стили один раз
+        if (!document.getElementById('sync-indicator-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'sync-indicator-styles';
+            styles.textContent = `
+                @keyframes breathe {
+                    0% { transform: scale(1); opacity: 0.6; }
+                    50% { transform: scale(1.35); opacity: 1; }
+                    100% { transform: scale(1); opacity: 0.6; }
+                }
+                .sync-indicator {
+                    position: fixed;
+                    top: 12px;
+                    right: 12px;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: var(--accent-gold, #d4af37);
+                    box-shadow: 0 0 6px rgba(212, 175, 55, 0.4);
+                    z-index: 9999;
+                    opacity: 0.25; /* почти незаметен в обычном режиме */
+                    transition: opacity 0.3s ease, transform 0.3s ease;
+                }
+                .sync-indicator.active {
+                    opacity: 0.9;
+                    animation: breathe 1.6s ease-in-out infinite;
+                }
+            `;
+            document.head.appendChild(styles);
         }
 
-        const button = document.createElement('button');
-        button.id = 'force-sync-button';
-        button.innerHTML = '🔄 Синхронизировать баланс';
-        button.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #2196F3;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            z-index: 10000;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        `;
+        const dot = document.createElement('div');
+        dot.id = 'sync-indicator';
+        dot.className = 'sync-indicator';
+        dot.title = 'Синхронизация баланса';
+        document.body.appendChild(dot);
 
-        button.onclick = () => {
-            this.forceSyncWithServer();
-        };
+        console.log('🫧 Индикатор синхронизации создан');
+    }
 
-        document.body.appendChild(button);
-        console.log('📱 Кнопка принудительной синхронизации создана');
+    setSyncIndicatorActive(active) {
+        const dot = document.getElementById('sync-indicator');
+        if (!dot) return;
+        dot.classList.toggle('active', !!active);
     }
 
     /**
      * 📢 Показ статуса синхронизации
      */
     showSyncStatus(message, type = 'info') {
-        // Удаляем предыдущие уведомления
-        const existingNotifications = document.querySelectorAll('.sync-notification');
-        existingNotifications.forEach(n => n.remove());
-
-        const notification = document.createElement('div');
-        notification.className = 'sync-notification';
-        
-        const colors = {
-            info: '#2196F3',
-            success: '#4CAF50',
-            error: '#f44336'
-        };
-
-        notification.style.cssText = `
-            position: fixed;
-            top: 50px;
-            right: 10px;
-            background: ${colors[type] || colors.info};
-            color: white;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            z-index: 10001;
-            max-width: 300px;
-            word-wrap: break-word;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            animation: slideInFromRight 0.3s ease-out;
-        `;
-        
-        notification.textContent = message;
-        document.body.appendChild(notification);
-
-        // Автоматически скрываем через 3-5 секунд
-        const hideDelay = type === 'error' ? 5000 : 3000;
-        setTimeout(() => {
-            if (notification.parentElement) {
-                notification.style.animation = 'slideOutToRight 0.3s ease-in';
-                setTimeout(() => notification.remove(), 300);
-            }
-        }, hideDelay);
+        // Тихий режим: без визуальных тостов. Оставляем только ненавязчивый лог.
+        try {
+            const level = (type === 'error') ? 'error' : (type === 'success' ? 'log' : 'debug');
+            // eslint-disable-next-line no-console
+            console[level](`(sync) ${message}`);
+        } catch (_) {
+            // игнорируем
+        }
     }
 
     /**
